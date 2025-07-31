@@ -22,8 +22,8 @@ try {
     $remoteUrl = git config --get remote.origin.url
     if ($remoteUrl -match "github\.com[:/](.+?)/(.+?)(\.git)?$") {
         $owner = $Matches[1]
-        $repo = $Matches[2]
-        Write-Host "Repository: $owner/$repo" -ForegroundColor Cyan
+        $repoName = $Matches[2]
+        Write-Host "Repository: $owner/$repoName" -ForegroundColor Cyan
     } else {
         Write-Error "Could not parse GitHub repository information from remote URL"
         exit 1
@@ -31,7 +31,7 @@ try {
 
     # List running workflows
     Write-Host "`nFetching running workflows..." -ForegroundColor Yellow
-    $runningWorkflows = gh run list --repo "$owner/$repo" --status in_progress --json databaseId,displayTitle,workflowName,createdAt,url
+    $runningWorkflows = gh run list --repo "$owner/$repoName" --status in_progress --json databaseId,displayTitle,workflowName,createdAt,url
 
     if ($runningWorkflows) {
         $workflows = $runningWorkflows | ConvertFrom-Json
@@ -52,14 +52,14 @@ try {
             
             Write-Host "`n----------------------------------------" -ForegroundColor DarkGray
             Write-Host "`nTo cancel a workflow, use:" -ForegroundColor Yellow
-            Write-Host "gh run cancel <ID> --repo $owner/$repo" -ForegroundColor Cyan
+            Write-Host "gh run cancel <ID> --repo $owner/$repoName" -ForegroundColor Cyan
             
             # Optional: Ask if user wants to cancel all running workflows
             $response = Read-Host "`nDo you want to cancel all running workflows? (y/N)"
             if ($response -eq 'y' -or $response -eq 'Y') {
                 foreach ($workflow in $workflows) {
                     Write-Host "Cancelling workflow $($workflow.databaseId)..." -ForegroundColor Yellow
-                    gh run cancel $workflow.databaseId --repo "$owner/$repo"
+                    gh run cancel $workflow.databaseId --repo "$owner/$repoName"
                 }
                 Write-Host "All workflows cancelled." -ForegroundColor Green
             }
