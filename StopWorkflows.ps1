@@ -2,8 +2,17 @@
 # Lists all running GitHub Actions workflows for the Ivy-Services repository
 
 param(
-    [string]$RepoPath = "D:\Repos\_Ivy\Ivy-Services"
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("Services", "Infra")]
+    [string]$Repo = "Services"
 )
+
+# Set repository path based on selection
+if ($Repo -eq "Services") {
+    $RepoPath = "D:\Repos\_Ivy\Ivy-Services"
+} else {
+    $RepoPath = "D:\Repos\_Ivy\Ivy-Infrastructure"
+}
 
 # Change to the repository directory
 Push-Location $RepoPath

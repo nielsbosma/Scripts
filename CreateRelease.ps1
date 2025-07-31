@@ -1,10 +1,21 @@
 # ReleaseServices.ps1
 # Script to manage Ivy-Services releases
 
+param(
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("Services", "Infra")]
+    [string]$Repo = "Services"
+)
+
 # Import shared functions
 . "$PSScriptRoot\_Shared.ps1"
 
-$repoPath = "D:\Repos\_Ivy\Ivy-Services"
+# Set repository path based on selection
+if ($Repo -eq "Services") {
+    $repoPath = "D:\Repos\_Ivy\Ivy-Services"
+} else {
+    $repoPath = "D:\Repos\_Ivy\Ivy-Infrastructure"
+}
 
 # Get the latest tag
 $tag = Get-LatestTag -RepoPath $repoPath
