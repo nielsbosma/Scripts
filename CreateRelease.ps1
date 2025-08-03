@@ -1,20 +1,43 @@
-# ReleaseServices.ps1
-# Script to manage Ivy-Services releases
-
-param(
-    [Parameter(Mandatory=$false)]
-    [ValidateSet("Services", "Infra")]
-    [string]$Repo = "Services"
-)
+# CreateRelease.ps1
+# Script to create releases for the current git repository
 
 # Import shared functions
 . "$PSScriptRoot\_Shared.ps1"
 
-# Set repository path based on selection
-if ($Repo -eq "Services") {
-    $repoPath = "D:\Repos\_Ivy\Ivy-Services"
-} else {
-    $repoPath = "D:\Repos\_Ivy\Ivy-Infrastructure"
+# Function to find git repository in current or parent directories
+function Find-GitRepository {
+    $currentPath = Get-Location
+    $originalPath = $currentPath
+    
+    while ($currentPath) {
+        if (Test-Path (Join-Path $currentPath ".git")) {
+            return $currentPath
+        }
+        
+        $parent = Split-Path $currentPath -Parent
+        if ($parent -eq $currentPath) {
+            # We've reached the root
+            break
+        }
+        $currentPath = $parent
+    }
+    
+    return $null
+}
+
+# Check for git repository in current or parent directories
+$repoPath = Find-GitRepository
+if (-not $repoPath) {
+    Write-Error "Not in a git repository. No .git folder found in current or parent directories."
+    exit 1
+}
+
+# Change to git repository root if needed
+$currentLocation = Get-Location
+if ($repoPath.Path -ne $currentLocation.Path) {
+    Write-Host "Found git repository at: $repoPath" -ForegroundColor Yellow
+    Write-Host "Changing to repository root..." -ForegroundColor Yellow
+    Set-Location $repoPath
 }
 
 # Get the latest tag
