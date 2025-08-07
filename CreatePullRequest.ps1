@@ -206,7 +206,15 @@ if (-not $prBody) {
 }
 
 # Create the pull request
-$prUrl = gh pr create --title "$prTitle" --body "$prBody" --base $currentBranch 2>&1
+# Write PR body to temporary file to handle special characters and formatting
+$tempFile = [System.IO.Path]::GetTempFileName()
+Set-Content -Path $tempFile -Value $prBody -Encoding UTF8
+
+# Use the file for PR body content
+$prUrl = gh pr create --title "$prTitle" --body-file "$tempFile" --base $currentBranch 2>&1
+
+# Clean up temporary file
+Remove-Item -Path $tempFile -Force -ErrorAction SilentlyContinue
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`nPull request created successfully!" -ForegroundColor Green
