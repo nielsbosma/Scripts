@@ -1,21 +1,44 @@
-# StopServicesWorkflows.ps1
-# Lists all running GitHub Actions workflows for the Ivy-Services repository
+# StopWorkflows.ps1
+# Lists all running GitHub Actions workflows for a GitHub repository
 
-param(
-    [Parameter(Mandatory=$false)]
-    [ValidateSet("Services", "Infra")]
-    [string]$Repo = "Services"
-)
-
-# Set repository path based on selection
-if ($Repo -eq "Services") {
-    $RepoPath = "D:\Repos\_Ivy\Ivy-Services"
-} else {
-    $RepoPath = "D:\Repos\_Ivy\Ivy-Infrastructure"
+# Function to find git repository in current or parent directories
+function Find-GitRepository {
+    $currentPath = Get-Location
+    $originalPath = $currentPath
+    
+    while ($currentPath) {
+        if (Test-Path (Join-Path $currentPath ".git")) {
+            return $currentPath
+        }
+        
+        $parent = Split-Path $currentPath -Parent
+        if ($parent -eq $currentPath) {
+            # We've reached the root
+            break
+        }
+        $currentPath = $parent
+    }
+    
+    return $null
 }
 
-# Change to the repository directory
-Push-Location $RepoPath
+# Check for git repository in current or parent directories
+$gitRoot = Find-GitRepository
+if (-not $gitRoot) {
+    Write-Error "Not in a git repository. No .git folder found in current or parent directories."
+    exit 1
+}
+
+# Change to git repository root if needed
+$currentLocation = Get-Location
+if ($gitRoot.Path -ne $currentLocation.Path) {
+    Write-Host "Found git repository at: $gitRoot" -ForegroundColor Yellow
+    Write-Host "Changing to repository root..." -ForegroundColor Yellow
+    Push-Location $gitRoot
+} else {
+    # Still push location to maintain consistency with Pop-Location in finally block
+    Push-Location $currentLocation
+}
 
 try {
     # Get repository information
