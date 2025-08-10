@@ -36,3 +36,4 @@ while (-not $done) {
 
 $chosenFolder = $folders[$selectedIndex]
 Set-Location -Path (Join-Path $basePath $chosenFolder)
+Clear-Host

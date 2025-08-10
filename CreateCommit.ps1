@@ -1,3 +1,7 @@
+param(
+    [switch]$Push
+)
+
 # Import shared functions
 . "$PSScriptRoot\_Shared.ps1"
 
@@ -109,6 +113,19 @@ if ($LASTEXITCODE -eq 0) {
     # Show the commit
     Write-Host "`nCommit details:" -ForegroundColor Yellow
     git log -1 --oneline
+    
+    # Push if -Push flag is set
+    if ($Push) {
+        Write-Host "`nPushing to remote..." -ForegroundColor Yellow
+        git push
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Push successful!" -ForegroundColor Green
+        } else {
+            Write-Error "Failed to push to remote"
+            exit 1
+        }
+    }
 } else {
     Write-Error "Failed to create commit"
     exit 1
