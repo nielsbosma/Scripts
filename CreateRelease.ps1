@@ -1,5 +1,30 @@
 # CreateRelease.ps1
 # Script to create releases for the current git repository
+#
+# .SYNOPSIS
+# Creates a new release for the current git repository
+#
+# .DESCRIPTION
+# This script automatically creates a new release for the current git repository.
+# It can either auto-increment the version from the latest tag or use a specified version.
+#
+# .PARAMETER Version
+# Optional. Specifies the version to use for the release. If not provided, the script
+# will automatically increment the version number from the latest tag.
+#
+# .EXAMPLE
+# ./CreateRelease.ps1
+# Creates a new release with an auto-incremented version number.
+#
+# .EXAMPLE
+# ./CreateRelease.ps1 -Version "1.2.3"
+# Creates a new release with the specified version 1.2.3.
+
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory = $false)]
+    [string]$Version
+)
 
 # Import shared functions
 . "$PSScriptRoot\_Shared.ps1"
@@ -45,24 +70,32 @@ $tag = Get-LatestTag -RepoPath $repoPath
 
 # Main execution
 if ($tag) {
-    $newVersion = Get-IncrementedVersion -Tag $tag
-    if ($newVersion) {
+    # Use specified version if provided, otherwise calculate next version
+    if ($Version) {
+        $newVersion = $Version
+        Write-Host "Current version: $tag" -ForegroundColor Cyan
+        Write-Host "Specified version: $newVersion" -ForegroundColor Green
+    } else {
+        $newVersion = Get-IncrementedVersion -Tag $tag
+        if (-not $newVersion) {
+            exit 1
+        }
         Write-Host "Current version: $tag" -ForegroundColor Cyan
         Write-Host "Next version: $newVersion" -ForegroundColor Green
+    }
+    
+    # Ask for confirmation
+    Write-Host "`nDo you want to create a new release with version $newVersion? (Y/N)" -ForegroundColor Yellow
+    $confirmation = Read-Host
+    
+    if ($confirmation -eq 'Y' -or $confirmation -eq 'y') {
+        # Create the release
+        $success = New-Release -Version $newVersion -RepoPath $repoPath
         
-        # Ask for confirmation
-        Write-Host "`nDo you want to create a new release with version $newVersion? (Y/N)" -ForegroundColor Yellow
-        $confirmation = Read-Host
-        
-        if ($confirmation -eq 'Y' -or $confirmation -eq 'y') {
-            # Create the release
-            $success = New-Release -Version $newVersion -RepoPath $repoPath
-            
-            if (-not $success) {
-                Write-Host "Release creation failed" -ForegroundColor Red
-            }
-        } else {
-            Write-Host "Release creation cancelled" -ForegroundColor Yellow
+        if (-not $success) {
+            Write-Host "Release creation failed" -ForegroundColor Red
         }
+    } else {
+        Write-Host "Release creation cancelled" -ForegroundColor Yellow
     }
 }
