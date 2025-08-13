@@ -118,6 +118,20 @@ function New-Release {
         
         if ($LASTEXITCODE -eq 0) {
             Write-Host "`nRelease created successfully!" -ForegroundColor Green
+            
+            # Get repository URL and open Actions page
+            try {
+                $repoUrl = gh repo view --json url -q .url
+                if ($repoUrl) {
+                    $actionsUrl = "$repoUrl/actions"
+                    Write-Host "Opening GitHub Actions page: $actionsUrl" -ForegroundColor Cyan
+                    Start-Process $actionsUrl
+                }
+            }
+            catch {
+                Write-Warning "Could not open GitHub Actions page: $_"
+            }
+            
             return $true
         } else {
             Write-Error "Failed to create release"
