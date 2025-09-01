@@ -366,6 +366,142 @@ if ($spectreAvailable) {
     }
     
     Write-Host ""
+    
+    # Handle failed items - ask to rerun
+    if ($failCount -gt 0) {
+        Write-Host ""
+        $rerunConfirm = Read-SpectreConfirm -Prompt "[yellow]Would you like to rerun the failed files?[/]" -DefaultAnswer "n"
+        if ($rerunConfirm) {
+            # Collect failed files
+            $failedFiles = @()
+            foreach ($file in $results.Keys) {
+                if (-not $results[$file].Success) {
+                    $failedFiles += $file
+                }
+            }
+            
+            # Rerun the script with failed files
+            Write-SpectreRule "[yellow]Rerunning Failed Files[/]"
+            Write-SpectreHost "Reprocessing [red]$($failedFiles.Count)[/] failed file(s)..."
+            Write-Host ""
+            
+            # Re-execute for failed files
+            $rerunJobs = @()
+            $rerunResults = @{}
+            $rerunCompletedJobs = 0
+            $rerunTotalJobs = $failedFiles.Count
+            
+            # Reopen runspace pool for rerun
+            $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, $maxParallel)
+            $runspacePool.Open()
+            
+            $jobIndex = 0
+            foreach ($file in $failedFiles) {
+                $filePrompt = $promptTemplate -replace '{{File}}', $file
+                
+                $powershell = [PowerShell]::Create()
+                $powershell.RunspacePool = $runspacePool
+                [void]$powershell.AddScript($scriptBlock)
+                [void]$powershell.AddArgument($file)
+                [void]$powershell.AddArgument($filePrompt)
+                
+                $handle = $powershell.BeginInvoke()
+                
+                $rerunJobs += [PSCustomObject]@{
+                    PowerShell = $powershell
+                    Handle = $handle
+                    File = $file
+                    JobIndex = $jobIndex
+                }
+                
+                $jobIndex++
+                
+                while ($rerunJobs.Count -ge $maxParallel) {
+                    Start-Sleep -Milliseconds 100
+                    
+                    $completedJobsInBatch = @($rerunJobs | Where-Object { $_.Handle.IsCompleted })
+                    
+                    foreach ($job in $completedJobsInBatch) {
+                        $result = $job.PowerShell.EndInvoke($job.Handle)
+                        $rerunResults[$job.File] = $result
+                        $job.PowerShell.Dispose()
+                        
+                        $rerunCompletedJobs++
+                        
+                        Show-ProgressBar -Current $rerunCompletedJobs -Total $rerunTotalJobs -Activity "Reprocessing failed files"
+                        
+                        if ($result.Success) {
+                            Write-ColoredMessage "[[RETRY OK]] Completed: $($job.File)" -Color Green
+                        } else {
+                            Write-ColoredMessage "[[RETRY FAILED]] Still failing: $($job.File)" -Color Red
+                        }
+                        
+                        $rerunJobs = @($rerunJobs | Where-Object { $_ -ne $job })
+                    }
+                }
+            }
+            
+            # Wait for remaining rerun jobs
+            while ($rerunJobs.Count -gt 0) {
+                Start-Sleep -Milliseconds 100
+                
+                $completedJobsInBatch = @($rerunJobs | Where-Object { $_.Handle.IsCompleted })
+                
+                foreach ($job in $completedJobsInBatch) {
+                    $result = $job.PowerShell.EndInvoke($job.Handle)
+                    $rerunResults[$job.File] = $result
+                    $job.PowerShell.Dispose()
+                    
+                    $rerunCompletedJobs++
+                    
+                    Show-ProgressBar -Current $rerunCompletedJobs -Total $rerunTotalJobs -Activity "Reprocessing failed files"
+                    
+                    if ($result.Success) {
+                        Write-ColoredMessage "[[RETRY OK]] Completed: $($job.File)" -Color Green
+                    } else {
+                        Write-ColoredMessage "[[RETRY FAILED]] Still failing: $($job.File)" -Color Red
+                    }
+                    
+                    $rerunJobs = @($rerunJobs | Where-Object { $_ -ne $job })
+                }
+            }
+            
+            $runspacePool.Close()
+            $runspacePool.Dispose()
+            
+            Write-Progress -Activity "Reprocessing failed files" -Completed
+            
+            # Final summary after rerun
+            $rerunSuccessCount = @($rerunResults.Values | Where-Object { $_.Success }).Count
+            $stillFailedCount = $rerunTotalJobs - $rerunSuccessCount
+            
+            Write-SpectreRule "[cyan]Rerun Summary[/]"
+            
+            $rerunTableData = @(
+                @{ Metric = "Retried Files"; Count = $rerunTotalJobs }
+                @{ Metric = "Now Successful"; Count = $rerunSuccessCount }
+                @{ Metric = "Still Failed"; Count = $stillFailedCount }
+            )
+            
+            $rerunTableData | Format-SpectreTable
+            
+            if ($stillFailedCount -gt 0) {
+                Write-SpectreRule "[red]Still Failing Files[/]"
+                foreach ($file in $rerunResults.Keys) {
+                    if (-not $rerunResults[$file].Success) {
+                        $fileName = Split-Path $file -Leaf
+                        $dir = Split-Path $file -Parent
+                        Write-SpectreHost "  [red]x[/] $fileName [grey]($dir)[/]"
+                        if ($rerunResults[$file].Error) {
+                            $errorMsg = '    [darkred]Error: ' + $rerunResults[$file].Error + '[/]'
+                            Write-SpectreHost $errorMsg
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     Write-SpectreHost '[green]Operation completed[/]'
 } else {
     Write-Host ""
@@ -382,6 +518,136 @@ if ($spectreAvailable) {
                 if ($results[$file].Error) {
                     $errorMsg = '    Error: ' + $results[$file].Error
                     Write-Host $errorMsg -ForegroundColor DarkRed
+                }
+            }
+        }
+        
+        # Handle failed items - ask to rerun (non-Spectre version)
+        Write-Host ""
+        Write-ColoredMessage "Would you like to rerun the failed files? (Y/N)" -Color Yellow
+        $rerunConfirmation = Read-Host "Rerun"
+        
+        if ($rerunConfirmation -eq 'Y' -or $rerunConfirmation -eq 'y') {
+            # Collect failed files
+            $failedFiles = @()
+            foreach ($file in $results.Keys) {
+                if (-not $results[$file].Success) {
+                    $failedFiles += $file
+                }
+            }
+            
+            # Rerun the script with failed files
+            Write-Host ""
+            Write-ColoredMessage "========== Rerunning Failed Files ==========" -Color Yellow
+            Write-ColoredMessage "Reprocessing $($failedFiles.Count) failed file(s)..." -Color Yellow
+            Write-Host ""
+            
+            # Re-execute for failed files
+            $rerunJobs = @()
+            $rerunResults = @{}
+            $rerunCompletedJobs = 0
+            $rerunTotalJobs = $failedFiles.Count
+            
+            # Reopen runspace pool for rerun
+            $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, $maxParallel)
+            $runspacePool.Open()
+            
+            $jobIndex = 0
+            foreach ($file in $failedFiles) {
+                $filePrompt = $promptTemplate -replace '{{File}}', $file
+                
+                $powershell = [PowerShell]::Create()
+                $powershell.RunspacePool = $runspacePool
+                [void]$powershell.AddScript($scriptBlock)
+                [void]$powershell.AddArgument($file)
+                [void]$powershell.AddArgument($filePrompt)
+                
+                $handle = $powershell.BeginInvoke()
+                
+                $rerunJobs += [PSCustomObject]@{
+                    PowerShell = $powershell
+                    Handle = $handle
+                    File = $file
+                    JobIndex = $jobIndex
+                }
+                
+                $jobIndex++
+                
+                while ($rerunJobs.Count -ge $maxParallel) {
+                    Start-Sleep -Milliseconds 100
+                    
+                    $completedJobsInBatch = @($rerunJobs | Where-Object { $_.Handle.IsCompleted })
+                    
+                    foreach ($job in $completedJobsInBatch) {
+                        $result = $job.PowerShell.EndInvoke($job.Handle)
+                        $rerunResults[$job.File] = $result
+                        $job.PowerShell.Dispose()
+                        
+                        $rerunCompletedJobs++
+                        
+                        Show-ProgressBar -Current $rerunCompletedJobs -Total $rerunTotalJobs -Activity "Reprocessing failed files"
+                        
+                        if ($result.Success) {
+                            Write-ColoredMessage "[[RETRY OK]] Completed: $($job.File)" -Color Green
+                        } else {
+                            Write-ColoredMessage "[[RETRY FAILED]] Still failing: $($job.File)" -Color Red
+                        }
+                        
+                        $rerunJobs = @($rerunJobs | Where-Object { $_ -ne $job })
+                    }
+                }
+            }
+            
+            # Wait for remaining rerun jobs
+            while ($rerunJobs.Count -gt 0) {
+                Start-Sleep -Milliseconds 100
+                
+                $completedJobsInBatch = @($rerunJobs | Where-Object { $_.Handle.IsCompleted })
+                
+                foreach ($job in $completedJobsInBatch) {
+                    $result = $job.PowerShell.EndInvoke($job.Handle)
+                    $rerunResults[$job.File] = $result
+                    $job.PowerShell.Dispose()
+                    
+                    $rerunCompletedJobs++
+                    
+                    Show-ProgressBar -Current $rerunCompletedJobs -Total $rerunTotalJobs -Activity "Reprocessing failed files"
+                    
+                    if ($result.Success) {
+                        Write-ColoredMessage "[[RETRY OK]] Completed: $($job.File)" -Color Green
+                    } else {
+                        Write-ColoredMessage "[[RETRY FAILED]] Still failing: $($job.File)" -Color Red
+                    }
+                    
+                    $rerunJobs = @($rerunJobs | Where-Object { $_ -ne $job })
+                }
+            }
+            
+            $runspacePool.Close()
+            $runspacePool.Dispose()
+            
+            Write-Progress -Activity "Reprocessing failed files" -Completed
+            
+            # Final summary after rerun
+            $rerunSuccessCount = @($rerunResults.Values | Where-Object { $_.Success }).Count
+            $stillFailedCount = $rerunTotalJobs - $rerunSuccessCount
+            
+            Write-Host ""
+            Write-ColoredMessage "========== Rerun Summary ==========" -Color Cyan
+            $rerunSummaryMsg = 'Retried: {0} | Now Successful: {1} | Still Failed: {2}' -f $rerunTotalJobs, $rerunSuccessCount, $stillFailedCount
+            Write-ColoredMessage $rerunSummaryMsg -Color White
+            
+            if ($stillFailedCount -gt 0) {
+                Write-Host ""
+                Write-ColoredMessage 'Still failing files:' -Color Red
+                foreach ($file in $rerunResults.Keys) {
+                    if (-not $rerunResults[$file].Success) {
+                        Write-Host ('  - ' + $file)
+                        if ($rerunResults[$file].Error) {
+                            $errorMsg = '    Error: ' + $rerunResults[$file].Error
+                            Write-Host $errorMsg -ForegroundColor DarkRed
+                        }
+                    }
                 }
             }
         }
