@@ -6,17 +6,42 @@
     [string]$Prompt,
     
     [Parameter(Mandatory=$true, ParameterSetName="PromptFile")]
-    [string]$PromptFile
+    [string]$PromptFile,
+    
+    [Parameter()]
+    [switch]$Select
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Try to import Spectre.Console module
+$spectreAvailable = $false
+try {
+    Import-Module PwshSpectreConsole -ErrorAction Stop
+    $spectreAvailable = $true
+} catch {
+    # Spectre.Console not available, will fall back to standard output
+}
 
 function Write-ColoredMessage {
     param(
         [string]$Message,
         [ConsoleColor]$Color = 'White'
     )
-    Write-Host $Message -ForegroundColor $Color
+    if ($spectreAvailable) {
+        $spectreColor = switch ($Color) {
+            'Red' { 'red' }
+            'Green' { 'green' }
+            'Yellow' { 'yellow' }
+            'Cyan' { 'cyan' }
+            'DarkGray' { 'grey' }
+            'DarkRed' { 'darkred' }
+            default { 'white' }
+        }
+        Write-SpectreHost "[$spectreColor]$Message[/]"
+    } else {
+        Write-Host $Message -ForegroundColor $Color
+    }
 }
 
 function Show-ProgressBar {
@@ -30,7 +55,80 @@ function Show-ProgressBar {
     Write-Progress -Activity $Activity -Status "$Current of $Total completed" -PercentComplete $percentComplete
 }
 
-Write-ColoredMessage "Searching for files matching: $FileGlob" -Color Cyan
+function Select-Files {
+    param(
+        [string[]]$Files
+    )
+    
+    if ($spectreAvailable) {
+        # Create selection choices with file names
+        $choices = @()
+        for ($i = 0; $i -lt $Files.Count; $i++) {
+            $fileName = Split-Path $Files[$i] -Leaf
+            $dir = Split-Path $Files[$i] -Parent
+            $choices += @{
+                Display = "$fileName [grey]($dir)[/]"
+                Value = $Files[$i]
+            }
+        }
+        
+        # Use Spectre.Console multi-selection
+        $selected = Read-SpectreMultiSelection -Title "[cyan]Select files to process:[/]" -Choices $choices -PageSize 15 -ChoiceLabelProperty Display
+        
+        if ($selected.Count -eq 0) {
+            return @()
+        }
+        
+        return $selected | ForEach-Object { $_.Value }
+    } else {
+        # Fallback to original selection method
+        Write-Host ""
+        for ($i = 0; $i -lt $Files.Count; $i++) {
+            Write-Host "  [$($i + 1)] $($Files[$i])"
+        }
+        
+        Write-Host ""
+        Write-ColoredMessage "Enter file numbers to process (comma-separated, e.g., 1,3,5) or 'all' for all files:" -Color Cyan
+        $selection = Read-Host "Selection"
+        
+        if ($selection -eq 'all' -or $selection -eq 'ALL') {
+            return $Files
+        } else {
+            $selectedIndices = @()
+            foreach ($num in ($selection -split ',')) {
+                $num = $num.Trim()
+                if ($num -match '^\d+$') {
+                    $index = [int]$num - 1
+                    if ($index -ge 0 -and $index -lt $Files.Count) {
+                        $selectedIndices += $index
+                    } else {
+                        Write-ColoredMessage "Warning: Ignoring invalid selection: $num (out of range)" -Color Yellow
+                    }
+                } else {
+                    Write-ColoredMessage "Warning: Ignoring invalid selection: $num (not a number)" -Color Yellow
+                }
+            }
+            
+            if ($selectedIndices.Count -eq 0) {
+                return @()
+            }
+            
+            $selectedFiles = @()
+            foreach ($idx in $selectedIndices) {
+                $selectedFiles += $Files[$idx]
+            }
+            return $selectedFiles
+        }
+    }
+}
+
+# Search for files
+if ($spectreAvailable) {
+    Write-SpectreRule "[cyan]Searching for files[/]"
+    Write-SpectreHost "Pattern: [yellow]$FileGlob[/]"
+} else {
+    Write-ColoredMessage "Searching for files matching: $FileGlob" -Color Cyan
+}
 
 $matchedFiles = @(Get-ChildItem -Path $FileGlob -File -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
 
@@ -39,24 +137,69 @@ if ($matchedFiles.Count -eq 0) {
     exit 1
 }
 
-Write-ColoredMessage "`nFound $($matchedFiles.Count) file(s):" -Color Green
+Write-ColoredMessage "`nFound $($matchedFiles.Count) file(s)" -Color Green
 
-$displayCount = [Math]::Min(5, $matchedFiles.Count)
-for ($i = 0; $i -lt $displayCount; $i++) {
-    Write-Host "  $($i + 1). $($matchedFiles[$i])"
+# File selection
+if ($Select) {
+    $matchedFiles = Select-Files -Files $matchedFiles
+    
+    if ($matchedFiles.Count -eq 0) {
+        Write-ColoredMessage "No files selected. Operation cancelled." -Color Red
+        exit 0
+    }
+    
+    if ($spectreAvailable) {
+        Write-SpectreRule "[green]Selected $($matchedFiles.Count) file(s) for processing[/]"
+        $matchedFiles | ForEach-Object {
+            $fileName = Split-Path $_ -Leaf
+            $dir = Split-Path $_ -Parent
+            Write-SpectreHost "  [white]•[/] $fileName [grey]($dir)[/]"
+        }
+    } else {
+        Write-ColoredMessage "`nSelected $($matchedFiles.Count) file(s) for processing:" -Color Green
+        foreach ($file in $matchedFiles) {
+            Write-Host "  - $file"
+        }
+    }
+} else {
+    # Original behavior - show first 5 files
+    if ($spectreAvailable) {
+        Write-SpectreRule "[green]Files to process[/]"
+        $displayCount = [Math]::Min(5, $matchedFiles.Count)
+        for ($i = 0; $i -lt $displayCount; $i++) {
+            Write-SpectreHost "  $($i + 1). $($matchedFiles[$i])"
+        }
+        if ($matchedFiles.Count -gt 5) {
+            Write-SpectreHost "  [grey]+ $($matchedFiles.Count - 5) more...[/]"
+        }
+    } else {
+        $displayCount = [Math]::Min(5, $matchedFiles.Count)
+        for ($i = 0; $i -lt $displayCount; $i++) {
+            Write-Host "  $($i + 1). $($matchedFiles[$i])"
+        }
+        if ($matchedFiles.Count -gt 5) {
+            Write-ColoredMessage "  + $($matchedFiles.Count - 5) more..." -Color DarkGray
+        }
+    }
 }
 
-if ($matchedFiles.Count -gt 5) {
-    Write-ColoredMessage "  + $($matchedFiles.Count - 5) more..." -Color DarkGray
-}
-
+# Confirmation
 Write-Host ""
-$confirmation = Read-Host "Do you want to proceed? (Y/N)"
-if ($confirmation -ne 'Y' -and $confirmation -ne 'y') {
-    Write-ColoredMessage "Operation cancelled." -Color Yellow
-    exit 0
+if ($spectreAvailable) {
+    $confirm = Read-SpectreConfirm -Prompt "[yellow]Do you want to proceed?[/]" -DefaultAnswer "n"
+    if (-not $confirm) {
+        Write-ColoredMessage "Operation cancelled." -Color Yellow
+        exit 0
+    }
+} else {
+    $confirmation = Read-Host "Do you want to proceed? (Y/N)"
+    if ($confirmation -ne 'Y' -and $confirmation -ne 'y') {
+        Write-ColoredMessage "Operation cancelled." -Color Yellow
+        exit 0
+    }
 }
 
+# Load prompt template
 if ($PSCmdlet.ParameterSetName -eq "PromptFile") {
     if (-not (Test-Path $PromptFile)) {
         Write-ColoredMessage "Prompt file not found: $PromptFile" -Color Red
@@ -67,6 +210,7 @@ if ($PSCmdlet.ParameterSetName -eq "PromptFile") {
     $promptTemplate = $Prompt
 }
 
+# Setup parallel processing
 $maxParallel = 5
 $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, $maxParallel)
 $runspacePool.Open()
@@ -104,8 +248,16 @@ $scriptBlock = {
     }
 }
 
-Write-ColoredMessage "`nProcessing $totalJobs file(s) with max $maxParallel parallel jobs..." -Color Cyan
+# Processing with progress
+if ($spectreAvailable) {
+    Write-SpectreRule "[cyan]Processing Files[/]"
+    Write-SpectreHost "Processing [yellow]$totalJobs[/] file(s) with max [yellow]$maxParallel[/] parallel jobs..."
+    Write-Host ""
+} else {
+    Write-ColoredMessage "`nProcessing $totalJobs file(s) with max $maxParallel parallel jobs..." -Color Cyan
+}
 
+$jobIndex = 0
 foreach ($file in $matchedFiles) {
     $filePrompt = $promptTemplate -replace '{{File}}', $file
     
@@ -121,7 +273,10 @@ foreach ($file in $matchedFiles) {
         PowerShell = $powershell
         Handle = $handle
         File = $file
+        JobIndex = $jobIndex
     }
+    
+    $jobIndex++
     
     while ($jobs.Count -ge $maxParallel) {
         Start-Sleep -Milliseconds 100
@@ -132,20 +287,23 @@ foreach ($file in $matchedFiles) {
             $result = $job.PowerShell.EndInvoke($job.Handle)
             $results[$job.File] = $result
             $job.PowerShell.Dispose()
-            $jobs = @($jobs | Where-Object { $_ -ne $job })
             
             $completedJobs++
+            
             Show-ProgressBar -Current $completedJobs -Total $totalJobs -Activity "Processing files"
             
             if ($result.Success) {
-                Write-ColoredMessage "✓ Completed: $($job.File)" -Color Green
+                Write-ColoredMessage "[[OK]] Completed: $($job.File)" -Color Green
             } else {
-                Write-ColoredMessage "✗ Failed: $($job.File)" -Color Red
+                Write-ColoredMessage "[[FAILED]] Failed: $($job.File)" -Color Red
             }
+            
+            $jobs = @($jobs | Where-Object { $_ -ne $job })
         }
     }
 }
 
+# Wait for remaining jobs
 while ($jobs.Count -gt 0) {
     Start-Sleep -Milliseconds 100
     
@@ -155,16 +313,18 @@ while ($jobs.Count -gt 0) {
         $result = $job.PowerShell.EndInvoke($job.Handle)
         $results[$job.File] = $result
         $job.PowerShell.Dispose()
-        $jobs = @($jobs | Where-Object { $_ -ne $job })
         
         $completedJobs++
+        
         Show-ProgressBar -Current $completedJobs -Total $totalJobs -Activity "Processing files"
         
         if ($result.Success) {
-            Write-ColoredMessage "✓ Completed: $($job.File)" -Color Green
+            Write-ColoredMessage "[[OK]] Completed: $($job.File)" -Color Green
         } else {
-            Write-ColoredMessage "✗ Failed: $($job.File)" -Color Red
+            Write-ColoredMessage "[[FAILED]] Failed: $($job.File)" -Color Red
         }
+        
+        $jobs = @($jobs | Where-Object { $_ -ne $job })
     }
 }
 
@@ -173,22 +333,59 @@ $runspacePool.Dispose()
 
 Write-Progress -Activity "Processing files" -Completed
 
-Write-ColoredMessage "`n========== Summary ==========" -Color Cyan
+# Summary
 $successCount = @($results.Values | Where-Object { $_.Success }).Count
 $failCount = $totalJobs - $successCount
 
-Write-ColoredMessage "Total: $totalJobs | Success: $successCount | Failed: $failCount" -Color White
-
-if ($failCount -gt 0) {
-    Write-ColoredMessage "`nFailed files:" -Color Red
-    foreach ($file in $results.Keys) {
-        if (-not $results[$file].Success) {
-            Write-Host "  - $file"
-            if ($results[$file].Error) {
-                Write-Host "    Error: $($results[$file].Error)" -ForegroundColor DarkRed
+if ($spectreAvailable) {
+    Write-SpectreRule "[cyan]Summary[/]"
+    
+    # Create table data
+    $tableData = @(
+        @{ Metric = "Total Files"; Count = $totalJobs }
+        @{ Metric = "Successful"; Count = $successCount }
+        @{ Metric = "Failed"; Count = $failCount }
+    )
+    
+    # Format and display the table
+    $tableData | Format-SpectreTable
+    
+    if ($failCount -gt 0) {
+        Write-SpectreRule "[red]Failed Files[/]"
+        foreach ($file in $results.Keys) {
+            if (-not $results[$file].Success) {
+                $fileName = Split-Path $file -Leaf
+                $dir = Split-Path $file -Parent
+                Write-SpectreHost "  [red]x[/] $fileName [grey]($dir)[/]"
+                if ($results[$file].Error) {
+                    $errorMsg = '    [darkred]Error: ' + $results[$file].Error + '[/]'
+                    Write-SpectreHost $errorMsg
+                }
             }
         }
     }
+    
+    Write-Host ""
+    Write-SpectreHost '[green]Operation completed[/]'
+} else {
+    Write-Host ""
+    Write-ColoredMessage '========== Summary ==========' -Color Cyan
+    $summaryMsg = 'Total: {0} | Success: {1} | Failed: {2}' -f $totalJobs, $successCount, $failCount
+    Write-ColoredMessage $summaryMsg -Color White
+    
+    if ($failCount -gt 0) {
+        Write-Host ""
+        Write-ColoredMessage 'Failed files:' -Color Red
+        foreach ($file in $results.Keys) {
+            if (-not $results[$file].Success) {
+                Write-Host ('  - ' + $file)
+                if ($results[$file].Error) {
+                    $errorMsg = '    Error: ' + $results[$file].Error
+                    Write-Host $errorMsg -ForegroundColor DarkRed
+                }
+            }
+        }
+    }
+    
+    Write-Host 'Operation completed.' -ForegroundColor Green
 }
-
-Write-ColoredMessage "`nOperation completed." -Color Green
