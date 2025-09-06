@@ -9,7 +9,16 @@
     [string]$PromptFile,
     
     [Parameter()]
-    [switch]$Select
+    [switch]$Select,
+    
+    [Parameter()]
+    [int]$Parallel = 5,
+    
+    [Parameter()]
+    [switch]$VerboseOutput,
+    
+    [Parameter()]
+    [switch]$YesToAll
 )
 
 $ErrorActionPreference = 'Stop'
@@ -183,19 +192,21 @@ if ($Select) {
     }
 }
 
-# Confirmation
-Write-Host ""
-if ($spectreAvailable) {
-    $confirm = Read-SpectreConfirm -Prompt "[yellow]Do you want to proceed?[/]" -DefaultAnswer "n"
-    if (-not $confirm) {
-        Write-ColoredMessage "Operation cancelled." -Color Yellow
-        exit 0
-    }
-} else {
-    $confirmation = Read-Host "Do you want to proceed? (Y/N)"
-    if ($confirmation -ne 'Y' -and $confirmation -ne 'y') {
-        Write-ColoredMessage "Operation cancelled." -Color Yellow
-        exit 0
+# Confirmation (skip if YesToAll is specified)
+if (-not $YesToAll) {
+    Write-Host ""
+    if ($spectreAvailable) {
+        $confirm = Read-SpectreConfirm -Prompt "[yellow]Do you want to proceed?[/]" -DefaultAnswer "n"
+        if (-not $confirm) {
+            Write-ColoredMessage "Operation cancelled." -Color Yellow
+            exit 0
+        }
+    } else {
+        $confirmation = Read-Host "Do you want to proceed? (Y/N)"
+        if ($confirmation -ne 'Y' -and $confirmation -ne 'y') {
+            Write-ColoredMessage "Operation cancelled." -Color Yellow
+            exit 0
+        }
     }
 }
 
@@ -211,7 +222,10 @@ if ($PSCmdlet.ParameterSetName -eq "PromptFile") {
 }
 
 # Setup parallel processing
-$maxParallel = 5
+$maxParallel = if ($VerboseOutput) { 1 } else { $Parallel }
+if ($VerboseOutput -and $Parallel -ne 1) {
+    Write-ColoredMessage "Note: Forcing parallel to 1 for verbose output mode" -Color Yellow
+}
 $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, $maxParallel)
 $runspacePool.Open()
 
@@ -221,15 +235,65 @@ $totalJobs = $matchedFiles.Count
 $completedJobs = 0
 
 $scriptBlock = {
-    param($FilePath, $PromptText)
+    param($FilePath, $PromptText, $VerboseMode)
     
     try {
         # Set working directory for the file
         $workingDir = Split-Path $FilePath -Parent
         
-        # Use PowerShell's native command execution
-        $result = & claude --dangerously-skip-permissions -p $PromptText 2>&1 | Out-String
-        $exitCode = $LASTEXITCODE
+        # Build command with verbose flag if needed
+        if ($VerboseMode) {
+            # Stream output continuously in verbose mode
+            $output = ""
+            # Use cmd.exe to invoke claude to ensure proper execution on Windows
+            $cmdArgs = "/c claude --dangerously-skip-permissions --verbose --print --output-format stream-json -p `"$($PromptText.Replace('"', '\"'))`""
+            $process = Start-Process -FilePath "cmd.exe" -ArgumentList $cmdArgs -NoNewWindow -PassThru -RedirectStandardOutput "$env:TEMP\claude_out_$PID.txt" -RedirectStandardError "$env:TEMP\claude_err_$PID.txt" -WorkingDirectory $workingDir
+            
+            # Stream the output as it's generated
+            $outFile = "$env:TEMP\claude_out_$PID.txt"
+            $errFile = "$env:TEMP\claude_err_$PID.txt"
+            $lastPos = 0
+            
+            while (-not $process.HasExited) {
+                Start-Sleep -Milliseconds 100
+                if (Test-Path $outFile) {
+                    $content = Get-Content $outFile -Raw
+                    if ($content -and $content.Length -gt $lastPos) {
+                        $newContent = $content.Substring($lastPos)
+                        Write-Host $newContent -NoNewline
+                        $output += $newContent
+                        $lastPos = $content.Length
+                    }
+                }
+            }
+            
+            # Get any remaining output
+            if (Test-Path $outFile) {
+                $content = Get-Content $outFile -Raw
+                if ($content -and $content.Length -gt $lastPos) {
+                    $newContent = $content.Substring($lastPos)
+                    Write-Host $newContent -NoNewline
+                    $output += $newContent
+                }
+            }
+            
+            $exitCode = $process.ExitCode
+            
+            # Get error output if any
+            $errorOutput = if (Test-Path $errFile) { Get-Content $errFile -Raw } else { "" }
+            if ($errorOutput) {
+                $output += "`n" + $errorOutput
+            }
+            
+            # Cleanup temp files
+            Remove-Item -Path $outFile -ErrorAction SilentlyContinue
+            Remove-Item -Path $errFile -ErrorAction SilentlyContinue
+            
+            $result = $output
+        } else {
+            $result = & claude --dangerously-skip-permissions -p $PromptText 2>&1 | Out-String
+            $exitCode = $LASTEXITCODE
+        }
         
         return @{
             FilePath = $FilePath
@@ -251,34 +315,121 @@ $scriptBlock = {
 # Processing with progress
 if ($spectreAvailable) {
     Write-SpectreRule "[cyan]Processing Files[/]"
-    Write-SpectreHost "Processing [yellow]$totalJobs[/] file(s) with max [yellow]$maxParallel[/] parallel jobs..."
+    Write-SpectreHost "Processing [yellow]$totalJobs[/] file(s) with max [yellow]$Parallel[/] parallel jobs..."
+    if ($VerboseOutput) {
+        Write-SpectreHost "[grey]Verbose mode enabled - Claude will print details of its work[/]"
+    }
     Write-Host ""
 } else {
-    Write-ColoredMessage "`nProcessing $totalJobs file(s) with max $maxParallel parallel jobs..." -Color Cyan
+    Write-ColoredMessage "`nProcessing $totalJobs file(s) with max $Parallel parallel jobs..." -Color Cyan
+    if ($VerboseOutput) {
+        Write-ColoredMessage "Verbose mode enabled - Claude will print details of its work" -Color DarkGray
+    }
 }
 
-$jobIndex = 0
-foreach ($file in $matchedFiles) {
-    $filePrompt = $promptTemplate -replace '{{File}}', $file
-    
-    $powershell = [PowerShell]::Create()
-    $powershell.RunspacePool = $runspacePool
-    [void]$powershell.AddScript($scriptBlock)
-    [void]$powershell.AddArgument($file)
-    [void]$powershell.AddArgument($filePrompt)
-    
-    $handle = $powershell.BeginInvoke()
-    
-    $jobs += [PSCustomObject]@{
-        PowerShell = $powershell
-        Handle = $handle
-        File = $file
-        JobIndex = $jobIndex
+# In verbose mode, run directly without runspaces for proper output streaming
+if ($VerboseOutput) {
+    foreach ($file in $matchedFiles) {
+        $filePrompt = $promptTemplate -replace '{{File}}', $file
+        
+        Write-ColoredMessage "`n[[PROCESSING]] $file" -Color Cyan
+        
+        # Change to the file's directory for proper context
+        $originalLocation = Get-Location
+        $fileDir = Split-Path $file -Parent
+        Push-Location $fileDir
+        
+        try {
+            # Build and display the command
+            $claudeCmd = "claude --dangerously-skip-permissions --verbose --print --output-format text -p `"$filePrompt`""
+            Write-ColoredMessage "Command: $claudeCmd" -Color DarkGray
+            Write-Host ""
+            
+            # Run claude directly using Invoke-Expression for real-time output
+            Invoke-Expression $claudeCmd
+            $exitCode = $LASTEXITCODE
+        }
+        catch {
+            Write-ColoredMessage "Error running claude: $_" -Color Red
+            $exitCode = 1
+        }
+        finally {
+            Pop-Location
+        }
+        
+        if ($exitCode -eq 0) {
+            Write-ColoredMessage "`n[[OK]] Completed: $file" -Color Green
+            $results[$file] = @{ Success = $true; Error = $null }
+        } else {
+            Write-ColoredMessage "`n[[FAILED]] Failed: $file" -Color Red
+            Write-ColoredMessage "  Exit code: $exitCode" -Color DarkRed
+            $results[$file] = @{ Success = $false; Error = "Command failed with exit code: $exitCode" }
+        }
+        
+        $completedJobs++
     }
     
-    $jobIndex++
-    
-    while ($jobs.Count -ge $maxParallel) {
+    # Skip the parallel processing section
+    $runspacePool.Close()
+    $runspacePool.Dispose()
+} else {
+    # Original parallel processing code
+    $jobIndex = 0
+    foreach ($file in $matchedFiles) {
+        $filePrompt = $promptTemplate -replace '{{File}}', $file
+        
+        $powershell = [PowerShell]::Create()
+        $powershell.RunspacePool = $runspacePool
+        [void]$powershell.AddScript($scriptBlock)
+        [void]$powershell.AddArgument($file)
+        [void]$powershell.AddArgument($filePrompt)
+        [void]$powershell.AddArgument($VerboseOutput.IsPresent)
+        
+        $handle = $powershell.BeginInvoke()
+        
+        $jobs += [PSCustomObject]@{
+            PowerShell = $powershell
+            Handle = $handle
+            File = $file
+            JobIndex = $jobIndex
+        }
+        
+        $jobIndex++
+        
+        while ($jobs.Count -ge $maxParallel) {
+            Start-Sleep -Milliseconds 100
+            
+            $completedJobsInBatch = @($jobs | Where-Object { $_.Handle.IsCompleted })
+            
+            foreach ($job in $completedJobsInBatch) {
+                $result = $job.PowerShell.EndInvoke($job.Handle)
+                $results[$job.File] = $result
+                $job.PowerShell.Dispose()
+                
+                $completedJobs++
+                
+                if (-not $VerboseOutput) {
+                    Show-ProgressBar -Current $completedJobs -Total $totalJobs -Activity "Processing files"
+                }
+                
+                if ($result.Success) {
+                    Write-ColoredMessage "[[OK]] Completed: $($job.File)" -Color Green
+                } else {
+                    Write-ColoredMessage "[[FAILED]] Failed: $($job.File)" -Color Red
+                    if ($result.Error) {
+                        Write-ColoredMessage "  Error: $($result.Error)" -Color DarkRed
+                    }
+                }
+                
+                $jobs = @($jobs | Where-Object { $_ -ne $job })
+            }
+        }
+    }
+}
+
+# Wait for remaining jobs (only in non-verbose mode)
+if (-not $VerboseOutput) {
+    while ($jobs.Count -gt 0) {
         Start-Sleep -Milliseconds 100
         
         $completedJobsInBatch = @($jobs | Where-Object { $_.Handle.IsCompleted })
@@ -296,42 +447,22 @@ foreach ($file in $matchedFiles) {
                 Write-ColoredMessage "[[OK]] Completed: $($job.File)" -Color Green
             } else {
                 Write-ColoredMessage "[[FAILED]] Failed: $($job.File)" -Color Red
+                if ($result.Error) {
+                    Write-ColoredMessage "  Error: $($result.Error)" -Color DarkRed
+                }
             }
             
             $jobs = @($jobs | Where-Object { $_ -ne $job })
         }
     }
+    
+    $runspacePool.Close()
+    $runspacePool.Dispose()
 }
 
-# Wait for remaining jobs
-while ($jobs.Count -gt 0) {
-    Start-Sleep -Milliseconds 100
-    
-    $completedJobsInBatch = @($jobs | Where-Object { $_.Handle.IsCompleted })
-    
-    foreach ($job in $completedJobsInBatch) {
-        $result = $job.PowerShell.EndInvoke($job.Handle)
-        $results[$job.File] = $result
-        $job.PowerShell.Dispose()
-        
-        $completedJobs++
-        
-        Show-ProgressBar -Current $completedJobs -Total $totalJobs -Activity "Processing files"
-        
-        if ($result.Success) {
-            Write-ColoredMessage "[[OK]] Completed: $($job.File)" -Color Green
-        } else {
-            Write-ColoredMessage "[[FAILED]] Failed: $($job.File)" -Color Red
-        }
-        
-        $jobs = @($jobs | Where-Object { $_ -ne $job })
-    }
+if (-not $VerboseOutput) {
+    Write-Progress -Activity "Processing files" -Completed
 }
-
-$runspacePool.Close()
-$runspacePool.Dispose()
-
-Write-Progress -Activity "Processing files" -Completed
 
 # Summary
 $successCount = @($results.Values | Where-Object { $_.Success }).Count
@@ -370,7 +501,11 @@ if ($spectreAvailable) {
     # Handle failed items - ask to rerun
     if ($failCount -gt 0) {
         Write-Host ""
-        $rerunConfirm = Read-SpectreConfirm -Prompt "[yellow]Would you like to rerun the failed files?[/]" -DefaultAnswer "n"
+        $rerunConfirm = if ($YesToAll) { 
+            $false  # Don't automatically rerun failed files even with YesToAll
+        } else {
+            Read-SpectreConfirm -Prompt "[yellow]Would you like to rerun the failed files?[/]" -DefaultAnswer "n"
+        }
         if ($rerunConfirm) {
             # Collect failed files
             $failedFiles = @()
@@ -392,7 +527,7 @@ if ($spectreAvailable) {
             $rerunTotalJobs = $failedFiles.Count
             
             # Reopen runspace pool for rerun
-            $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, $maxParallel)
+            $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, $Parallel)
             $runspacePool.Open()
             
             $jobIndex = 0
@@ -404,6 +539,7 @@ if ($spectreAvailable) {
                 [void]$powershell.AddScript($scriptBlock)
                 [void]$powershell.AddArgument($file)
                 [void]$powershell.AddArgument($filePrompt)
+                [void]$powershell.AddArgument($VerboseOutput.IsPresent)
                 
                 $handle = $powershell.BeginInvoke()
                 
@@ -416,7 +552,7 @@ if ($spectreAvailable) {
                 
                 $jobIndex++
                 
-                while ($rerunJobs.Count -ge $maxParallel) {
+                while ($rerunJobs.Count -ge $Parallel) {
                     Start-Sleep -Milliseconds 100
                     
                     $completedJobsInBatch = @($rerunJobs | Where-Object { $_.Handle.IsCompleted })
@@ -428,12 +564,17 @@ if ($spectreAvailable) {
                         
                         $rerunCompletedJobs++
                         
-                        Show-ProgressBar -Current $rerunCompletedJobs -Total $rerunTotalJobs -Activity "Reprocessing failed files"
+                        if (-not $VerboseOutput) {
+                            Show-ProgressBar -Current $rerunCompletedJobs -Total $rerunTotalJobs -Activity "Reprocessing failed files"
+                        }
                         
                         if ($result.Success) {
                             Write-ColoredMessage "[[RETRY OK]] Completed: $($job.File)" -Color Green
                         } else {
                             Write-ColoredMessage "[[RETRY FAILED]] Still failing: $($job.File)" -Color Red
+                            if ($result.Error) {
+                                Write-ColoredMessage "  Error: $($result.Error)" -Color DarkRed
+                            }
                         }
                         
                         $rerunJobs = @($rerunJobs | Where-Object { $_ -ne $job })
@@ -460,6 +601,9 @@ if ($spectreAvailable) {
                         Write-ColoredMessage "[[RETRY OK]] Completed: $($job.File)" -Color Green
                     } else {
                         Write-ColoredMessage "[[RETRY FAILED]] Still failing: $($job.File)" -Color Red
+                        if ($result.Error) {
+                            Write-ColoredMessage "  Error: $($result.Error)" -Color DarkRed
+                        }
                     }
                     
                     $rerunJobs = @($rerunJobs | Where-Object { $_ -ne $job })
@@ -469,7 +613,9 @@ if ($spectreAvailable) {
             $runspacePool.Close()
             $runspacePool.Dispose()
             
-            Write-Progress -Activity "Reprocessing failed files" -Completed
+            if (-not $VerboseOutput) {
+                Write-Progress -Activity "Reprocessing failed files" -Completed
+            }
             
             # Final summary after rerun
             $rerunSuccessCount = @($rerunResults.Values | Where-Object { $_.Success }).Count
@@ -523,9 +669,13 @@ if ($spectreAvailable) {
         }
         
         # Handle failed items - ask to rerun (non-Spectre version)
-        Write-Host ""
-        Write-ColoredMessage "Would you like to rerun the failed files? (Y/N)" -Color Yellow
-        $rerunConfirmation = Read-Host "Rerun"
+        if (-not $YesToAll) {
+            Write-Host ""
+            Write-ColoredMessage "Would you like to rerun the failed files? (Y/N)" -Color Yellow
+            $rerunConfirmation = Read-Host "Rerun"
+        } else {
+            $rerunConfirmation = 'N'  # Don't automatically rerun failed files even with YesToAll
+        }
         
         if ($rerunConfirmation -eq 'Y' -or $rerunConfirmation -eq 'y') {
             # Collect failed files
@@ -549,7 +699,7 @@ if ($spectreAvailable) {
             $rerunTotalJobs = $failedFiles.Count
             
             # Reopen runspace pool for rerun
-            $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, $maxParallel)
+            $runspacePool = [RunspaceFactory]::CreateRunspacePool(1, $Parallel)
             $runspacePool.Open()
             
             $jobIndex = 0
@@ -561,6 +711,7 @@ if ($spectreAvailable) {
                 [void]$powershell.AddScript($scriptBlock)
                 [void]$powershell.AddArgument($file)
                 [void]$powershell.AddArgument($filePrompt)
+                [void]$powershell.AddArgument($VerboseOutput.IsPresent)
                 
                 $handle = $powershell.BeginInvoke()
                 
@@ -573,7 +724,7 @@ if ($spectreAvailable) {
                 
                 $jobIndex++
                 
-                while ($rerunJobs.Count -ge $maxParallel) {
+                while ($rerunJobs.Count -ge $Parallel) {
                     Start-Sleep -Milliseconds 100
                     
                     $completedJobsInBatch = @($rerunJobs | Where-Object { $_.Handle.IsCompleted })
@@ -585,12 +736,17 @@ if ($spectreAvailable) {
                         
                         $rerunCompletedJobs++
                         
-                        Show-ProgressBar -Current $rerunCompletedJobs -Total $rerunTotalJobs -Activity "Reprocessing failed files"
+                        if (-not $VerboseOutput) {
+                            Show-ProgressBar -Current $rerunCompletedJobs -Total $rerunTotalJobs -Activity "Reprocessing failed files"
+                        }
                         
                         if ($result.Success) {
                             Write-ColoredMessage "[[RETRY OK]] Completed: $($job.File)" -Color Green
                         } else {
                             Write-ColoredMessage "[[RETRY FAILED]] Still failing: $($job.File)" -Color Red
+                            if ($result.Error) {
+                                Write-ColoredMessage "  Error: $($result.Error)" -Color DarkRed
+                            }
                         }
                         
                         $rerunJobs = @($rerunJobs | Where-Object { $_ -ne $job })
@@ -617,6 +773,9 @@ if ($spectreAvailable) {
                         Write-ColoredMessage "[[RETRY OK]] Completed: $($job.File)" -Color Green
                     } else {
                         Write-ColoredMessage "[[RETRY FAILED]] Still failing: $($job.File)" -Color Red
+                        if ($result.Error) {
+                            Write-ColoredMessage "  Error: $($result.Error)" -Color DarkRed
+                        }
                     }
                     
                     $rerunJobs = @($rerunJobs | Where-Object { $_ -ne $job })
@@ -626,7 +785,9 @@ if ($spectreAvailable) {
             $runspacePool.Close()
             $runspacePool.Dispose()
             
-            Write-Progress -Activity "Reprocessing failed files" -Completed
+            if (-not $VerboseOutput) {
+                Write-Progress -Activity "Reprocessing failed files" -Completed
+            }
             
             # Final summary after rerun
             $rerunSuccessCount = @($rerunResults.Values | Where-Object { $_.Success }).Count
