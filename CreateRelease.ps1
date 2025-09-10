@@ -23,7 +23,9 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $false)]
-    [string]$Version
+    [string]$Version,
+    [Parameter(Mandatory = $false)]
+    [switch]$Pre
 )
 
 # Import shared functions
@@ -65,32 +67,62 @@ if ($repoPath.Path -ne $currentLocation.Path) {
     Set-Location $repoPath
 }
 
+# Check for Directory.Build.props in repository root
+$directoryBuildPropsPath = Join-Path $repoPath "Directory.Build.props"
+$versionFromProps = $null
+
+if (Test-Path $directoryBuildPropsPath) {
+    Write-Host "Found Directory.Build.props, parsing version..." -ForegroundColor Yellow
+    $propsContent = Get-Content -Path $directoryBuildPropsPath -Raw
+    if ($propsContent -match '<Version>([^<]+)</Version>') {
+        $versionFromProps = $matches[1]
+        Write-Host "Version from Directory.Build.props: $versionFromProps" -ForegroundColor Green
+    }
+}
+
 # Get the latest tag
 $tag = Get-LatestTag -RepoPath $repoPath
 
 # Main execution
-if ($tag) {
-    # Use specified version if provided, otherwise calculate next version
+if ($tag -or $versionFromProps) {
+    # Use specified version if provided, otherwise use version from props or calculate next version
     if ($Version) {
         $newVersion = $Version
-        Write-Host "Current version: $tag" -ForegroundColor Cyan
-        Write-Host "Specified version: $newVersion" -ForegroundColor Green
-    } else {
+        Write-Host "Using specified version: $newVersion" -ForegroundColor Green
+    } elseif ($versionFromProps) {
+        $newVersion = $versionFromProps
+        Write-Host "Using version from Directory.Build.props: $newVersion" -ForegroundColor Green
+        if ($tag) {
+            Write-Host "Current tag version: $tag" -ForegroundColor Cyan
+        }
+    } elseif ($tag) {
         $newVersion = Get-IncrementedVersion -Tag $tag
         if (-not $newVersion) {
             exit 1
         }
         Write-Host "Current version: $tag" -ForegroundColor Cyan
-        Write-Host "Next version: $newVersion" -ForegroundColor Green
+        Write-Host "Auto-incremented version: $newVersion" -ForegroundColor Green
+    } else {
+        Write-Error "No version source found (no tags, no Directory.Build.props, and no version specified)"
+        exit 1
+    }
+    
+    # Add prerelease suffix if -Pre flag is used
+    if ($Pre) {
+        # Generate a timestamp suffix for unique prerelease version
+        $timestamp = Get-Date -Format "yyyyMMddHHmmss"
+        $newVersion = "${newVersion}-pre-${timestamp}"
+        Write-Host "Prerelease version with suffix: $newVersion" -ForegroundColor Magenta
     }
     
     # Ask for confirmation
-    Write-Host "`nDo you want to create a new release with version $newVersion? (Y/N)" -ForegroundColor Yellow
+    $releaseType = if ($Pre) { "prerelease" } else { "release" }
+    Write-Host "`nDo you want to create a new $releaseType with version $newVersion? (Y/N)" -ForegroundColor Yellow
     $confirmation = Read-Host
     
     if ($confirmation -eq 'Y' -or $confirmation -eq 'y') {
         # Create the release
-        $success = New-Release -Version $newVersion -RepoPath $repoPath
+        $success = New-Release -Version $newVersion -RepoPath $repoPath -Prerelease:$Pre
         
         if (-not $success) {
             Write-Host "Release creation failed" -ForegroundColor Red
@@ -98,4 +130,7 @@ if ($tag) {
     } else {
         Write-Host "Release creation cancelled" -ForegroundColor Yellow
     }
+} else {
+    Write-Error "No version source found (no tags, no Directory.Build.props, and no version specified)"
+    exit 1
 }

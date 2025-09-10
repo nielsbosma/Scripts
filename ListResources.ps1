@@ -63,7 +63,6 @@ function Get-DllResources {
         }
         else {
             Write-Host "Found $($resources.Count) embedded resource(s) in $DllPath"
-            $resources | ForEach-Object { Write-Output $_ }
         }
         
         return $resources

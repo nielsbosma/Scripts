@@ -96,13 +96,6 @@ if (-not $commitMessage) {
 Write-Host "`nGenerated commit message:" -ForegroundColor Green
 Write-Host $commitMessage -ForegroundColor Cyan
 
-# Ask for confirmation
-$confirmation = Read-Host "`nDo you want to use this commit message? (y/n)"
-if ($confirmation -ne 'y') {
-    Write-Host "Commit cancelled." -ForegroundColor Yellow
-    exit 0
-}
-
 # Create a commit with the generated message
 Write-Host "`nCreating commit..." -ForegroundColor Yellow
 git commit -m $commitMessage
