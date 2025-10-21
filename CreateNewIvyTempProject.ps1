@@ -4,7 +4,7 @@
     Creates a new temporary test folder and initializes an Ivy project
 .DESCRIPTION
     Creates a new folder in D:\Temp\TestX\ where X is the next available number,
-    then navigates to that folder and runs ivy init
+    then navigates to that folder and runs ivy-local init
 #>
 
 param(
@@ -38,10 +38,10 @@ New-Item -ItemType Directory -Path $newFolder -Force | Out-Null
 Push-Location $newFolder
 Write-Host "Changed to directory: $newFolder" -ForegroundColor Cyan
 
-# Run ivy init
+# Run ivy-local init
 Write-Host "Initializing Ivy project..." -ForegroundColor Yellow
 try {
-    ivy init
+    ivy-local init
     Write-Host "Ivy project initialized successfully!" -ForegroundColor Green
     Write-Host "Project location: $newFolder" -ForegroundColor Cyan
     
