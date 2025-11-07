@@ -111,6 +111,12 @@ You are an expert software engineer. You will help me fix build errors in my pro
 2. Write down a summary of what you learned during the process in .debug/learnings.md
 
 Do not touch anything in the /Connections folder
+
+This is using the Ivy-Framework. The source code can be found here:
+D:\Repos\_Ivy\Ivy-Framework\Ivy\
+
+Samples:
+D:\Repos\_Ivy\Ivy-Framework\Ivy.Samples.Shared\
 "@
 
 claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt1" | ForEach-Object {
@@ -151,12 +157,11 @@ Your task is to understand the learnings and improve these prompt/template files
 
 If you make any changes to D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Examples\ make sure this compiles using dotnet build. 
 
-These app are using the Ivy-Framework. The source code can be found here:
+This is using the Ivy-Framework. The source code can be found here:
 D:\Repos\_Ivy\Ivy-Framework\Ivy\
 
 Samples:
 D:\Repos\_Ivy\Ivy-Framework\Ivy.Samples.Shared\
-
 "@
 
 claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt2" | ForEach-Object {
