@@ -148,6 +148,15 @@ The agent root folder is in:
 D:\Repos\_Ivy\Ivy-Agent\ and the paths in sources.yaml are relative to this. 
 
 Your task is to understand the learnings and improve these prompt/template files so that the agent can be improved.
+
+If you make any changes to D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Examples\ make sure this compiles using dotnet build. 
+
+These app are using the Ivy-Framework. The source code can be found here:
+D:\Repos\_Ivy\Ivy-Framework\Ivy\
+
+Samples:
+D:\Repos\_Ivy\Ivy-Framework\Ivy.Samples.Shared\
+
 "@
 
 claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt2" | ForEach-Object {
