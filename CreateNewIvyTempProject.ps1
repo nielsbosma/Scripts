@@ -41,7 +41,7 @@ Write-Host "Changed to directory: $newFolder" -ForegroundColor Cyan
 # Run ivy-local init
 Write-Host "Initializing Ivy project..." -ForegroundColor Yellow
 try {
-    ivy-local init
+    ivy-local init --yes-to-all
     Write-Host "Ivy project initialized successfully!" -ForegroundColor Green
     Write-Host "Project location: $newFolder" -ForegroundColor Cyan
     
