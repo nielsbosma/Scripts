@@ -132,6 +132,7 @@ $prompt1 = @"
 You are an expert software engineer. You will help me fix build errors in my project.
 1. Run '$BuildCommand' and fix the errors. Repeat until there are no build errors.
 2. Write down a summary of what you learned during the process in .debug/learnings.md
+3. When all tasks are complete, your session will automatically end.
 
 Do not touch anything in the /Connections folder
 
@@ -142,7 +143,12 @@ Samples:
 $newDebugDirPath\Ivy.Samples.Shared\
 "@
 
-claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt1" | ForEach-Object {
+$outputFile = "$debugFolderPath\claude-step4.jsonl"
+if (Test-Path $outputFile) { Remove-Item $outputFile }
+
+# Run claude in print mode with stream-json output
+# Note: Using -p (print mode) for non-interactive execution
+claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt1" 2>&1 | Tee-Object -FilePath $outputFile | ForEach-Object {
     ConvertFrom-ClaudeOutput $_
 }
 Write-Host "  Claude Code execution completed" -ForegroundColor Green
@@ -192,7 +198,12 @@ Note:
 
 "@
 
-claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt2" | ForEach-Object {
+$outputFile2 = "$debugFolderPath\claude-step6.jsonl"
+if (Test-Path $outputFile2) { Remove-Item $outputFile2 }
+
+# Run claude in print mode with stream-json output
+# Note: Using -p (print mode) for non-interactive execution
+claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt2" 2>&1 | Tee-Object -FilePath $outputFile2 | ForEach-Object {
     ConvertFrom-ClaudeOutput $_
 }
 Write-Host "`nStep 6: Claude Code execution completed" -ForegroundColor Green
@@ -214,6 +225,5 @@ if ([string]::IsNullOrWhiteSpace($gitStatus)) {
 
     Set-Location -Path $currentDir
 }
-
 
 Write-Host "`nAll steps completed successfully!" -ForegroundColor Cyan
