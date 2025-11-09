@@ -198,10 +198,11 @@ $newDebugDirPath\Ivy.Samples.Shared\
 
 Note:
 - Do not add any new .md files with any summaries or learnings.
+- Do not create any backup files. Git will track the changes.
 - Keep the changes to prompts clean and general.
 - Avoid adding contradictory or overly specific instructions. In the end these are LLM prompts and should be TOKEN efficient.
 - Leave the files better than you found them. The overall quality should be improved.
-- Make a final review/reflection that the prompt/template changes really make sense and would help an LLM avoid the issues found in learnings.md in the future.
+- Make a final review/reflection that the prompt/template changes really make sense and would help an LLM avoid the issues found in learnings.md in the future
 "@
 
 $outputFile2 = "$debugFolderPath\claude-step6.jsonl"
