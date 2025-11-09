@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pwsh:*)"
+      "Bash(pwsh:*)",
+      "Bash(Test-Path \"d:\\Repos\\_Personal\\Scripts\\.debug\\build.log\")",
+      "Bash(Test-Path \"d:\\Repos\\_Personal\\Scripts\\.debug\\learnings.md\")"
     ],
     "deny": [],
     "ask": []

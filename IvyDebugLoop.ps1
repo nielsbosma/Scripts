@@ -117,6 +117,12 @@ $buildLogPath = Join-Path -Path $debugFolderPath -ChildPath "build.log"
 Invoke-Expression "$BuildCommand *>&1" | Out-File -FilePath $buildLogPath -Encoding utf8
 Write-Host "  Build output saved to $buildLogPath" -ForegroundColor Green
 
+# Print build.log contents to console
+Write-Host "`n  Build Log:" -ForegroundColor Red
+Get-Content $buildLogPath | ForEach-Object {
+    Write-Host "    $_" -ForegroundColor Red
+}
+
 # 3. Setup a git repository in $currentDir folder and make an initial commit with all files
 Write-Host "`nStep 3: Setting up git repository..." -ForegroundColor Cyan
 $gitPath = Join-Path -Path $currentDir -ChildPath ".git"
@@ -156,6 +162,15 @@ claude -p --model opus --fallback-model sonnet --verbose --dangerously-skip-perm
     ConvertFrom-ClaudeOutput $_
 }
 Write-Host "  Claude Code execution completed" -ForegroundColor Green
+
+# Print learnings.md to console
+$learningsPath = Join-Path -Path $debugFolderPath -ChildPath "learnings.md"
+if (Test-Path $learningsPath) {
+    Write-Host "`n  Learnings from debugging session:" -ForegroundColor Yellow
+    Get-Content $learningsPath | ForEach-Object {
+        Write-Host "    $_" -ForegroundColor Yellow
+    }
+}
 
 # 5. Get the changes git diff > .debug/changes.txt
 Write-Host "`nStep 5: Saving git diff to changes.txt..." -ForegroundColor Cyan
