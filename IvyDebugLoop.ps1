@@ -81,20 +81,24 @@ if (-Not (Test-Path -Path $baseDebugPath)) {
 }
 $datePrefix = (Get-Date).ToString("yyyy-MM-dd")
 $existingDirs = Get-ChildItem -Path $baseDebugPath -Directory | Where-Object { $_.Name -like "$datePrefix-*" }
-$nextIndex = ($existingDirs | ForEach-Object {
+$maxIndex = ($existingDirs | ForEach-Object {
     $nameParts = $_.Name -split "-"
-    if ($nameParts.Length -eq 3) {
-        return [int]$nameParts[2]
+    if ($nameParts.Length -eq 4) {
+        return [int]$nameParts[3]
     } else {
         return 0
     }
-} | Measure-Object -Maximum).Maximum + 1
+} | Measure-Object -Maximum).Maximum
+
+# Handle case when no existing directories are found (Maximum is $null)
+$nextIndex = if ($null -eq $maxIndex) { 1 } else { [int]$maxIndex + 1 }
+
 $newDebugDirName = "{0}-{1:D4}" -f $datePrefix, $nextIndex
 $newDebugDirPath = Join-Path -Path $baseDebugPath -ChildPath $newDebugDirName
 New-Item -ItemType Directory -Path $newDebugDirPath | Out-Null
 
 # Check out https://github.com/Ivy-Interactive/Ivy-Agent.git in this folder
-git clone https://github.com/Ivy-Interactive/Ivy-Agent.git $newDebugDirPath\
+git clone https://github.com/Ivy-Interactive/Ivy-Agent.git $newDebugDirPath
 Write-Host "Cloned Ivy-Agent repository to $newDebugDirPath" -ForegroundColor Green
 
 # 1. Create a folder named .debug in the current directory if it doesn't exist
@@ -134,7 +138,7 @@ You are an expert software engineer. You will help me fix build errors in my pro
 2. Write down a summary of what you learned during the process in .debug/learnings.md
 3. When all tasks are complete, your session will automatically end.
 
-Do not touch anything in the /Connections folder
+NOTE! Do not touch anything in the /Connections folder
 
 This is using the Ivy-Framework. The source code can be found here:
 $newDebugDirPath\Ivy\
@@ -148,7 +152,7 @@ if (Test-Path $outputFile) { Remove-Item $outputFile }
 
 # Run claude in print mode with stream-json output
 # Note: Using -p (print mode) for non-interactive execution
-claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt1" 2>&1 | Tee-Object -FilePath $outputFile | ForEach-Object {
+claude -p --model opus --fallback-model sonnet --verbose --dangerously-skip-permissions --output-format stream-json "$prompt1" 2>&1 | Tee-Object -FilePath $outputFile | ForEach-Object {
     ConvertFrom-ClaudeOutput $_
 }
 Write-Host "  Claude Code execution completed" -ForegroundColor Green
@@ -194,8 +198,9 @@ $newDebugDirPath\Ivy.Samples.Shared\
 
 Note:
 - Keep the changes to prompts clean and general.
-- Avoid adding contradictory or overly specific instructions.
-
+- Avoid adding contradictory or overly specific instructions. In the end these are LLM prompts and should be TOKEN efficient.
+- Leave the files better than you found them. The overall quality should be improved.
+- Make a final review/reflection that the prompt/template changes really make sense and would help an LLM avoid the issues found in learnings.md in the future.
 "@
 
 $outputFile2 = "$debugFolderPath\claude-step6.jsonl"
@@ -203,7 +208,7 @@ if (Test-Path $outputFile2) { Remove-Item $outputFile2 }
 
 # Run claude in print mode with stream-json output
 # Note: Using -p (print mode) for non-interactive execution
-claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt2" 2>&1 | Tee-Object -FilePath $outputFile2 | ForEach-Object {
+claude -p --verbose --model opus --fallback-model sonnet --dangerously-skip-permissions --output-format stream-json "$prompt2" 2>&1 | Tee-Object -FilePath $outputFile2 | ForEach-Object {
     ConvertFrom-ClaudeOutput $_
 }
 Write-Host "`nStep 6: Claude Code execution completed" -ForegroundColor Green
@@ -220,8 +225,8 @@ if ([string]::IsNullOrWhiteSpace($gitStatus)) {
 
     #7. Run CreateCommit in $newDebugDirPath
     Write-Host "`nStep 7: Running CreateCommit in the cloned Ivy-Agent repository..." -ForegroundColor Cyan
-    ./CreateCommit.ps1
-    ./CreatePullRequest.ps1
+    CreateCommit.ps1
+    CreatePullRequest.ps1
 
     Set-Location -Path $currentDir
 }
