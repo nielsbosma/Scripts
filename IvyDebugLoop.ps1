@@ -197,6 +197,7 @@ Samples:
 $newDebugDirPath\Ivy.Samples.Shared\
 
 Note:
+- Do not add any new .md files with any summaries or learnings.
 - Keep the changes to prompts clean and general.
 - Avoid adding contradictory or overly specific instructions. In the end these are LLM prompts and should be TOKEN efficient.
 - Leave the files better than you found them. The overall quality should be improved.
@@ -226,7 +227,7 @@ if ([string]::IsNullOrWhiteSpace($gitStatus)) {
     #7. Run CreateCommit in $newDebugDirPath
     Write-Host "`nStep 7: Running CreateCommit in the cloned Ivy-Agent repository..." -ForegroundColor Cyan
     CreateCommit.ps1
-    CreatePullRequest.ps1
+    CreatePullRequest.ps1 -Reviewer nielsbosma -Open
 
     Set-Location -Path $currentDir
 }

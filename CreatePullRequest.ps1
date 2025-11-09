@@ -4,7 +4,8 @@
 param(
     [string]$BranchName = "",
     [switch]$Approve,
-    [switch]$Open
+    [switch]$Open,
+    [string]$Reviewer = ""
 )
 
 # Import shared functions
@@ -224,14 +225,26 @@ if ($LASTEXITCODE -eq 0) {
     if ($prUrl -match "/pull/(\d+)") {
         $prNumber = $matches[1]
         
+        # Add reviewer if specified
+        if ($Reviewer) {
+            Write-Host "`nAdding reviewer '$Reviewer'..." -ForegroundColor Yellow
+            gh pr edit $prNumber --add-reviewer $Reviewer 2>$null
+
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Reviewer '$Reviewer' added successfully!" -ForegroundColor Green
+            } else {
+                Write-Host "Could not add reviewer '$Reviewer' (user may not exist or insufficient permissions)" -ForegroundColor Yellow
+            }
+        }
+
         # Approve the pull request if flag is set
         if ($Approve) {
             Write-Host "`nApproving pull request..." -ForegroundColor Yellow
-            
+
             # Note: gh pr review --approve requires appropriate permissions
             # This might fail if the user doesn't have approval rights
             gh pr review $prNumber --approve 2>$null
-            
+
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "Pull request approved!" -ForegroundColor Green
             } else {
