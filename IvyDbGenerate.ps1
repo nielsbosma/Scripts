@@ -1,5 +1,6 @@
 param(
-    [string]$Prompt
+    [string]$Prompt,
+    [string]$ModelId
 )
 
 # Get prompt from parameter or ask user
@@ -13,7 +14,13 @@ if ([string]::IsNullOrWhiteSpace($Prompt)) {
 
 CreateNewIvyTempProject.ps1
 
-ivy-local db generate --use-console --debug-agent-server http://localhost:5122 --skip-debug --yes-to-all --prompt "$Prompt"
+# Build command with optional model-id parameter
+$command = "ivy-local db generate --use-console --debug-agent-server http://localhost:5122 --skip-debug --yes-to-all --prompt `"$Prompt`""
+if (-not [string]::IsNullOrWhiteSpace($ModelId)) {
+    $command += " --model-id `"$ModelId`""
+}
+
+Invoke-Expression $command
 $exitCode = $LASTEXITCODE
 
 switch ($exitCode) {
