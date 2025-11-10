@@ -23,10 +23,10 @@ switch ($exitCode) {
     1 {
         Write-Host "Failed - General failure" -ForegroundColor Red
     }
-    2 {
-        Write-Host "Failed - DBML is wrong" -ForegroundColor Red
+    20 {
+        Write-Host "Failed - TODO:DBML is wrong" -ForegroundColor Red
     }
-    3 {
+    30 {
         Write-Host "Failed - DatabaseGenerator build error. Starting debug loop..." -ForegroundColor Yellow
         Push-Location .ivy/DatabaseGenerator
         try {
@@ -36,7 +36,17 @@ switch ($exitCode) {
             Pop-Location
         }
     }
-    4 {
+    40 {
+        Write-Host "Failed - Add EF Migration fails. Starting debug loop with AddMigration..." -ForegroundColor Yellow
+        Push-Location .ivy/DatabaseGenerator
+        try {
+            IvyDebugLoop.ps1 -BuildCommand "./AddMigration.ps1"
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    50 {
         Write-Host "Failed - DatabaseGenerator run error. Starting debug loop with RecreateDatabase..." -ForegroundColor Yellow
         Push-Location .ivy/DatabaseGenerator
         try {
@@ -46,7 +56,7 @@ switch ($exitCode) {
             Pop-Location
         }
     }
-    5 {
+    60 {
         Write-Host "Failed - Project error. Starting debug loop..." -ForegroundColor Yellow
         IvyDebugLoop.ps1
     }
