@@ -14,8 +14,7 @@ if ([string]::IsNullOrWhiteSpace($Prompt)) {
 
 CreateNewIvyTempProject.ps1
 
-# Build command with optional model-id parameter
-$command = "ivy-local db generate --use-console --debug-agent-server http://localhost:5122 --skip-debug --yes-to-all --prompt `"$Prompt`""
+$command = "ivy-local db generate --use-console --debug-agent-server http://localhost:5122 --skip-debug --model-disable-cache --yes-to-all --prompt `"$Prompt`""
 if (-not [string]::IsNullOrWhiteSpace($ModelId)) {
     $command += " --model-id `"$ModelId`""
 }
