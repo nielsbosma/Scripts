@@ -158,7 +158,8 @@ if (Test-Path $outputFile) { Remove-Item $outputFile }
 
 # Run claude in print mode with stream-json output
 # Note: Using -p (print mode) for non-interactive execution
-claude -p --model opus --fallback-model sonnet --verbose --dangerously-skip-permissions --output-format stream-json "$prompt1" 2>&1 | Tee-Object -FilePath $outputFile | ForEach-Object {
+# --model opus --fallback-model sonnet
+claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt1" 2>&1 | Tee-Object -FilePath $outputFile | ForEach-Object {
     ConvertFrom-ClaudeOutput $_
 }
 Write-Host "  Claude Code execution completed" -ForegroundColor Green
@@ -211,6 +212,9 @@ $newDebugDirPath\Ivy\
 Samples:
 $newDebugDirPath\Ivy.Samples.Shared\
 
+IF IT SEEMS THAT ENTIRE FILES ARE MISSING FROM THE SOLUTION THEN SOMETHING IS VERY WRONG AND
+IS UNFIXABLE. IN THIS CASE DO NOT MAKE ANY CHANGES TO THE PROMPTS OR TEMPLATES. JUST STOP.
+
 Note:
 - Do not add any new .md files with any summaries or learnings.
 - Do not create any backup files. Git will track the changes.
@@ -218,7 +222,7 @@ Note:
 - Avoid adding contradictory or overly specific instructions. In the end these are LLM prompts and should be TOKEN efficient.
 - Leave the files better than you found them. The overall quality should be improved.
 - Make a final review/reflection that the prompt/template changes really make sense and would help an LLM avoid the issues found in learnings.md in the future
-- Make sure to put database specific instructions in relevant prompt files. 
+- Make sure to put database specific instructions in relevant prompt files.
 "@
 
 $outputFile2 = "$debugFolderPath\claude-step6.jsonl"
@@ -226,7 +230,8 @@ if (Test-Path $outputFile2) { Remove-Item $outputFile2 }
 
 # Run claude in print mode with stream-json output
 # Note: Using -p (print mode) for non-interactive execution
-claude -p --verbose --model opus --fallback-model sonnet --dangerously-skip-permissions --output-format stream-json "$prompt2" 2>&1 | Tee-Object -FilePath $outputFile2 | ForEach-Object {
+# --model opus --fallback-model sonnet
+claude -p --verbose --dangerously-skip-permissions --output-format stream-json "$prompt2" 2>&1 | Tee-Object -FilePath $outputFile2 | ForEach-Object {
     ConvertFrom-ClaudeOutput $_
 }
 Write-Host "`nStep 6: Claude Code execution completed" -ForegroundColor Green

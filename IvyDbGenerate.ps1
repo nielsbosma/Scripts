@@ -62,6 +62,9 @@ switch ($exitCode) {
             Pop-Location
         }
     }
+    55 {
+        Write-Host "Failed - All applications didn't complete" -ForegroundColor Red
+    }
     60 {
         Write-Host "Failed - Project error. Starting debug loop..." -ForegroundColor Yellow
         IvyDebugLoop.ps1
