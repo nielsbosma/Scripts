@@ -1,5 +1,6 @@
 param(
-    [switch]$Push
+    [switch]$Push,
+    [switch]$NoVerify
 )
 
 # Import shared functions
@@ -58,13 +59,37 @@ git add -A
 # Generate a Diff of all files that have been changed and compile into a single string suitable for an LLM to write a commit message
 Write-Host "`nGenerating diff of staged changes..." -ForegroundColor Yellow
 
-# Get the staged changes (which now includes everything)
+# Get the staged changes
 $fullDiff = git diff --cached
 
 # If no diff content (shouldn't happen after git add -A, but just in case)
 if (-not $fullDiff) {
-    Write-Error "No changes found after staging"
-    exit 1
+    # Check if there are only binary files
+    $binaryFiles = git diff --cached --numstat | Where-Object { $_ -match "^-\s+-\s+" }
+    if ($binaryFiles) {
+        $fullDiff = "Binary files changed:`n" + (git diff --cached --stat)
+    } else {
+        Write-Error "No changes found after staging"
+        exit 1
+    }
+}
+
+# Truncate diff if too large (limit to ~100KB to stay well under token limits)
+$maxDiffLength = 100000
+if ($fullDiff.Length -gt $maxDiffLength) {
+    Write-Host "Diff is large ($($fullDiff.Length) chars), truncating for LLM..." -ForegroundColor Yellow
+    $truncatedDiff = $fullDiff.Substring(0, $maxDiffLength)
+    # Get a summary of all changed files to provide context
+    $diffStat = git diff --cached --stat
+    $fullDiff = @"
+[DIFF TRUNCATED - showing first $maxDiffLength characters]
+
+File change summary:
+$diffStat
+
+Partial diff:
+$truncatedDiff
+"@
 }
 
 # Prepare prompt for LLM
@@ -98,7 +123,11 @@ Write-Host $commitMessage -ForegroundColor Cyan
 
 # Create a commit with the generated message
 Write-Host "`nCreating commit..." -ForegroundColor Yellow
-git commit -m $commitMessage
+$commitArgs = @("-m", $commitMessage)
+if ($NoVerify) {
+    $commitArgs += "--no-verify"
+}
+git commit @commitArgs
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`nCommit created successfully!" -ForegroundColor Green
