@@ -9,14 +9,14 @@ if ($existingServer) {
     $existingServer | Stop-Process -Force
 }
 
-Write-Host "Starting Ivy.Agent.Server in background..."
-$serverProcess = Start-Process dotnet -ArgumentList "run", "--project", "D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Server\Ivy.Agent.Server.csproj" -WindowStyle Minimized -PassThru
-
 dotnet build "D:\Repos\_Ivy\Ivy\Ivy.Console\Ivy.Console.csproj"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed. Exiting."
     exit 1
 }
+
+Write-Host "Starting Ivy.Agent.Server in background..."
+$serverProcess = Start-Process dotnet -ArgumentList "run", "--project", "D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Server\Ivy.Agent.Server.csproj" -WindowStyle Minimized -PassThru
 
 if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
     $targetDir = Join-Path "D:\Temp" ([System.Guid]::NewGuid().ToString()) "Foo.Bar"
