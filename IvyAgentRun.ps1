@@ -18,6 +18,21 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Starting Ivy.Agent.Server in background..."
 $serverProcess = Start-Process dotnet -ArgumentList "run", "--project", "D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Server\Ivy.Agent.Server.csproj" -WindowStyle Minimized -PassThru
 
+# Wait for the server to start
+Write-Host "Waiting for Ivy.Agent.Server to start..."
+while ($true) {
+    try {
+        $response = Invoke-WebRequest -Uri "http://localhost:5122/health" -UseBasicParsing -ErrorAction Stop
+        if ($response.StatusCode -eq 200) {
+            Write-Host "Ivy.Agent.Server is up and running."
+            break
+        }
+    } catch {
+        Write-Host "Waiting for Ivy.Agent.Server to be ready..."
+        Start-Sleep -Seconds 1
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
     $targetDir = Join-Path "D:\Temp" ([System.Guid]::NewGuid().ToString()) "Foo.Bar"
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
