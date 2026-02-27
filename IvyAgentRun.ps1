@@ -44,7 +44,7 @@ if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
 
 Set-Location $targetDir
 
-$args = @("agent", "--staging", "--debug-agent-server", "http://localhost:5122", "--log-verbose", "--local-source")
+$args = @("agent", "--staging", "--debug-agent-server", "http://localhost:5122", "--log-verbose", "--local-source", "--log-output")
 
 if (-not [string]::IsNullOrWhiteSpace($Prompt)) {
     $args += "-p"
