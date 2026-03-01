@@ -31,9 +31,14 @@ if ($Annotate) {
     }
     $logContent = Get-Content -Path $logPath -Raw
     $initialContent = @"
-This is what we saw in the client:
+Do the following tasks marked with YES below:
 
-I have annotated my notes for investigation with a ">>" prefix.
+[NO] Review Ivy Framework hallucinations
+[NO] Suggest refactoring rules to common hallucination patterns
+[NO] Review debug-agent-session.md 
+[NO] Log IvyQuestions with inadequate answer 
+[NO] Suggest SessionTimelineCommand.cs improvements
+[YES] Review the annotated client output below for my feedback. The annotations are marked with ">>" and are my notes for investigation.
 
 ---
 $logContent
