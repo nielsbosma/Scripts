@@ -216,7 +216,7 @@ function LlmComplete {
     }
     
     $body = @{
-        "model" = "gpt-4.1"
+        "model" = "claude-sonnet-4-6"
         "messages" = @(
             @{
                 "role" = "user"
