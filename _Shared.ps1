@@ -147,6 +147,57 @@ function New-Release {
     }
 }
 
+# Function to generate a unique namespace for a temp working directory
+function New-TempNamespace {
+    param(
+        [string]$Prompt,
+        [string]$BasePath = "D:\Temp\IvyAgentRun"
+    )
+
+    $maxAttempts = 5
+    for ($i = 0; $i -lt $maxAttempts; $i++) {
+        if (-not [string]::IsNullOrWhiteSpace($Prompt)) {
+            $llmPrompt = @"
+Generate a short fictional .NET namespace (Company.Project format) that relates to the following task:
+$Prompt
+
+Rules:
+- Exactly two parts separated by a dot, e.g. Acme.Widgets
+- PascalCase, no spaces, no special characters
+- Output ONLY the namespace, nothing else
+"@
+        } else {
+            $llmPrompt = @"
+Generate a short fictional .NET namespace in Company.Project format.
+
+Rules:
+- Exactly two parts separated by a dot, e.g. Acme.Widgets
+- PascalCase, no spaces, no special characters
+- Be creative, use fictional company and project names
+- Output ONLY the namespace, nothing else
+"@
+        }
+
+        $namespace = (LlmComplete -Prompt $llmPrompt).Trim()
+
+        # Validate format: two PascalCase parts separated by a dot
+        if ($namespace -notmatch '^[A-Z][a-zA-Z0-9]+\.[A-Z][a-zA-Z0-9]+$') {
+            Write-Warning "LLM returned invalid namespace '$namespace', retrying..."
+            continue
+        }
+
+        $targetPath = Join-Path $BasePath $namespace
+        if (-not (Test-Path $targetPath)) {
+            return $namespace
+        }
+
+        Write-Warning "Namespace '$namespace' already exists, retrying..."
+    }
+
+    Write-Error "Failed to generate a unique namespace after $maxAttempts attempts"
+    return $null
+}
+
 # Function to complete text using OpenAI API
 function LlmComplete {
     param(
@@ -180,7 +231,9 @@ function LlmComplete {
         # Ensure proper UTF-8 encoding
         $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($body)
         
-        $response = Invoke-RestMethod -Uri "https://api.openai.com/v1/chat/completions" `
+        $endpoint = if ($env:OPENAI_ENDPOINT) { $env:OPENAI_ENDPOINT.TrimEnd('/') } else { "https://api.openai.com" }
+
+        $response = Invoke-RestMethod -Uri "$endpoint/v1/chat/completions" `
             -Method Post `
             -Headers $headers `
             -Body $bodyBytes `

@@ -33,8 +33,12 @@ while ($true) {
     }
 }
 
+. "$PSScriptRoot\_Shared.ps1"
+
 if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
-    $targetDir = Join-Path "D:\Temp" ([System.Guid]::NewGuid().ToString()) "Foo.Bar"
+    $namespace = New-TempNamespace -Prompt $Prompt
+    if (-not $namespace) { exit 1 }
+    $targetDir = Join-Path "D:\Temp\IvyAgentRun" $namespace
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 } elseif ($WorkingDirectory -eq ".") {
     $targetDir = Get-Location
