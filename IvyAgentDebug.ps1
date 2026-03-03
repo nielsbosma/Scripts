@@ -33,10 +33,10 @@ if ($Annotate) {
     $initialContent = @"
 Do the following tasks marked with YES below:
 
-[NO] Review Ivy Framework hallucinations
-[NO] Suggest refactoring rules to common hallucination patterns
+[YES] Review Ivy Framework hallucinations
+[YES] Suggest refactoring rules to common hallucination patterns
 [NO] Review debug-agent-session.md 
-[NO] Log IvyQuestions with inadequate answer 
+[YES] Log IvyQuestions with inadequate answer 
 [NO] Suggest SessionTimelineCommand.cs improvements
 [YES] Review the annotated client output below for my feedback. The annotations are marked with ">>" and are my notes for investigation.
 
@@ -52,7 +52,8 @@ $logContent
 $process = Start-Process notepad $tempFile -PassThru
 $process.WaitForExit()
 
-$content = (Get-Content -Path $tempFile -Raw).Trim() -replace '\r?\n', ' '
+$rawContent = Get-Content -Path $tempFile -Raw
+$content = if ($rawContent) { $rawContent.Trim() -replace '\r?\n', ' ' } else { "" }
 
 Remove-Item -Path $tempFile -Force
 

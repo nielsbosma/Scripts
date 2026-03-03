@@ -191,7 +191,16 @@ Rules:
             return $namespace
         }
 
-        Write-Warning "Namespace '$namespace' already exists, retrying..."
+        # Namespace exists, try appending incrementing numbers
+        for ($n = 2; $n -le 100; $n++) {
+            $candidate = "$namespace$n"
+            $candidatePath = Join-Path $BasePath $candidate
+            if (-not (Test-Path $candidatePath)) {
+                return $candidate
+            }
+        }
+
+        Write-Warning "Namespace '$namespace' already exists (all suffixes taken), retrying..."
     }
 
     Write-Error "Failed to generate a unique namespace after $maxAttempts attempts"
