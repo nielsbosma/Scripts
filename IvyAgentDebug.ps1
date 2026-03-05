@@ -31,18 +31,7 @@ if ($Annotate) {
     }
     $logContent = Get-Content -Path $logPath -Raw
     $initialContent = @"
-Do the following tasks marked with YES below:
-
-[YES] Review Ivy Framework hallucinations
-[YES] Suggest refactoring rules to common hallucination patterns
-[NO] Review debug-agent-session.md 
-[YES] Log IvyQuestions with inadequate answer 
-[NO] Suggest SessionTimelineCommand.cs improvements
-[YES] Review the annotated client output below for my feedback. The annotations are marked with ">>" and are my notes for investigation.
-
----
 $logContent
----
 "@
     Set-Content -Path $tempFile -Value $initialContent
 } else {
