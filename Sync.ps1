@@ -30,8 +30,11 @@ foreach ($repo in $repos) {
     $status = git -C $repo status --porcelain
     if ($status) {
         Write-Host "Changes found, creating logical commits..." -ForegroundColor Yellow
-        claude --dangerously-skip-permissions -p $prompt --cwd $repo
-        if ($LASTEXITCODE -ne 0) {
+        Push-Location $repo
+        claude --dangerously-skip-permissions -p $prompt
+        $exitCode = $LASTEXITCODE
+        Pop-Location
+        if ($exitCode -ne 0) {
             Write-Host "Claude commit failed for $name" -ForegroundColor Red
             continue
         }
