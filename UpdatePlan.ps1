@@ -14,6 +14,15 @@ $resolvedPath = $resolvedPath.Path
 $originalDir = Split-Path -Parent $resolvedPath
 $fileName = Split-Path -Leaf $resolvedPath
 
+# Copy current version to history before updating
+$historyDir = Join-Path $originalDir "history"
+if (-not (Test-Path $historyDir)) {
+    New-Item -ItemType Directory -Path $historyDir -Force | Out-Null
+}
+$historyPath = Join-Path $historyDir $fileName
+Copy-Item -Path $resolvedPath -Destination $historyPath -Force
+Write-Host "Previous version saved to: $historyPath"
+
 # Move to updating directory
 $updatingDir = "D:\Repos\_Ivy\.plans\updating"
 if (-not (Test-Path $updatingDir)) {
