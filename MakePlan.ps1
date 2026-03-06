@@ -154,6 +154,6 @@ IMPORTANT: Use the ``ivy-agent`` CLI tool (should be in PATH). Do NOT use ``dotn
 "@
 
 Write-Host "Running Claude with plan prompt..."
-claude -p --dangerously-skip-permissions $prompt
+& "$env:USERPROFILE\.local\bin\claude.exe" -p --dangerously-skip-permissions $prompt
 
 Remove-Item $tempFile -ErrorAction SilentlyContinue
