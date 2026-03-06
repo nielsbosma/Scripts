@@ -16,6 +16,7 @@ param(
     [string]$DonePath     = "D:\Repos\_Ivy\.plans\completed",
     [string]$FailPath     = "D:\Repos\_Ivy\.plans\failed",
     [string]$LogPath      = "D:\Repos\_Ivy\.plans\logs",
+    [string]$ReviewPath   = "D:\Repos\_Ivy\.plans\review",
     [int]   $PollInterval = 3
 )
 
@@ -29,7 +30,7 @@ $QueueDirs = @{
 $DefaultDir = "D:\Repos\_Ivy"
 
 # ── Ensure directories exist ────────────────────────────────────────────────
-foreach ($dir in @($WatchPath, $DonePath, $FailPath, $LogPath)) {
+foreach ($dir in @($WatchPath, $DonePath, $FailPath, $LogPath, $ReviewPath)) {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 }
 
@@ -186,12 +187,31 @@ try {
                 $workDir = Get-WorkDir $q
 
                 $job = Start-Job -ScriptBlock {
-                    param($PlanFile, $WorkDir)
+                    param($PlanFile, $WorkDir, $ReviewDir)
                     Set-Location $WorkDir
                     $content = Get-Content $PlanFile -Raw
-                    & claude -p $content --dangerously-skip-permissions 2>&1
+                    $stem = [IO.Path]::GetFileNameWithoutExtension($PlanFile)
+
+                    $reviewInstructions = @"
+
+## Review (optional)
+
+After completing all steps above, decide if a human should manually review or test anything after this implementation. If so, create a file at:
+
+    $ReviewDir\$stem.md
+
+The file should contain a short, actionable checklist of what to verify. Examples:
+- Test a specific command or feature end-to-end
+- Read updated docs for accuracy
+- Run a sample app to confirm behavior
+- Check UI rendering
+
+If the change is purely mechanical (e.g., renaming, formatting, trivial config) and needs no human review, skip creating the file.
+"@
+
+                    & claude -p ($content + $reviewInstructions) --dangerously-skip-permissions 2>&1
                     if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
-                } -ArgumentList $file, $workDir
+                } -ArgumentList $file, $workDir, $ReviewPath
 
                 $active[$q] = @{
                     Job   = $job
