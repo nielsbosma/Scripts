@@ -1,11 +1,23 @@
 $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "claude-plan-$(Get-Date -Format 'yyyyMMdd-HHmmss').md")
+Set-Content -Path $tempFile -Value "" -Encoding UTF8
 
-$template = @"
+$notepad = Start-Process notepad.exe -ArgumentList $tempFile -PassThru
+$notepad.WaitForExit()
+
+$userInput = Get-Content -Path $tempFile -Raw -Encoding UTF8
+
+if ([string]::IsNullOrWhiteSpace($userInput)) {
+    Write-Host "File was empty. Aborting."
+    Remove-Item $tempFile -ErrorAction SilentlyContinue
+    exit 1
+}
+
+$prompt = @"
 Make an implementation plan for the following task:
 
 ----
 
-
+$($userInput.Trim())
 
 ----
 
@@ -132,21 +144,7 @@ See ``D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Console\Commands\Langfuse\SessionTimelin
 Create plans for each finding (hallucinations, missing FAQ entries, logging improvements, etc.).
 
 IMPORTANT: Use the ``ivy-agent`` CLI tool (should be in PATH). Do NOT use ``dotnet run``.
-
 "@
-
-Set-Content -Path $tempFile -Value $template -Encoding UTF8
-
-$notepad = Start-Process notepad.exe -ArgumentList $tempFile -PassThru
-$notepad.WaitForExit()
-
-$prompt = Get-Content -Path $tempFile -Raw -Encoding UTF8
-
-if ([string]::IsNullOrWhiteSpace($prompt)) {
-    Write-Host "File was empty. Aborting."
-    Remove-Item $tempFile -ErrorAction SilentlyContinue
-    exit 1
-}
 
 Write-Host "Running Claude with plan prompt..."
 claude --dangerously-skip-permissions -p $prompt
