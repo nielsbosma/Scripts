@@ -1,6 +1,8 @@
 param(
     [Parameter(Mandatory=$true)]
-    [string]$PlanPath
+    [string]$PlanPath,
+
+    [switch]$ReadyToGo
 )
 
 $resolvedPath = Resolve-Path -Path $PlanPath -ErrorAction SilentlyContinue
@@ -20,9 +22,11 @@ if (-not (Test-Path $updatingDir)) {
 $updatingPath = Join-Path $updatingDir $fileName
 Move-Item -Path $resolvedPath -Destination $updatingPath -Force
 
-# Open in Notepad for user comments
-$notepad = Start-Process notepad.exe -ArgumentList $updatingPath -PassThru
-$notepad.WaitForExit()
+if (-not $ReadyToGo) {
+    # Open in Notepad for user comments
+    $notepad = Start-Process notepad.exe -ArgumentList $updatingPath -PassThru
+    $notepad.WaitForExit()
+}
 
 $fileContent = Get-Content -Path $updatingPath -Raw -Encoding UTF8
 
