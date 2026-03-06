@@ -1,3 +1,7 @@
+param(
+    [switch]$Debug
+)
+
 # Create a temp file
 $tempFile = [System.IO.Path]::GetTempFileName()
 Rename-Item -Path $tempFile -NewName "$tempFile.txt"
@@ -9,11 +13,21 @@ Start-Process -FilePath "notepad.exe" -ArgumentList $tempFile -Wait
 # Read the file and launch a new PowerShell window for each line
 $lines = Get-Content -Path $tempFile | Where-Object { $_.Trim() -ne "" }
 
+dotnet build "D:\Repos\_Ivy\Ivy\Ivy.Console\Ivy.Console.csproj"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Build failed. Exiting."
+    exit 1
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 foreach ($line in $lines) {
     Start-Sleep -Seconds 30
-    Start-Process powershell -ArgumentList "-NoExit", "-File", "$scriptDir\IvyAgentRun.ps1", "`"$line`"", "-NoBuild"
+    $runArgs = @("-NoExit", "-File", "$scriptDir\IvyAgentRun.ps1", "`"$line`"", "-NoBuild", "-NonInteractive")
+    if ($Debug) {
+        $runArgs += "-Debug"
+    }
+    Start-Process powershell -ArgumentList $runArgs
 }
 
 # Clean up
