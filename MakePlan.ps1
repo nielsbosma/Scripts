@@ -1,3 +1,10 @@
+# Re-launch in Windows Terminal if running in legacy conhost
+if (-not $env:WT_SESSION) {
+    $scriptPath = $MyInvocation.MyCommand.Path
+    Start-Process wt -ArgumentList "powershell -ExecutionPolicy Bypass -NoExit -File `"$scriptPath`""
+    exit 0
+}
+
 $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "claude-plan-$(Get-Date -Format 'yyyyMMdd-HHmmss').md")
 Set-Content -Path $tempFile -Value "" -Encoding UTF8
 
@@ -147,6 +154,6 @@ IMPORTANT: Use the ``ivy-agent`` CLI tool (should be in PATH). Do NOT use ``dotn
 "@
 
 Write-Host "Running Claude with plan prompt..."
-claude --dangerously-skip-permissions $prompt
+claude -p --dangerously-skip-permissions $prompt
 
 Remove-Item $tempFile -ErrorAction SilentlyContinue
