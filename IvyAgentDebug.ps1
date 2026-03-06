@@ -20,6 +20,8 @@ if ([string]::IsNullOrWhiteSpace($SessionId)) {
     Write-Host "Auto-detected SessionId: $SessionId"
 }
 
+$originalLocation = Get-Location
+try {
 Set-Location "D:\Repos\_Ivy\Ivy-Agent"
 
 if (-not [string]::IsNullOrWhiteSpace($Prompt)) {
@@ -59,3 +61,7 @@ $logContent
 $prompt = "/debug-agent-session $SessionId $content"
 
 claude --dangerously-skip-permissions $prompt
+}
+finally {
+    Set-Location $originalLocation
+}
