@@ -1,7 +1,9 @@
 param(
     [string]$Prompt,
     [string]$WorkingDirectory,
-    [switch]$NoBuild
+    [switch]$NoBuild,
+    [switch]$NonInteractive,
+    [switch]$Debug
 )
 
 if (-not $NoBuild) {
@@ -66,7 +68,15 @@ if (-not [string]::IsNullOrWhiteSpace($Prompt)) {
     $args += $Prompt
 }
 
+if ($NonInteractive) {
+    $args += "--non-interactive"
+}
+
 ivy-local @args
+
+if ($Debug) {
+    & "$PSScriptRoot\IvyAgentDebug.ps1" -Prompt "Analyze the session for issues"
+}
 
 Write-Host "Stopping Ivy.Agent.Server..."
 Stop-Process -Id $serverProcess.Id -Force -ErrorAction SilentlyContinue

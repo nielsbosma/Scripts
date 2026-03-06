@@ -1,6 +1,7 @@
 param(
     [string]$SessionId = "",
-    [switch]$Annotate
+    [switch]$Annotate,
+    [string]$Prompt = ""
 )
 
 if ([string]::IsNullOrWhiteSpace($SessionId)) {
@@ -21,34 +22,38 @@ if ([string]::IsNullOrWhiteSpace($SessionId)) {
 
 Set-Location "D:\Repos\_Ivy\Ivy-Agent"
 
-$tempFile = [System.IO.Path]::GetTempFileName() + ".txt"
+if (-not [string]::IsNullOrWhiteSpace($Prompt)) {
+    $content = $Prompt
+} else {
+    $tempFile = [System.IO.Path]::GetTempFileName() + ".txt"
 
-if ($Annotate) {
-    $logPath = "D:\Temp\ivy-agent\$SessionId\$SessionId-client-output.log"
-    if (-not (Test-Path $logPath)) {
-        Write-Host "Client output log not found: $logPath"
-        exit 1
-    }
-    $logContent = Get-Content -Path $logPath -Raw
-    $initialContent = @"
+    if ($Annotate) {
+        $logPath = "D:\Temp\ivy-agent\$SessionId\$SessionId-client-output.log"
+        if (-not (Test-Path $logPath)) {
+            Write-Host "Client output log not found: $logPath"
+            exit 1
+        }
+        $logContent = Get-Content -Path $logPath -Raw
+        $initialContent = @"
 $logContent
 "@
-    Set-Content -Path $tempFile -Value $initialContent
-} else {
-    Set-Content -Path $tempFile -Value "" -NoNewline
-}
+        Set-Content -Path $tempFile -Value $initialContent
+    } else {
+        Set-Content -Path $tempFile -Value "" -NoNewline
+    }
 
-$process = Start-Process notepad $tempFile -PassThru
-$process.WaitForExit()
+    $process = Start-Process notepad $tempFile -PassThru
+    $process.WaitForExit()
 
-$rawContent = Get-Content -Path $tempFile -Raw
-$content = if ($rawContent) { $rawContent.Trim() -replace '\r?\n', ' ' } else { "" }
+    $rawContent = Get-Content -Path $tempFile -Raw
+    $content = if ($rawContent) { $rawContent.Trim() -replace '\r?\n', ' ' } else { "" }
 
-Remove-Item -Path $tempFile -Force
+    Remove-Item -Path $tempFile -Force
 
-if ([string]::IsNullOrWhiteSpace($content)) {
-    Write-Host "No input provided. Exiting."
-    exit 1
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        Write-Host "No input provided. Exiting."
+        exit 1
+    }
 }
 
 $prompt = "/debug-agent-session $SessionId $content"
