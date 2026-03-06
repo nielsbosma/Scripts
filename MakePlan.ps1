@@ -5,6 +5,9 @@ if (-not $env:WT_SESSION) {
     exit 0
 }
 
+$plansDir = "D:\Repos\_Ivy\.plans"
+$counterFile = Join-Path $plansDir ".counter"
+
 $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "claude-plan-$(Get-Date -Format 'yyyyMMdd-HHmmss').md")
 Set-Content -Path $tempFile -Value "" -Encoding UTF8
 
@@ -18,6 +21,15 @@ if ([string]::IsNullOrWhiteSpace($userInput)) {
     Remove-Item $tempFile -ErrorAction SilentlyContinue
     exit 1
 }
+
+if (Test-Path $counterFile) {
+    $nextId = [int](Get-Content $counterFile -Raw).Trim()
+} else {
+    $nextId = 200
+}
+$nextIdFormatted = $nextId.ToString("000")
+$nextId++
+Set-Content -Path $counterFile -Value $nextId -NoNewline -Encoding UTF8
 
 $prompt = @"
 Make an implementation plan for the following task:
@@ -41,7 +53,7 @@ File name template: XXX-<RepositoryName>-Feature-<Title>.md
 
 RepositoryName should be a short name for the repository where the fix needs to be applied (e.g. IvyAgent, IvyConsole, IvyFramework, etc.). If the finding is not specific to a single repository, use "General".
 
-XXX should be a sequential number to ensure unique filenames and to indicate the order of plans (e.g. 001, 002, etc.).
+The next plan number is $nextIdFormatted. Use this exact number. Do not scan existing files for the next number.
 
 <plan-format>
 # [Title]
