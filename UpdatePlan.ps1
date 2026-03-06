@@ -46,10 +46,15 @@ if ([string]::IsNullOrWhiteSpace($fileContent)) {
 }
 
 $prompt = @"
-Update the following implementation plan based on the user's comments (lines prefixed with >>).
-Remove the >> comment lines after incorporating them into the plan.
-Keep the same plan format and level of detail.
-The plan must include all paths and information for an LLM coding agent to execute end-to-end without human intervention.
+You are given an implementation plan that contains user comments (lines prefixed with >>).
+Apply the user's comments to produce an updated version of the plan.
+
+Rules:
+- Output the COMPLETE plan from start to finish, not a summary or list of changes.
+- Remove all >> comment lines after incorporating their intent into the plan.
+- Keep the same markdown format, structure, and level of detail as the original.
+- The plan must include all paths and information for an LLM coding agent to execute end-to-end without human intervention.
+- Output ONLY the plan content, no preamble or explanation.
 
 ---
 

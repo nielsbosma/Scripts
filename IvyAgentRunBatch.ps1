@@ -22,12 +22,12 @@ if ($LASTEXITCODE -ne 0) {
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 foreach ($line in $lines) {
-    Start-Sleep -Seconds 30
-    $runArgs = @("-NoExit", "-File", "$scriptDir\IvyAgentRun.ps1", "`"$line`"", "-NoBuild", "-NonInteractive")
+    $runArgs = @("-NoExit", "-File", "$scriptDir\IvyAgentRun.ps1", "`"$line`"", "-NoBuild")
     if ($Debug) {
         $runArgs += "-Debug"
     }
     Start-Process powershell -ArgumentList $runArgs
+     Start-Sleep -Seconds 30
 }
 
 # Clean up

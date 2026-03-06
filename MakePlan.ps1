@@ -163,6 +163,9 @@ See ``D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Console\Commands\Langfuse\SessionTimelin
 Create plans for each finding (hallucinations, missing FAQ entries, logging improvements, etc.).
 
 IMPORTANT: Use the ``ivy-agent`` CLI tool (should be in PATH). Do NOT use ``dotnet run``.
+
+KEEP PLAN FILES SMALL - ONE ISSUE PER FILE!
+If there are multiple issues, create multiple plan files.
 "@
 
 Write-Host "Running Claude with plan prompt..."

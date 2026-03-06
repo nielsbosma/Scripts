@@ -202,11 +202,11 @@ After completing all steps above, decide if a human should manually review or te
 
 The file should contain a short, actionable checklist of what to verify. Examples:
 - Test a specific command or feature end-to-end
-- Read updated docs for accuracy
 - Run a sample app to confirm behavior
 - Check UI rendering
 
 If the change is purely mechanical (e.g., renaming, formatting, trivial config) and needs no human review, skip creating the file.
+We don't need to review faq updates, doc fixes, or simple code changes that are low-risk. 
 "@
 
                     & claude -p ($content + $reviewInstructions) --dangerously-skip-permissions 2>&1
