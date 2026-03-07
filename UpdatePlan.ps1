@@ -57,12 +57,15 @@ $prompt = @"
 You are given an implementation plan that contains user comments (lines prefixed with >>).
 Apply the user's comments to produce an updated version of the plan.
 
-Rules:
-- Output the COMPLETE plan from start to finish, not a summary or list of changes.
+CRITICAL RULES:
+- You MUST output the ENTIRE plan document from the very first line to the very last line.
+- DO NOT summarize, abbreviate, or describe what changed.
+- DO NOT skip sections with "..." or "unchanged" or similar placeholders.
 - Remove all >> comment lines after incorporating their intent into the plan.
 - Keep the same markdown format, structure, and level of detail as the original.
+- The output must be at least as long as the original plan (minus the >> lines).
 - The plan must include all paths and information for an LLM coding agent to execute end-to-end without human intervention.
-- Output ONLY the plan content, no preamble or explanation.
+- Output ONLY the updated plan content. No preamble, no explanation, no change summary.
 
 ---
 
@@ -72,8 +75,22 @@ $fileContent
 "@
 
 Write-Host "Running Claude to update plan..."
-$updatedContent = claude --dangerously-skip-permissions -p $prompt
+$updatedContent = claude --dangerously-skip-permissions --max-turns 1 -p $prompt
 Set-Content -Path $updatingPath -Value $updatedContent -Encoding UTF8
+
+# Validate output completeness
+$inputLineCount = ($fileContent -split "`n").Count
+$outputLineCount = ($updatedContent -split "`n").Count
+$ratio = $outputLineCount / [Math]::Max($inputLineCount, 1)
+
+if ($ratio -lt 0.5) {
+    Write-Host "WARNING: Output ($outputLineCount lines) is much shorter than input ($inputLineCount lines)."
+    Write-Host "Claude may have returned a summary instead of the complete plan."
+    Write-Host "Restoring original file from history."
+    Copy-Item -Path $historyPath -Destination $resolvedPath -Force
+    Remove-Item -Path $updatingPath -Force
+    exit 1
+}
 
 # Determine version suffix
 $baseName = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
