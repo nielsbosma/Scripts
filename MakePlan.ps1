@@ -22,6 +22,12 @@ if ([string]::IsNullOrWhiteSpace($userInput)) {
     exit 1
 }
 
+Write-Host ""
+Write-Host "--- Your prompt ---" -ForegroundColor Cyan
+Write-Host $userInput.Trim()
+Write-Host "-------------------" -ForegroundColor Cyan
+Write-Host ""
+
 if (Test-Path $counterFile) {
     $nextId = [int](Get-Content $counterFile -Raw).Trim()
 } else {
