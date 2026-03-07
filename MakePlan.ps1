@@ -35,14 +35,36 @@ Write-Host $userInput.Trim()
 Write-Host "-------------------" -ForegroundColor Cyan
 Write-Host ""
 
-if (Test-Path $counterFile) {
-    $nextId = [int](Get-Content $counterFile -Raw).Trim()
-} else {
-    $nextId = 200
+$lockFile = "$counterFile.lock"
+$maxRetries = 10
+$retryDelay = 500  # milliseconds
+
+for ($i = 0; $i -lt $maxRetries; $i++) {
+    try {
+        # Open lock file with exclusive access - this is the mutex
+        $lockStream = [System.IO.File]::Open($lockFile, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+
+        # Read counter while holding lock
+        if (Test-Path $counterFile) {
+            $nextId = [int](Get-Content $counterFile -Raw).Trim()
+        } else {
+            $nextId = 200
+        }
+        $nextIdFormatted = $nextId.ToString("000")
+        $nextId++
+        Set-Content -Path $counterFile -Value $nextId -NoNewline -Encoding UTF8
+
+        # Release lock
+        $lockStream.Close()
+        break
+    } catch [System.IO.IOException] {
+        if ($i -eq ($maxRetries - 1)) {
+            Write-Host "Failed to acquire lock on counter file after $maxRetries retries. Aborting." -ForegroundColor Red
+            exit 1
+        }
+        Start-Sleep -Milliseconds $retryDelay
+    }
 }
-$nextIdFormatted = $nextId.ToString("000")
-$nextId++
-Set-Content -Path $counterFile -Value $nextId -NoNewline -Encoding UTF8
 
 $promptsDir = Join-Path $plansDir "prompts"
 if (-not (Test-Path $promptsDir)) {
