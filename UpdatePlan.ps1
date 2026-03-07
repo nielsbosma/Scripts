@@ -45,6 +45,14 @@ if ([string]::IsNullOrWhiteSpace($fileContent)) {
     exit 1
 }
 
+# Check if there are any >> comments
+$hasComments = $fileContent -split "`n" | Where-Object { $_ -match '^\s*>>' }
+if (-not $hasComments) {
+    Write-Host "No >> comments found. Moving back and aborting."
+    Move-Item -Path $updatingPath -Destination $resolvedPath -Force
+    exit 0
+}
+
 $prompt = @"
 You are given an implementation plan that contains user comments (lines prefixed with >>).
 Apply the user's comments to produce an updated version of the plan.
