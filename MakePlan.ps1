@@ -16,6 +16,13 @@ $notepad.WaitForExit()
 
 $userInput = Get-Content -Path $tempFile -Raw -Encoding UTF8
 
+$relatedFiles = @()
+$firstLine = ($userInput.Trim() -split "`n")[0]
+if ($firstLine -match '^\[(\d+)\]') {
+    $groupNumber = $Matches[1]
+    $relatedFiles = Get-ChildItem -Path $plansDir -Recurse -File | Where-Object { $_.Name -match "^$groupNumber-" } | Select-Object -ExpandProperty FullName
+}
+
 if ([string]::IsNullOrWhiteSpace($userInput)) {
     Write-Host "File was empty. Aborting."
     Remove-Item $tempFile -ErrorAction SilentlyContinue
@@ -177,6 +184,16 @@ IMPORTANT: Use the ``ivy-agent`` CLI tool (should be in PATH). Do NOT use ``dotn
 
 KEEP PLAN FILES SMALL - ONE ISSUE PER FILE!
 If there are multiple issues, create multiple plan files.
+$(if ($relatedFiles.Count -gt 0) {
+@"
+
+## Related plans
+
+The following existing plan files are related to this task. Read them for context:
+
+$($relatedFiles | ForEach-Object { "- $_" } | Out-String)
+"@
+})
 "@
 
 $promptFile = Join-Path $promptsDir "$nextIdFormatted-prompt.txt"
