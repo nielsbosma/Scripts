@@ -37,6 +37,11 @@ $nextIdFormatted = $nextId.ToString("000")
 $nextId++
 Set-Content -Path $counterFile -Value $nextId -NoNewline -Encoding UTF8
 
+$promptsDir = Join-Path $plansDir "prompts"
+if (-not (Test-Path $promptsDir)) {
+    New-Item -ItemType Directory -Path $promptsDir | Out-Null
+}
+
 $prompt = @"
 Make an implementation plan for the following task:
 
@@ -173,6 +178,10 @@ IMPORTANT: Use the ``ivy-agent`` CLI tool (should be in PATH). Do NOT use ``dotn
 KEEP PLAN FILES SMALL - ONE ISSUE PER FILE!
 If there are multiple issues, create multiple plan files.
 "@
+
+$promptFile = Join-Path $promptsDir "$nextIdFormatted-prompt.txt"
+Set-Content -Path $promptFile -Value $prompt -Encoding UTF8
+Write-Host "Prompt saved to: $promptFile" -ForegroundColor Green
 
 Write-Host "Running Claude with plan prompt..."
 & "$env:USERPROFILE\.local\bin\claude.exe" -p --dangerously-skip-permissions $prompt
