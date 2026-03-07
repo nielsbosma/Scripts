@@ -18,9 +18,12 @@ $userInput = Get-Content -Path $tempFile -Raw -Encoding UTF8
 
 $relatedFiles = @()
 $firstLine = ($userInput.Trim() -split "`n")[0]
-if ($firstLine -match '^\[(\d+)\]') {
-    $groupNumber = $Matches[1]
-    $relatedFiles = Get-ChildItem -Path $plansDir -Recurse -File | Where-Object { $_.Name -match "^$groupNumber-" } | Select-Object -ExpandProperty FullName
+$groupNumbers = [regex]::Matches($firstLine, '\[(\d+)\]') | ForEach-Object { $_.Groups[1].Value }
+if ($groupNumbers.Count -gt 0) {
+    $allPlanFiles = Get-ChildItem -Path $plansDir -Recurse -File
+    foreach ($groupNumber in $groupNumbers) {
+        $relatedFiles += $allPlanFiles | Where-Object { $_.Name -match "^$groupNumber-" } | Select-Object -ExpandProperty FullName
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($userInput)) {
