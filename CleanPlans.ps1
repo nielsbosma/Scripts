@@ -1,4 +1,4 @@
-$folders = @('completed', 'failed', 'history', 'logs', 'prompts', 'review')
+$folders = @('completed', 'failed', 'history', 'logs', 'prompts')
 $root = 'D:\Repos\_Ivy\.plans'
 
 foreach ($folder in $folders) {
