@@ -30,6 +30,10 @@
           "command": "ivy.splitPlan",
           "when": "resourceExtname == .md",
           "group": "2_workspace@3"
+        },
+        {
+          "command": "ivy.makePlan",
+          "group": "2_workspace@4"
         }
       ]
     }
