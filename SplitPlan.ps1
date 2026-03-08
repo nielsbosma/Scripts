@@ -120,12 +120,35 @@ $(Get-Content -Path "$PSScriptRoot\PlanContext.md" -Raw)
 "@
 
 Write-Host "Running Claude to split plan..."
-$output = $prompt | & "$env:USERPROFILE\.local\bin\claude.exe" --dangerously-skip-permissions -p --output-format text
+$tempPromptFile = Join-Path $updatingDir "last-claude-prompt.txt"
+Set-Content -Path $tempPromptFile -Value $prompt -Encoding UTF8
+
+$stderrFile = Join-Path $updatingDir "last-claude-stderr.txt"
+$output = & "$env:USERPROFILE\.local\bin\claude.exe" --dangerously-skip-permissions -p --output-format text < $tempPromptFile 2> $stderrFile
+$exitCode = $LASTEXITCODE
 
 # Save raw output for debugging
 $debugPath = Join-Path $updatingDir "last-claude-output.txt"
 Set-Content -Path $debugPath -Value $output -Encoding UTF8
 Write-Host "Claude output saved to: $debugPath (length: $($output.Length) chars)"
+
+if ($exitCode -ne 0) {
+    $stderr = if (Test-Path $stderrFile) { Get-Content $stderrFile -Raw } else { "(no stderr)" }
+    Write-Host "ERROR: claude.exe exited with code $exitCode" -ForegroundColor Red
+    Write-Host "stderr: $stderr" -ForegroundColor Yellow
+    Write-Host "stdout (first 500 chars): $($output.Substring(0, [Math]::Min(500, $output.Length)))" -ForegroundColor Yellow
+    Copy-Item -Path $historyPath -Destination $resolvedPath -Force
+    Remove-Item -Path $updatingPath -Force
+    exit 1
+}
+
+if ($output.Length -lt 500) {
+    Write-Host "ERROR: Claude output suspiciously short ($($output.Length) chars). Likely an error response:" -ForegroundColor Red
+    Write-Host $output -ForegroundColor Yellow
+    Copy-Item -Path $historyPath -Destination $resolvedPath -Force
+    Remove-Item -Path $updatingPath -Force
+    exit 1
+}
 
 # Strip ANSI escape codes that may break regex matching
 $output = $output -replace '\x1b\[[0-9;]*m', ''
@@ -136,6 +159,8 @@ $matches = [regex]::Matches($output, $planPattern)
 
 if ($matches.Count -eq 0) {
     Write-Host "ERROR: No ===PLAN_START=== markers found in Claude output. Restoring original and aborting." -ForegroundColor Red
+    Write-Host "First 500 chars of output:" -ForegroundColor Yellow
+    Write-Host $output.Substring(0, [Math]::Min(500, $output.Length)) -ForegroundColor Yellow
     Copy-Item -Path $historyPath -Destination $resolvedPath -Force
     Remove-Item -Path $updatingPath -Force
     exit 1
