@@ -1,0 +1,37 @@
+{
+  "name": "ivy-plans",
+  "displayName": "Ivy Plans",
+  "description": "Plan management commands: Update, Approve, Split, and Make plans",
+  "version": "0.1.0",
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Other"],
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "ivy.updatePlan", "title": "Ivy: Update Plan" },
+      { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan" },
+      { "command": "ivy.splitPlan", "title": "Ivy: Split Plan" },
+      { "command": "ivy.makePlan", "title": "Ivy: Make Plan" }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "ivy.updatePlan",
+          "when": "resourceExtname == .md",
+          "group": "2_workspace@1"
+        },
+        {
+          "command": "ivy.approvePlan",
+          "when": "resourceExtname == .md",
+          "group": "2_workspace@2"
+        },
+        {
+          "command": "ivy.splitPlan",
+          "when": "resourceExtname == .md",
+          "group": "2_workspace@3"
+        }
+      ]
+    }
+  }
+}
