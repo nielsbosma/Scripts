@@ -1,7 +1,15 @@
+param(
+    [string]$InitialPrompt = ""
+)
+
 # Re-launch in Windows Terminal if running in legacy conhost
 if (-not $env:WT_SESSION) {
     $scriptPath = $MyInvocation.MyCommand.Path
-    Start-Process wt -ArgumentList "powershell -ExecutionPolicy Bypass -NoExit -File `"$scriptPath`""
+    $args = "powershell -ExecutionPolicy Bypass -NoExit -File `"$scriptPath`""
+    if ($InitialPrompt) {
+        $args += " -InitialPrompt `"$($InitialPrompt -replace '"', '\"')`""
+    }
+    Start-Process wt -ArgumentList $args
     exit 0
 }
 
@@ -9,7 +17,12 @@ $plansDir = "D:\Repos\_Ivy\.plans"
 $counterFile = Join-Path $plansDir ".counter"
 
 $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "claude-plan-$(Get-Date -Format 'yyyyMMdd-HHmmss').md")
-Set-Content -Path $tempFile -Value "" -Encoding UTF8
+
+if ($InitialPrompt) {
+    Set-Content -Path $tempFile -Value $InitialPrompt -Encoding UTF8
+} else {
+    Set-Content -Path $tempFile -Value "" -Encoding UTF8
+}
 
 & code --wait $tempFile
 
@@ -132,6 +145,6 @@ Set-Content -Path $promptFile -Value $prompt -Encoding UTF8
 Write-Host "Prompt saved to: $promptFile" -ForegroundColor Green
 
 Write-Host "Running Claude with plan prompt..."
-& "$env:USERPROFILE\.local\bin\claude.exe" -p --dangerously-skip-permissions $prompt
+$prompt | & "$env:USERPROFILE\.local\bin\claude.exe" -p --dangerously-skip-permissions
 
 Remove-Item $tempFile -ErrorAction SilentlyContinue

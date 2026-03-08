@@ -88,7 +88,13 @@ for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
     }
 
     Write-Host "Running Claude to update plan..."
-    $rawOutput = claude --dangerously-skip-permissions --max-turns 1 --tools "" --system-prompt $systemPrompt -p $userPrompt
+    $combinedPrompt = "$systemPrompt`n`n$userPrompt"
+    $rawOutput = ($combinedPrompt | & "$env:USERPROFILE\.local\bin\claude.exe" --dangerously-skip-permissions -p --output-format text) -join "`n"
+
+    if ([string]::IsNullOrWhiteSpace($rawOutput)) {
+        Write-Host "WARNING: Claude returned empty output. Attempt $attempt failed."
+        continue
+    }
 
     # Extract content between markers if present
     $markerPattern = '(?s)===PLAN_START===\s*\n(.*?)===PLAN_END==='

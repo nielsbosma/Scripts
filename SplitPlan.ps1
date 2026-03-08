@@ -120,22 +120,13 @@ $(Get-Content -Path "$PSScriptRoot\PlanContext.md" -Raw)
 "@
 
 Write-Host "Running Claude to split plan..."
-$tempPromptFile = Join-Path $updatingDir "last-claude-prompt.txt"
-Set-Content -Path $tempPromptFile -Value $prompt -Encoding UTF8
-
-$stderrFile = Join-Path $updatingDir "last-claude-stderr.txt"
-$output = & "$env:USERPROFILE\.local\bin\claude.exe" --dangerously-skip-permissions -p --output-format text < $tempPromptFile 2> $stderrFile
+$output = ($prompt | & "$env:USERPROFILE\.local\bin\claude.exe" --dangerously-skip-permissions -p --output-format text 2>$null) -join "`n"
 $exitCode = $LASTEXITCODE
 
-# Save raw output for debugging
-$debugPath = Join-Path $updatingDir "last-claude-output.txt"
-Set-Content -Path $debugPath -Value $output -Encoding UTF8
-Write-Host "Claude output saved to: $debugPath (length: $($output.Length) chars)"
+Write-Host "Claude output length: $($output.Length) chars"
 
 if ($exitCode -ne 0) {
-    $stderr = if (Test-Path $stderrFile) { Get-Content $stderrFile -Raw } else { "(no stderr)" }
     Write-Host "ERROR: claude.exe exited with code $exitCode" -ForegroundColor Red
-    Write-Host "stderr: $stderr" -ForegroundColor Yellow
     Write-Host "stdout (first 500 chars): $($output.Substring(0, [Math]::Min(500, $output.Length)))" -ForegroundColor Yellow
     Copy-Item -Path $historyPath -Destination $resolvedPath -Force
     Remove-Item -Path $updatingPath -Force
