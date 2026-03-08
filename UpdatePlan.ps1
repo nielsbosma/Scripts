@@ -72,6 +72,8 @@ CRITICAL RULES:
 $fileContent
 
 ---
+
+$(Get-Content -Path "$PSScriptRoot\PlanContext.md" -Raw)
 "@
 
 Write-Host "Running Claude to update plan..."
