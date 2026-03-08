@@ -5,6 +5,11 @@ param(
     [switch]$ReadyToGo
 )
 
+# Ensure UTF-8 output encoding so multi-byte characters survive process capture
+$prevOutputEncoding = [Console]::OutputEncoding
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 $resolvedPath = Resolve-Path -Path $PlanPath -ErrorAction SilentlyContinue
 if (-not $resolvedPath) {
     Write-Host "File not found: $PlanPath"
@@ -64,19 +69,26 @@ CRITICAL RULES:
 - Remove all >> lines after incorporating their intent.
 - Keep the same markdown format, structure, and detail level.
 - Output must be at least as long as the original (minus >> lines).
+- Do NOT include any reference context or background information in the output — only the plan itself.
 - Output ONLY: ===PLAN_START===, then the plan, then ===PLAN_END===. Nothing else.
 "@
+
+$contextContent = Get-Content -Path "$PSScriptRoot\PlanContext.md" -Raw
 
 $userPrompt = @"
 Apply the >> comments and output the complete updated plan wrapped in ===PLAN_START=== and ===PLAN_END=== markers.
 
----
+===PLAN TO UPDATE===
 
 $fileContent
 
----
+===END OF PLAN===
 
-$(Get-Content -Path "$PSScriptRoot\PlanContext.md" -Raw)
+===REFERENCE CONTEXT (DO NOT include this in the output - this is background information only)===
+
+$contextContent
+
+===END OF REFERENCE CONTEXT===
 "@
 
 $maxAttempts = 3
@@ -105,7 +117,10 @@ for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
         $updatedContent = $rawOutput
     }
 
-    Set-Content -Path $updatingPath -Value $updatedContent -Encoding UTF8
+    # Normalize line endings and write UTF-8 without BOM
+    $updatedContent = $updatedContent -replace "`r`n", "`n" -replace "`r", "`n"
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($updatingPath, $updatedContent, $utf8NoBom)
 
     # Validate output completeness
     $inputLineCount = ($fileContent -split "`n").Count

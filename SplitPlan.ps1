@@ -5,6 +5,11 @@ param(
     [switch]$ReadyToGo
 )
 
+# Ensure UTF-8 output encoding so multi-byte characters survive process capture
+$prevOutputEncoding = [Console]::OutputEncoding
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 $resolvedPath = Resolve-Path -Path $PlanPath -ErrorAction SilentlyContinue
 if (-not $resolvedPath) {
     Write-Host "File not found: $PlanPath"
@@ -170,7 +175,10 @@ foreach ($match in $matches) {
     $planFileName = $match.Groups[1].Value.Trim()
     $planContent = $match.Groups[2].Value.TrimEnd()
     $planPath = Join-Path $originalDir $planFileName
-    Set-Content -Path $planPath -Value $planContent -Encoding UTF8
+    # Normalize line endings and write UTF-8 without BOM
+    $planContent = $planContent -replace "`r`n", "`n" -replace "`r", "`n"
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($planPath, $planContent, $utf8NoBom)
     $createdFiles += $planFileName
     Write-Host "Created: $planPath" -ForegroundColor Green
 }
