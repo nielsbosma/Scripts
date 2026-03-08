@@ -120,7 +120,15 @@ $(Get-Content -Path "$PSScriptRoot\PlanContext.md" -Raw)
 "@
 
 Write-Host "Running Claude to split plan..."
-$output = & "$env:USERPROFILE\.local\bin\claude.exe" --dangerously-skip-permissions --max-turns 1 -p $prompt
+$output = $prompt | & "$env:USERPROFILE\.local\bin\claude.exe" --dangerously-skip-permissions -p --output-format text
+
+# Save raw output for debugging
+$debugPath = Join-Path $updatingDir "last-claude-output.txt"
+Set-Content -Path $debugPath -Value $output -Encoding UTF8
+Write-Host "Claude output saved to: $debugPath (length: $($output.Length) chars)"
+
+# Strip ANSI escape codes that may break regex matching
+$output = $output -replace '\x1b\[[0-9;]*m', ''
 
 # Parse output for ===PLAN_START=== ... ===PLAN_END=== blocks
 $planPattern = '(?s)===PLAN_START===\s*\nFILENAME:\s*(.+?)\s*\n---\s*\n(.*?)===PLAN_END==='
