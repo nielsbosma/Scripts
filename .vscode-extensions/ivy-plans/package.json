@@ -12,17 +12,18 @@
       { "command": "ivy.updatePlan", "title": "Ivy: Update Plan" },
       { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan" },
       { "command": "ivy.splitPlan", "title": "Ivy: Split Plan" },
+      { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan" },
       { "command": "ivy.makePlan", "title": "Ivy: Make Plan" }
     ],
     "menus": {
       "explorer/context": [
         {
-          "command": "ivy.updatePlan",
+          "command": "ivy.approvePlan",
           "when": "resourceExtname == .md",
           "group": "2_workspace@1"
         },
         {
-          "command": "ivy.approvePlan",
+          "command": "ivy.updatePlan",
           "when": "resourceExtname == .md",
           "group": "2_workspace@2"
         },
@@ -32,10 +33,26 @@
           "group": "2_workspace@3"
         },
         {
-          "command": "ivy.makePlan",
+          "command": "ivy.skipPlan",
+          "when": "resourceExtname == .md",
           "group": "2_workspace@4"
+        },
+        {
+          "command": "ivy.makePlan",
+          "group": "2_workspace@5"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "ivy.makePlan",
+        "key": "ctrl+alt+m"
+      },
+      {
+        "command": "ivy.approvePlan",
+        "key": "ctrl+alt+a",
+        "when": "editorTextFocus && resourceExtname == .md"
+      }
+    ]
   }
 }

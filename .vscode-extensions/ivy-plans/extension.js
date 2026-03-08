@@ -2,13 +2,25 @@ const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 
-async function saveIfOpen(uri) {
+async function saveAndClose(uri) {
     if (!uri) return;
     const doc = vscode.workspace.textDocuments.find(
         d => d.uri.toString() === uri.toString()
     );
-    if (doc && doc.isDirty) {
-        await doc.save();
+    if (doc) {
+        if (doc.isDirty) {
+            await doc.save();
+        }
+        // Find the tab and close it
+        for (const group of vscode.window.tabGroups.all) {
+            for (const tab of group.tabs) {
+                if (tab.input instanceof vscode.TabInputText &&
+                    tab.input.uri.toString() === uri.toString()) {
+                    await vscode.window.tabGroups.close(tab);
+                    return;
+                }
+            }
+        }
     }
 }
 
@@ -17,7 +29,7 @@ function activate(context) {
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.updatePlan', async (uri) => {
             if (!uri) return;
-            await saveIfOpen(uri);
+            await saveAndClose(uri);
             const terminal = vscode.window.createTerminal('Update Plan');
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\UpdatePlan.ps1" "${uri.fsPath}" -ReadyToGo`);
@@ -27,8 +39,11 @@ function activate(context) {
     // Approve Plan - moves .md file to approved/ subdirectory
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.approvePlan', async (uri) => {
+            if (!uri && vscode.window.activeTextEditor) {
+                uri = vscode.window.activeTextEditor.document.uri;
+            }
             if (!uri) return;
-            await saveIfOpen(uri);
+            await saveAndClose(uri);
             const filePath = uri.fsPath;
             const dir = path.dirname(filePath);
             const fileName = path.basename(filePath);
@@ -56,14 +71,42 @@ function activate(context) {
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.splitPlan', async (uri) => {
             if (!uri) return;
-            await saveIfOpen(uri);
+            await saveAndClose(uri);
             const terminal = vscode.window.createTerminal('Split Plan');
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\SplitPlan.ps1" "${uri.fsPath}" -ReadyToGo`);
         })
     );
 
-    // Make Plan - runs MakePlan.ps1 (command palette only, no file context)
+    // Skip Plan - moves .md file to skipped/ subdirectory
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ivy.skipPlan', async (uri) => {
+            if (!uri) return;
+            await saveAndClose(uri);
+            const filePath = uri.fsPath;
+            const dir = path.dirname(filePath);
+            const fileName = path.basename(filePath);
+            const skippedDir = path.join(dir, 'skipped');
+
+            if (!fs.existsSync(skippedDir)) {
+                fs.mkdirSync(skippedDir, { recursive: true });
+            }
+
+            const dest = path.join(skippedDir, fileName);
+            if (fs.existsSync(dest)) {
+                const overwrite = await vscode.window.showWarningMessage(
+                    `"${fileName}" already exists in skipped/. Overwrite?`,
+                    'Yes', 'No'
+                );
+                if (overwrite !== 'Yes') return;
+            }
+
+            fs.renameSync(filePath, dest);
+            vscode.window.showInformationMessage(`Skipped: ${fileName}`);
+        })
+    );
+
+    // Make Plan - runs MakePlan.ps1 (opens Notepad for input)
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.makePlan', () => {
             const terminal = vscode.window.createTerminal('Make Plan');
