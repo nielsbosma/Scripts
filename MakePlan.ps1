@@ -11,8 +11,7 @@ $counterFile = Join-Path $plansDir ".counter"
 $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "claude-plan-$(Get-Date -Format 'yyyyMMdd-HHmmss').md")
 Set-Content -Path $tempFile -Value "" -Encoding UTF8
 
-$notepad = Start-Process notepad.exe -ArgumentList $tempFile -PassThru
-$notepad.WaitForExit()
+& code --wait $tempFile
 
 $userInput = Get-Content -Path $tempFile -Raw -Encoding UTF8
 
