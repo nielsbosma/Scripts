@@ -53,19 +53,22 @@ if (-not $hasComments) {
     exit 0
 }
 
-$prompt = @"
-You are given an implementation plan that contains user comments (lines prefixed with >>).
-Apply the user's comments to produce an updated version of the plan.
+$systemPrompt = @"
+You are a plan-editing assistant. You receive an implementation plan with user comments (lines prefixed with >>).
+Apply the comments and output the complete updated plan.
 
 CRITICAL RULES:
-- You MUST output the ENTIRE plan document from the very first line to the very last line.
-- DO NOT summarize, abbreviate, or describe what changed.
-- DO NOT skip sections with "..." or "unchanged" or similar placeholders.
-- Remove all >> comment lines after incorporating their intent into the plan.
-- Keep the same markdown format, structure, and level of detail as the original.
-- The output must be at least as long as the original plan (minus the >> lines).
-- The plan must include all paths and information for an LLM coding agent to execute end-to-end without human intervention.
-- Output ONLY the updated plan content. No preamble, no explanation, no change summary.
+- Output the ENTIRE plan from first line to last line.
+- Wrap output in ===PLAN_START=== and ===PLAN_END=== markers.
+- DO NOT summarize, abbreviate, or skip sections.
+- Remove all >> lines after incorporating their intent.
+- Keep the same markdown format, structure, and detail level.
+- Output must be at least as long as the original (minus >> lines).
+- Output ONLY: ===PLAN_START===, then the plan, then ===PLAN_END===. Nothing else.
+"@
+
+$userPrompt = @"
+Apply the >> comments and output the complete updated plan wrapped in ===PLAN_START=== and ===PLAN_END=== markers.
 
 ---
 
@@ -76,19 +79,43 @@ $fileContent
 $(Get-Content -Path "$PSScriptRoot\PlanContext.md" -Raw)
 "@
 
-Write-Host "Running Claude to update plan..."
-$updatedContent = claude --dangerously-skip-permissions --max-turns 1 -p $prompt
-Set-Content -Path $updatingPath -Value $updatedContent -Encoding UTF8
+$maxAttempts = 3
+$success = $false
 
-# Validate output completeness
-$inputLineCount = ($fileContent -split "`n").Count
-$outputLineCount = ($updatedContent -split "`n").Count
-$ratio = $outputLineCount / [Math]::Max($inputLineCount, 1)
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    if ($attempt -gt 1) {
+        Write-Host "Retry attempt $attempt of $maxAttempts..."
+    }
 
-if ($ratio -lt 0.5) {
-    Write-Host "WARNING: Output ($outputLineCount lines) is much shorter than input ($inputLineCount lines)."
-    Write-Host "Claude may have returned a summary instead of the complete plan."
-    Write-Host "Restoring original file from history."
+    Write-Host "Running Claude to update plan..."
+    $rawOutput = claude --dangerously-skip-permissions --max-turns 1 --tools "" --system-prompt $systemPrompt -p $userPrompt
+
+    # Extract content between markers if present
+    $markerPattern = '(?s)===PLAN_START===\s*\n(.*?)===PLAN_END==='
+    $markerMatch = [regex]::Match($rawOutput, $markerPattern)
+    if ($markerMatch.Success) {
+        $updatedContent = $markerMatch.Groups[1].Value.TrimEnd()
+    } else {
+        $updatedContent = $rawOutput
+    }
+
+    Set-Content -Path $updatingPath -Value $updatedContent -Encoding UTF8
+
+    # Validate output completeness
+    $inputLineCount = ($fileContent -split "`n").Count
+    $outputLineCount = ($updatedContent -split "`n").Count
+    $ratio = $outputLineCount / [Math]::Max($inputLineCount, 1)
+
+    if ($ratio -ge 0.5) {
+        $success = $true
+        break
+    }
+
+    Write-Host "WARNING: Output ($outputLineCount lines) is much shorter than input ($inputLineCount lines). Attempt $attempt failed."
+}
+
+if (-not $success) {
+    Write-Host "All $maxAttempts attempts failed. Restoring original file from history."
     Copy-Item -Path $historyPath -Destination $resolvedPath -Force
     Remove-Item -Path $updatingPath -Force
     exit 1
