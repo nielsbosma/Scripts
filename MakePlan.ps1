@@ -2,31 +2,24 @@ param(
     [string]$InitialPrompt = ""
 )
 
-# Re-launch in Windows Terminal if running in legacy conhost
-if (-not $env:WT_SESSION) {
-    $scriptPath = $MyInvocation.MyCommand.Path
-    $args = "powershell -ExecutionPolicy Bypass -NoExit -File `"$scriptPath`""
-    if ($InitialPrompt) {
-        $args += " -InitialPrompt `"$($InitialPrompt -replace '"', '\"')`""
-    }
-    Start-Process wt -ArgumentList $args
-    exit 0
-}
+# Ensure UTF-8 output encoding so multi-byte characters survive process capture
+$prevOutputEncoding = [Console]::OutputEncoding
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 $plansDir = "D:\Repos\_Ivy\.plans"
 $counterFile = Join-Path $plansDir ".counter"
 
-$tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "claude-plan-$(Get-Date -Format 'yyyyMMdd-HHmmss').md")
-
-if ($InitialPrompt) {
-    Set-Content -Path $tempFile -Value $InitialPrompt -Encoding UTF8
-} else {
+if ([string]::IsNullOrWhiteSpace($InitialPrompt)) {
+    $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "claude-plan-$(Get-Date -Format 'yyyyMMdd-HHmmss').md")
     Set-Content -Path $tempFile -Value "" -Encoding UTF8
+    $notepad = Start-Process notepad.exe -ArgumentList $tempFile -PassThru
+    $notepad.WaitForExit()
+    $userInput = Get-Content -Path $tempFile -Raw -Encoding UTF8
+    Remove-Item $tempFile -ErrorAction SilentlyContinue
+} else {
+    $userInput = $InitialPrompt
 }
-
-& code --wait $tempFile
-
-$userInput = Get-Content -Path $tempFile -Raw -Encoding UTF8
 
 $relatedFiles = @()
 $firstLine = ($userInput.Trim() -split "`n")[0]
@@ -86,6 +79,10 @@ if (-not (Test-Path $promptsDir)) {
     New-Item -ItemType Directory -Path $promptsDir | Out-Null
 }
 
+$planFileName = "$nextIdFormatted-Plan.md"
+
+$contextContent = Get-Content -Path "$PSScriptRoot\PlanContext.md" -Raw
+
 $prompt = @"
 Make an implementation plan for the following task:
 
@@ -102,13 +99,7 @@ D:\Repos\_Ivy\Ivy\
 D:\Repos\_Ivy\Ivy-Framework\
 D:\Repos\_Ivy\Ivy-Mcp\
 
-Store plans in D:\Repos\_Ivy\.plans\
-
-File name template: XXX-<RepositoryName>-Feature-<Title>.md
-
-RepositoryName should be a short name for the repository where the fix needs to be applied (e.g. IvyAgent, IvyConsole, IvyFramework, etc.). If the finding is not specific to a single repository, use "General".
-
-The next plan number is $nextIdFormatted. Use this exact number. Do not scan existing files for the next number.
+File name: $planFileName
 
 <plan-format>
 # [Title]
@@ -125,17 +116,28 @@ Commit!
 
 </plan-format>
 
-The plan should include all paths and information for an LLM based coding agent to be able to execute the plan end-to-end without any human intervention. Keep the plan short and consise.
+The plan should include all paths and information for an LLM based coding agent to be able to execute the plan end-to-end without any human intervention. Keep the plan short and concise.
 
-$(Get-Content -Path "$PSScriptRoot\PlanContext.md" -Raw)
+CRITICAL RULES:
+- Do NOT create, write, or save any files. You may read files to understand the codebase.
+- Wrap your entire output in ===PLAN_START=== and ===PLAN_END=== markers.
+- Output the filename on the first line after the start marker as FILENAME: <filename>
+- Use the filename template: $nextIdFormatted-<RepositoryName>-Feature-<Title>.md
+- RepositoryName should be a short name for the repository (e.g. IvyAgent, IvyConsole, IvyFramework, General).
+- Output ONLY: ===PLAN_START===, FILENAME line, then ---, then the plan, then ===PLAN_END===. Nothing else.
+
+===REFERENCE CONTEXT (DO NOT include this in the output - this is background information only)===
+
+$contextContent
+
+===END OF REFERENCE CONTEXT===
 $(if ($relatedFiles.Count -gt 0) {
 @"
 
-## Related plans
-
-The following existing plan files are related to this task. Read them for context:
+===RELATED PLANS (read for context, DO NOT include in output)===
 
 $($relatedFiles | ForEach-Object { "- $_" } | Out-String)
+===END OF RELATED PLANS===
 "@
 })
 "@
@@ -144,7 +146,38 @@ $promptFile = Join-Path $promptsDir "$nextIdFormatted-prompt.txt"
 Set-Content -Path $promptFile -Value $prompt -Encoding UTF8
 Write-Host "Prompt saved to: $promptFile" -ForegroundColor Green
 
-Write-Host "Running Claude with plan prompt..."
-$prompt | & "$env:USERPROFILE\.local\bin\claude.exe" -p --dangerously-skip-permissions
+Write-Host "Running Claude to create plan..."
+$output = ($prompt | & "$env:USERPROFILE\.local\bin\claude.exe" --dangerously-skip-permissions -p --output-format text 2>$null) -join "`n"
+$exitCode = $LASTEXITCODE
 
-Remove-Item $tempFile -ErrorAction SilentlyContinue
+if ($exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($output)) {
+    Write-Host "ERROR: Claude failed (exit code $exitCode)" -ForegroundColor Red
+    Remove-Item $tempFile -ErrorAction SilentlyContinue
+    exit 1
+}
+
+# Strip ANSI escape codes
+$output = $output -replace '\x1b\[[0-9;]*m', ''
+
+# Parse output for ===PLAN_START=== ... ===PLAN_END=== block
+$planPattern = '(?s)===PLAN_START===\s*\nFILENAME:\s*(.+?)\s*\n---\s*\n(.*?)===PLAN_END==='
+$match = [regex]::Match($output, $planPattern)
+
+if (-not $match.Success) {
+    Write-Host "ERROR: No ===PLAN_START=== markers found in Claude output. Aborting." -ForegroundColor Red
+    Write-Host "First 500 chars of output:" -ForegroundColor Yellow
+    Write-Host $output.Substring(0, [Math]::Min(500, $output.Length)) -ForegroundColor Yellow
+    Remove-Item $tempFile -ErrorAction SilentlyContinue
+    exit 1
+}
+
+$planFileName = $match.Groups[1].Value.Trim()
+$planContent = $match.Groups[2].Value.TrimEnd()
+
+# Normalize line endings and write UTF-8 without BOM
+$planContent = $planContent -replace "`r`n", "`n" -replace "`r", "`n"
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+$planPath = Join-Path $plansDir $planFileName
+[System.IO.File]::WriteAllText($planPath, $planContent, $utf8NoBom)
+
+Write-Host "Created: $planPath" -ForegroundColor Green
