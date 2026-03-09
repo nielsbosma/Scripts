@@ -129,7 +129,7 @@ CRITICAL RULES:
 - Output the filename on the first line after the start marker as FILENAME: <filename>
 - Use the filename template: $nextIdFormatted-<RepositoryName>-Feature-<Title>.md
 - RepositoryName should be a short name for the repository (e.g. IvyAgent, IvyConsole, IvyFramework, General).
-- Output ONLY: ===PLAN_START===, FILENAME line, then ---, then the plan, then ===PLAN_END===. Nothing else.
+- Output ONLY: ===PLAN_START===, FILENAME line, then the plan content (starting with --- frontmatter if applicable, or the # title otherwise), then ===PLAN_END===. Nothing else.
 
 ===REFERENCE CONTEXT (DO NOT include this in the output - this is background information only)===
 
@@ -165,7 +165,7 @@ if ($exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($output)) {
 $output = $output -replace '\x1b\[[0-9;]*m', ''
 
 # Parse output for ===PLAN_START=== ... ===PLAN_END=== block
-$planPattern = '(?s)===PLAN_START===\s*\nFILENAME:\s*(.+?)\s*\n---\s*\n(.*?)===PLAN_END==='
+$planPattern = '(?s)===PLAN_START===\s*\nFILENAME:\s*(.+?)\s*\n(?:---\s*\n)?(.*?)===PLAN_END==='
 $match = [regex]::Match($output, $planPattern)
 
 if (-not $match.Success) {
