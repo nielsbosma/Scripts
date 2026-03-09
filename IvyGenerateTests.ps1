@@ -7,6 +7,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Ensure UTF-8 output so Claude's response renders correctly
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 # Allow running inside another Claude Code session
 $env:CLAUDECODE = $null
 
@@ -505,6 +509,66 @@ Output ONLY the bullet list, no other text.
         Write-Host "  No new learnings to add" -ForegroundColor DarkGray
     }
 }
+
+# --- Write report.md ---
+
+Write-Host "`nWriting report..." -ForegroundColor Yellow
+
+$result = if ($testsPassed) { 'PASSED' } elseif ($Run) { 'FAILED' } else { 'NOT RUN' }
+
+$reportMd = "# Test Report`n`n"
+$reportMd += "**Project:** $projectName`n"
+$reportMd += "**Date:** $(Get-Date -Format 'yyyy-MM-dd HH:mm')`n"
+$reportMd += "**Result:** $result`n"
+$reportMd += "**Generated files:** $($generatedNames -join ', ')`n"
+if ($attempt -gt 0 -and $Run) {
+    $reportMd += "**Fix rounds:** $attempt`n"
+}
+$reportMd += "`n---`n"
+
+# Source files section
+$reportMd += "`n## Source Files`n`n"
+$reportMd += "$($sourceFiles.Count) file(s) collected.`n"
+
+# Test generation section
+$reportMd += "`n## Generated Tests`n`n"
+foreach ($name in $generatedNames) {
+    $reportMd += "- $name`n"
+}
+
+# Fixes section (inline from fix history)
+if ($fixHistory.Count -gt 0) {
+    $reportMd += "`n## Fixes Applied`n`n"
+    $reportMd += "$($fixHistory.Count) round(s) required source code changes.`n"
+    foreach ($fix in $fixHistory) {
+        $reportMd += "`n### Round $($fix.Round)`n"
+        $reportMd += "`n#### Errors`n``````n$($fix.Errors)`n```````n"
+        $reportMd += "`n#### Changes`n$($fix.Changes)`n"
+    }
+}
+
+# Screenshots section
+if ($Run -and $testsPassed) {
+    $screenshots = Get-ChildItem -Path $screenshotsDir -Filter "*.png" -File -ErrorAction SilentlyContinue
+    if ($screenshots.Count -gt 0) {
+        $reportMd += "`n## Screenshots`n`n"
+        $reportMd += "$($screenshots.Count) screenshot(s) captured.`n`n"
+        foreach ($s in $screenshots) {
+            $reportMd += "- $($s.Name)`n"
+        }
+    }
+}
+
+# Review section (if review.md was written this run)
+$reviewFile = Join-Path $testsDir "review.md"
+if (Test-Path $reviewFile) {
+    $reportMd += "`n## Review`n`n"
+    $reportMd += "See [review.md](review.md) for screenshot and log review details.`n"
+}
+
+$reportFile = Join-Path $testsDir "report.md"
+Set-Content -Path $reportFile -Value $reportMd -Encoding UTF8
+Write-Host "  Written: .ivy/tests/report.md" -ForegroundColor Green
 
 # --- Summary ---
 
