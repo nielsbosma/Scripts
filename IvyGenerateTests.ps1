@@ -109,7 +109,7 @@ New-Item -ItemType Directory -Path $screenshotsDir -Force | Out-Null
 
 $generatePrompt = @"
 You are generating Playwright end-to-end tests for an Ivy Framework .NET web application.
-Write the files directly to disk. Do not output file contents as text — use your Write tool.
+Write the files directly to disk. Do not output file contents as text -- use your Write tool.
 
 ## Knowledge Base (learnings from previous runs)
 $knowledge
@@ -117,10 +117,10 @@ $knowledge
 ## Project Source Code
 $sourceContext
 
-## Existing Tests (if any — improve or extend, do not duplicate)
+## Existing Tests (if any -- improve or extend, do not duplicate)
 $existingTests
 
-$(if ($previousReview) { "## Previous Review (issues found in last run — address these)`n$previousReview" })
+$(if ($previousReview) { "## Previous Review (issues found in last run -- address these)`n$previousReview" })
 
 $(if ($previousConsoleLogs) { "## Previous Console Logs`n``````n$previousConsoleLogs``````" })
 
@@ -133,9 +133,9 @@ Write each file directly to the .ivy/tests/ directory at: $testsDir
 
 ### Files to create:
 
-1. **$testsDir\package.json** — minimal, with @playwright/test dependency
-2. **$testsDir\playwright.config.ts** — Chromium only, single worker, uses APP_PORT env var
-3. **$testsDir\<app-name>.spec.ts** — one spec file per app found in the source code
+1. **$testsDir\package.json** -- minimal, with @playwright/test dependency
+2. **$testsDir\playwright.config.ts** -- Chromium only, single worker, uses APP_PORT env var
+3. **$testsDir\<app-name>.spec.ts** -- one spec file per app found in the source code
 
 ### Test file structure:
 - beforeAll: find free port, spawn dotnet run, wait for server ready
@@ -302,7 +302,7 @@ $sourceContext
 $knowledge
 
 ## Instructions
-- Analyze the errors — determine if the issue is in the test code OR the Ivy project source code
+- Analyze the errors -- determine if the issue is in the test code OR the Ivy project source code
 - If the Ivy source code has bugs, fix the .cs files in: $projectRoot
 - If the test code has wrong selectors or timing issues, fix the .spec.ts files in: $testsDir
 - Use your Write/Edit tools to write corrected files directly
@@ -427,8 +427,8 @@ OK or list of issues found.
 OK or list of issues found.
 
 ### Overall Verdict
-PASS — if everything looks good
-ISSUES FOUND — if there are problems, with a summary
+PASS -- if everything looks good
+ISSUES FOUND -- if there are problems, with a summary
 "@
 
         $verifyResult = & claude -p $verifyPrompt --dangerously-skip-permissions --verbose 2>&1 | Out-String
@@ -501,7 +501,7 @@ Output ONLY the bullet list, no other text.
 
     if ($learnings -ne "NO_NEW_LEARNINGS" -and $learnings.Length -gt 10) {
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
-        $entry = "`n### $timestamp — $projectName`n$learnings`n"
+        $entry = "`n### $timestamp -- $projectName`n$learnings`n"
 
         Add-Content -Path $knowledgeFile -Value $entry -Encoding UTF8
         Write-Host "  Knowledge base updated with new learnings" -ForegroundColor Green
