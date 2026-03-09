@@ -101,7 +101,11 @@ function Show-Status {
             $name  = [IO.Path]::GetFileName($entry.File)
             $dur   = Format-Duration $entry.Duration
             $icon  = if ($entry.Status -eq "Done") { "+" } else { "x" }
-            $null = $buf.AppendLine("    $icon $($name.PadRight(56))[$dur]")
+            $logName = [IO.Path]::GetFileName($entry.LogFile)
+            $null = $buf.AppendLine("    $icon $($name.PadRight(56))[$dur]  $logName")
+            if ($entry.Reason) {
+                $null = $buf.AppendLine("      Reason: $($entry.Reason)")
+            }
         }
         $null = $buf.AppendLine("")
     }
@@ -158,7 +162,20 @@ try {
                 # Write log
                 $stem    = [IO.Path]::GetFileNameWithoutExtension($info.File)
                 $logFile = Join-Path $LogPath "$stem.log"
-                ($output | Out-String) | Set-Content $logFile -Encoding utf8
+                $outputStr = $output | Out-String
+                $outputStr | Set-Content $logFile -Encoding utf8
+
+                # Extract failure reason from last non-blank lines of output
+                $reason = $null
+                if (-not $success) {
+                    $lines = $outputStr -split "`n" |
+                             ForEach-Object { $_.Trim() } |
+                             Where-Object { $_ -ne '' }
+                    if ($lines.Count -gt 0) {
+                        $reason = ($lines | Select-Object -Last 3) -join ' | '
+                        if ($reason.Length -gt 120) { $reason = $reason.Substring(0, 117) + '...' }
+                    }
+                }
 
                 # Move plan file
                 $destDir  = if ($success) { $DonePath } else { $FailPath }
@@ -173,6 +190,8 @@ try {
                     Queue    = $q
                     Status   = $status
                     Duration = $duration
+                    Reason   = $reason
+                    LogFile  = $logFile
                 })
 
                 $active.Remove($q)
@@ -190,6 +209,8 @@ try {
                     param($PlanFile, $WorkDir, $ReviewDir)
                     Set-Location $WorkDir
                     $content = Get-Content $PlanFile -Raw
+                    # Strip YAML frontmatter so --- isn't parsed as a CLI flag
+                    $content = $content -replace '(?s)\A---\r?\n.*?\r?\n---\r?\n', ''
                     $stem = [IO.Path]::GetFileNameWithoutExtension($PlanFile)
 
                     $reviewInstructions = @"
