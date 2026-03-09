@@ -1,7 +1,6 @@
 param(
     [string]$Path,
-    [switch]$NoBuild,
-    [switch]$Debug
+    [switch]$NoBuild
 )
 
 if (-not $NoBuild) {
@@ -44,11 +43,7 @@ while ($true) {
     }
 }
 
-$ivyArgs = @("open", "--staging", "--local-source", "--debug-agent-server", "http://localhost:$port")
-
-if ($Debug) {
-    $ivyArgs += "--debug"
-}
+$ivyArgs = @("open", "--staging", "--local-source", "--debug-agent-server", "http://localhost:$port", "--debug")
 
 if (-not [string]::IsNullOrWhiteSpace($Path)) {
     $ivyArgs += "-p"
