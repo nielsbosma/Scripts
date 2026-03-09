@@ -20,10 +20,6 @@ if ([string]::IsNullOrWhiteSpace($SessionId)) {
     Write-Host "Auto-detected SessionId: $SessionId"
 }
 
-$originalLocation = Get-Location
-try {
-Set-Location "D:\Repos\_Ivy\Ivy-Agent"
-
 if (-not [string]::IsNullOrWhiteSpace($Prompt)) {
     $content = $Prompt
 } else {
@@ -58,10 +54,12 @@ $logContent
     }
 }
 
-$prompt = "/debug-agent-session $SessionId $content"
-
-claude --dangerously-skip-permissions $prompt
-}
-finally {
-    Set-Location $originalLocation
+$mdPath = Join-Path $PSScriptRoot "IvyAgentDebug.md"
+$mdContent = (Get-Content -Path $mdPath -Raw) -replace '\{\{SESSION_ID\}\}', $SessionId -replace '\{\{PROMPT\}\}', $content
+$tempPromptFile = [System.IO.Path]::GetTempFileName() + ".md"
+Set-Content -Path $tempPromptFile -Value $mdContent
+try {
+    claude --dangerously-skip-permissions --prompt-file $tempPromptFile
+} finally {
+    Remove-Item -Path $tempPromptFile -Force -ErrorAction SilentlyContinue
 }

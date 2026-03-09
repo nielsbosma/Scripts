@@ -84,7 +84,7 @@ See ``D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Console\Commands\Langfuse\SessionTimelin
    - ``<session-id>-client-verbose.log`` - client logs
    - ``<session-id>-server-verbose.log`` - server logs
 
-6. For full debugging reference, see: ``D:\Repos\_Ivy\Ivy-Agent\.claude\commands\debug-agent-session.md``
+6. For full debugging reference, see: ``D:\Repos\_Personal\Scripts\IvyAgentDebug.md``
 
 Create plans for each finding (hallucinations, missing FAQ entries, logging improvements, etc.).
 

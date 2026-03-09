@@ -69,7 +69,7 @@ These paths are hardcoded throughout the scripts and extension. If your repos li
 |---|---|---|
 | `OPENAI_API_KEY` | Yes | API key for the LLM used by helper scripts (CreateCommit, CreatePullRequest, etc.). Despite the name, this is routed through an OpenAI-compatible endpoint — it currently calls `claude-sonnet-4-6`. |
 | `OPENAI_ENDPOINT` | No | Override the API base URL. Defaults to `https://api.openai.com`. Set this if you use a proxy, Azure OpenAI, or an OpenRouter-style gateway. |
-| `IVY_AGENT_DEBUG_FOLDER` | No | Path where Ivy agent debug sessions store logs and Langfuse traces (e.g. `D:\Temp\ivy-agent`). Used by `IvyAgentDebug.ps1` and the `debug-agent-session` command. |
+| `IVY_AGENT_DEBUG_FOLDER` | No | Path where Ivy agent debug sessions store logs and Langfuse traces (e.g. `D:\Temp\ivy-agent`). Used by `IvyAgentDebug.ps1`. |
 
 ### Installing the VS Code Extension
 
@@ -225,7 +225,7 @@ Debugs an Ivy agent session:
 
 - Auto-detects the session ID from `.ivy/session.ldjson` if not provided
 - Opens Notepad for your investigation prompt (or accepts `-Prompt` directly)
-- Runs the `/debug-agent-session` Claude command which fetches Langfuse traces and analyzes them for hallucinations, missing FAQ entries, and process improvements
+- Reads `IvyAgentDebug.md`, substitutes `{{SESSION_ID}}` and `{{PROMPT}}`, and runs Claude with the debug prompt which fetches Langfuse traces and analyzes them for hallucinations, missing FAQ entries, and process improvements
 
 ### Shared Utilities
 
@@ -249,9 +249,9 @@ Reference context injected into `MakePlan`, `SplitPlan`, and `UpdatePlan` prompt
 
 ### Claude Commands
 
-#### `debug-agent-session.md` (in `Ivy-Agent/.claude/commands/`)
+#### `IvyAgentDebug.md` (in `Scripts/`)
 
-A Claude Code slash command (`/debug-agent-session <session-id> <prompt>`) that provides a comprehensive framework for analyzing Ivy agent sessions: fetching Langfuse traces, running timeline analysis, finding hallucinations, identifying missing FAQ entries, and generating improvement plans. Includes jq recipes for querying observation files.
+A standalone debug prompt template (used by `IvyAgentDebug.ps1`) that provides a comprehensive framework for analyzing Ivy agent sessions: fetching Langfuse traces, running timeline analysis, finding hallucinations, identifying missing FAQ entries, and generating improvement plans. Includes jq recipes for querying observation files.
 
 ### Tips
 
