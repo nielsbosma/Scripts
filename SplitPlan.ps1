@@ -112,6 +112,7 @@ FILENAME: <filename>
 - Each plan MUST have: # [Title], ## Problem, ## Solution, ## Tests, ## Finish sections.
 - Each plan must include all paths and information for an LLM coding agent to execute end-to-end.
 - Keep each plan short and concise - ONE ISSUE PER FILE.
+- If the original plan starts with a YAML frontmatter block (--- source: ... ---), copy it to EACH split plan file, placing it as the first lines of the plan content (before the # Title).
 - If user >> comments exist, follow their guidance for how to split.
 - Output ONLY the plan blocks. No preamble, no explanation.
 

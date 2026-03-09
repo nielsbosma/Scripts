@@ -68,6 +68,7 @@ CRITICAL RULES:
 - DO NOT summarize, abbreviate, or skip sections.
 - Remove all >> lines after incorporating their intent.
 - Keep the same markdown format, structure, and detail level.
+- If the plan starts with a YAML frontmatter block (--- ... ---), preserve it exactly as-is in the output.
 - Output must be at least as long as the original (minus >> lines).
 - Do NOT include any reference context or background information in the output — only the plan itself.
 - Output ONLY: ===PLAN_START===, then the plan, then ===PLAN_END===. Nothing else.

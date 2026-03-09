@@ -102,6 +102,9 @@ D:\Repos\_Ivy\Ivy-Mcp\
 File name: $planFileName
 
 <plan-format>
+---
+source: <path-to-source-if-applicable>
+---
 # [Title]
 
 ## Problem
@@ -115,6 +118,8 @@ File name: $planFileName
 Commit!
 
 </plan-format>
+
+The source: frontmatter is optional. Include it only when the task references a specific source location (e.g. a debug session folder, a temp folder with reproduction files). Omit the entire frontmatter block if there is no source.
 
 The plan should include all paths and information for an LLM based coding agent to be able to execute the plan end-to-end without any human intervention. Keep the plan short and concise.
 
