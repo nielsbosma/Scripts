@@ -77,3 +77,14 @@ Claude reads this before generating tests, so accumulated learnings improve futu
 - `Button.Variant(ButtonVariant.Ghost)` and `.Primary()` render as standard `role="button"` elements ÔÇö no special locator strategy needed
 - After Clear button resets state, a `waitForTimeout(1000)` is needed before asserting the UI has updated (disabled state, empty fields)
 
+
+### 2026-03-09 21:01 — Chromatica.Palettes2
+- `Layout.TopCenter()` serves as a top-aligned centered layout container; the app renders without needing explicit navigation to a sub-path (loads at root `/`)
+- `state.ToTextInput()` renders as a standard `role="textbox"` element, locatable via `page.getByRole("textbox")` and compatible with `.fill()` for input
+- `.Placeholder()` on text inputs sets the HTML placeholder attribute; tests can verify presence but the successful tests used `.fill()` rather than asserting placeholder text
+- `.Primary()` and `.Outline()` button variants both render as standard `role="button"` elements with no special locator handling needed; `.Disabled()` with reactive boolean correctly toggles the HTML `disabled` attribute
+- Suggested prompt buttons that both set state and trigger an async action (e.g., `prompt.Set("..."); await GeneratePalette()`) populate the input with lowercase text ÔÇö assert `.toHaveValue("luxury spa")` not `"Luxury spa"`
+- For API-dependent tests, use `Promise.race()` with both success and error element waiters (30s timeout) to handle cases where API keys may not be configured ÔÇö test passes regardless of API availability
+- `Callout.Error()` renders error text that can be located via `page.getByText(/Failed to generate/i)` ÔÇö no special selector needed for Ivy callout components
+- `new Progress().Goal()` renders a loading indicator; combined with text elements, the loading state is brief and may require immediate screenshot capture after click
+
