@@ -75,7 +75,7 @@ if ($NonInteractive) {
 ivy-local @args
 
 if ($Debug) {
-    & "$PSScriptRoot\IvyAgentDebug.ps1" -Prompt "Analyze the session for issues"
+    pwsh -ExecutionPolicy Bypass -File "$PSScriptRoot\AF2\IvyAgentDebug.ps1"
 }
 
 Write-Host "Stopping Ivy.Agent.Server..."

@@ -28,9 +28,12 @@ function activate(context) {
     // Update Plan - runs UpdatePlan.ps1 on the selected .md file
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.updatePlan', async (uri) => {
+            if (!uri && vscode.window.activeTextEditor) {
+                uri = vscode.window.activeTextEditor.document.uri;
+            }
             if (!uri) return;
             await saveAndClose(uri);
-            const terminal = vscode.window.createTerminal('Update Plan');
+            const terminal = vscode.window.createTerminal({ name: 'Update Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\UpdatePlan.ps1" "${uri.fsPath}"`);
         })
@@ -72,7 +75,7 @@ function activate(context) {
         vscode.commands.registerCommand('ivy.splitPlan', async (uri) => {
             if (!uri) return;
             await saveAndClose(uri);
-            const terminal = vscode.window.createTerminal('Split Plan');
+            const terminal = vscode.window.createTerminal({ name: 'Split Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\SplitPlan.ps1" "${uri.fsPath}"`);
         })
@@ -109,7 +112,7 @@ function activate(context) {
     // Make Plan - runs MakePlan.ps1 (opens Notepad for input)
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.makePlan', () => {
-            const terminal = vscode.window.createTerminal('Make Plan');
+            const terminal = vscode.window.createTerminal({ name: 'Make Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\MakePlan.ps1"`);
         })
