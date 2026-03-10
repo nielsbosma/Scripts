@@ -1,0 +1,82 @@
+<#
+.SYNOPSIS
+    Extracts reference connection usage from langfuse data.
+    Looks for WorkflowReferenceMessage/WorkflowReferenceResultMessage events that reference connections.
+.PARAMETER LangfuseDir
+    Path to the langfuse data folder.
+.PARAMETER ConnectionsDir
+    Path to the connections directory. Default: D:\Repos\_Ivy\Ivy\connections
+.OUTPUTS
+    Array of objects: ReferenceName, LocalPath, Success, ContentChars
+#>
+param(
+    [Parameter(Mandatory)][string]$LangfuseDir,
+    [string]$ConnectionsDir = "D:\Repos\_Ivy\Ivy\connections"
+)
+
+$traceFolders = Get-ChildItem -Path $LangfuseDir -Directory | Sort-Object Name
+$connectionRefs = @{}
+
+foreach ($traceFolder in $traceFolders) {
+    $obsFiles = Get-ChildItem -Path $traceFolder.FullName -Filter "*.json" |
+        Where-Object { $_.Name -ne "trace.json" } | Sort-Object Name
+
+    foreach ($file in $obsFiles) {
+        try {
+            $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
+            $input = $json.input
+            if (-not $input -or -not $input.message -or -not $input.message.'$type') { continue }
+
+            $msgType = $input.message.'$type'
+
+            if ($msgType -eq 'WorkflowReferenceMessage') {
+                $name = $input.message.name
+                if ($name -and -not $connectionRefs.ContainsKey($name)) {
+                    $connectionRefs[$name] = [PSCustomObject]@{
+                        ReferenceName = $name
+                        LocalPath = $null
+                        Success = $null
+                        ContentChars = $null
+                    }
+                }
+            }
+            elseif ($msgType -eq 'WorkflowReferenceResultMessage') {
+                $name = $input.message.name
+                if ($name) {
+                    $success = $input.message.success -eq $true
+                    $contentLen = if ($input.message.content) { $input.message.content.Length } else { $null }
+
+                    if ($connectionRefs.ContainsKey($name)) {
+                        $connectionRefs[$name].Success = $success
+                        $connectionRefs[$name].ContentChars = $contentLen
+                    } else {
+                        $connectionRefs[$name] = [PSCustomObject]@{
+                            ReferenceName = $name
+                            LocalPath = $null
+                            Success = $success
+                            ContentChars = $contentLen
+                        }
+                    }
+                }
+            }
+        } catch {}
+    }
+}
+
+# Resolve local paths for connections
+foreach ($ref in $connectionRefs.Values) {
+    $name = $ref.ReferenceName
+    # Try to find matching connection folder
+    if (Test-Path $ConnectionsDir) {
+        $match = Get-ChildItem -Path $ConnectionsDir -Directory | Where-Object { $_.Name -eq $name } | Select-Object -First 1
+        if ($match) {
+            $ref.LocalPath = $match.FullName
+        } else {
+            # Try case-insensitive partial match
+            $match = Get-ChildItem -Path $ConnectionsDir -Directory | Where-Object { $_.Name -like "*$name*" } | Select-Object -First 1
+            if ($match) { $ref.LocalPath = $match.FullName }
+        }
+    }
+}
+
+return $connectionRefs.Values | Sort-Object ReferenceName

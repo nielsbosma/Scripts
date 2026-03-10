@@ -1,0 +1,163 @@
+# Ivy Playwright Test Knowledge Base
+
+## Ivy Framework Basics
+
+- Ivy apps are .NET web apps started with `dotnet run -- --port <port>`
+- The server prints `Ivy is running on http://localhost:<port>` when ready
+- Apps are decorated with `[App(icon: Icons.X, path: ["Apps"])]` and inherit `ViewBase`
+- The `Build()` method returns the UI tree
+- State is managed via `UseState<T>()` which returns reactive state objects
+- Services are injected via `UseService<T>()`
+
+## Ivy UI Components
+
+- `Layout.Center()`, `Layout.Vertical()`, `Layout.Horizontal()` — layout containers
+- `Text.H2()`, `Text.P()`, `Text.Label()`, `Text.InlineCode()` — text elements
+- `Slider` — range input, configured with `.Min()`, `.Max()`, `.Step()`
+- `Switch` — toggle input, configured with `.Label()`
+- `Button` — click handler, configured with `.Icon()`, `.Variant()`, `.Disabled()`
+- `Badge` — status label with variant (Destructive, Warning, Success, Info, Secondary)
+- `Card` — container card component
+- `Toast` — notification via `IClientProvider.Toast(message, type)`
+- State bindings: `state.ToSliderInput()`, `state.ToSwitchInput()`
+
+## Playwright Test Patterns for Ivy
+
+### Project Setup
+- Tests live in `.ivy/tests/` within the Ivy project
+- Use `package.json` with `@playwright/test` dependency
+- `playwright.config.ts` targets Chromium only, single worker, no retries
+- Config uses `process.env.APP_PORT` for base URL
+
+### App Lifecycle in Tests
+- `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
+- `afterAll`: kill the spawned process
+- `beforeEach`: navigate to `http://localhost:<port>`
+- Use `cwd: process.cwd().replace(/[/\\]\.ivy[/\\]tests$/, "")` to resolve project root from test dir
+- Wait for server with polling loop (500ms interval, 30s timeout)
+
+### Locator Strategies
+- Prefer `page.getByText()` for visible text content
+- Use `page.getByRole("button", { name: /pattern/i })` for buttons
+- Use `page.locator("code")` for inline code elements
+- Use `.first()` when multiple matches are possible
+- Use `waitFor({ state: "visible", timeout: 5000 })` for async content
+
+### Common Test Categories
+1. **Visibility tests** — verify UI elements render correctly
+2. **Interaction tests** — click buttons, toggle switches, move sliders
+3. **State change tests** — verify UI updates after interactions
+4. **Output validation** — check generated/computed values appear correctly
+
+### Gotchas & Tips
+- Ivy apps may take a few seconds to start; 30s timeout is safe
+- Use `shell: true` in spawn options on Windows
+- Password/random generation tests: compare two outputs rather than asserting exact values
+- Switch/toggle labels include the label text, use `getByText()` to find them
+- After clicking a button, use `waitForTimeout(500)` or `waitFor()` before asserting changes
+- Badges with strength/status text may appear multiple times; use `.first()`
+- `state.ToSelectInput().Variant(SelectInputVariants.Toggle)` renders as radio buttons — use `getByRole("radio", { name: "OptionName" })` to click them, NOT `getByText()` (the option text may appear in headings/descriptions too)
+- `IClientProvider.Toast()` renders both a visible `<div>` and an `aria-live` status `<span>` — use `getByText("message", { exact: true })` to avoid strict mode violations
+- `state.ToTextareaInput()` renders as a standard `<textarea>` element, locatable via `page.locator("textarea").first()`; disabled output textarea is the `.nth(1)`
+- Clipboard `writeText` fails in headless Chromium with "Write permission denied" — this is expected and not an app bug
+- `state.ToSliderInput()` renders as a Radix UI slider with `role="slider"`, NOT a native `<input type="range">` — use `page.getByRole("slider")` and keyboard interaction (ArrowRight/ArrowLeft to increment/decrement by step, Home/End for min/max)
+- `state.ToBoolInput().Variant(BoolInputVariants.Checkbox)` renders as `<button role="checkbox">` (Radix UI), NOT a native `<input type="checkbox">` — `getByRole("checkbox", { name: /.../ })` and `getByLabel()` do NOT work for locating these; use `page.locator('[role="checkbox"]').nth(N)` by index order instead
+- `new Card(content, header: Text.H3("Title"))` — the card header text (e.g., "Monthly Revenue") will match `getByText()` along with any content containing the same substring (e.g., "Total Monthly Revenue:"), causing strict mode violations. Always use `getByRole("heading", { name: "Title" })` for card headers
+- `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
+- `.ToDetails()` on an anonymous object renders key-value pairs with PascalCase property names converted to spaced labels (e.g., `MonthlyNetBurn` → "Monthly Net Burn")
+
+## Critical: ValueTuple Crash Pattern
+
+- **NEVER** use C# ValueTuple syntax `Layout.Vertical() | (item1, item2, ...)` when the tuple contains widgets — `DefaultContentBuilder.Format()` calls `ValueTuple.ToString()` which triggers `PrintMembers()` → `get_Id()` on uninitialized widgets, causing `InvalidOperationException`
+- **Always** use `|` operator chaining instead: `Layout.Vertical() | item1 | item2 | item3`
+- This is a Framework bug in `DefaultContentBuilder.Format()` (line 171) — note as external issue for planning
+- Affects ALL widget types (Field, TextInput, Button, etc.) when placed in tuples
+
+## Test Structure Patterns
+
+- `test.beforeAll` runs once per `test.describe` block. Multiple `test.describe` blocks = multiple `beforeAll` executions = multiple server spawns and potential DLL lock conflicts.
+- For shared server: put all tests in one `test.describe`, or use top-level `test()` calls outside describe blocks which share the file-level `beforeAll`.
+- Always kill app processes after test runs on Windows — lingering processes lock DLLs and prevent rebuild on next run. Use `powershell.exe -NoProfile -Command 'Get-Process -Name "AppName" -ErrorAction SilentlyContinue | Stop-Process -Force'`
+- When stale processes lock DLLs and `dotnet run` fails repeatedly, spawn the pre-built exe directly: `spawn(path.join(projectRoot, "bin", "Debug", "net10.0", "AppName.exe"), ["--port", port], ...)`
+
+## Ivy Component Test Patterns
+
+- `AsQueryable().ToDataTable()` renders using glide-data-grid — a virtualized grid where cells have `role="gridcell"` but may not be "visible" (outside virtual viewport). Use `toBeAttached()` instead of `toBeVisible()` for these cells.
+- `state.ToNumberInput().Variant(NumberInputVariants.Slider)` renders similarly to `ToSliderInput()` — a Radix slider with `role="slider"`.
+- `state.ToSelectInput(options).Variant(SelectInputVariants.Toggle)` with string arrays renders radio buttons — use `getByRole("radio", { name: "OptionName" })`.
+
+## Run History
+
+### 2026-03-10 — Polyglot.TypeTrainer
+- `new Html(...)` component renders raw HTML content but it appears invisible — the word display area is completely blank in all screenshots. Likely renders in an iframe without CSS custom property inheritance (`var(--foreground)` etc. resolve to nothing). Hardcoded colors or native Ivy components would fix this.
+- `SelectInput` with options that share a prefix (e.g., "Deutsch" and "Deutsch (Schweiz)", or "5 seconds" and "15 seconds") cause strict mode violations — always use `{ exact: true }` with `getByText()`
+- `TextInput` onChange fires with the full new value, not character-by-character — `fill("test")` sends value "test" in one event. The timer start condition `e.Value.Length == 1 && userInput.Value.Length == 0` only triggers with single-char input, so use `keyboard.type("t")` not `fill("t")` for reliability
+- `UseEffect` with `async` lambda containing `while(true) + Task.Delay(1000)` works as a polling timer in Ivy
+
+### 2026-03-10 — CineStream.Converter
+- `AsQueryable().ToDataTable()` uses glide-data-grid (virtualized) — cells are `role="gridcell"` but may not pass `toBeVisible()` check; use `toBeAttached()` instead
+- DataTable with `.Config(c => { c.AllowFiltering = true; c.ShowSearch = true; })` shows filter icon button and search — but these may be above/below the grid viewport
+- `state.ToNumberInput().Variant(NumberInputVariants.Slider)` renders as Radix slider, same as `ToSliderInput()`
+- Multiple `test.describe` blocks in one file each trigger their own `beforeAll` — caused server re-spawn failure due to DLL locks from first server instance
+- Solution: use top-level `test()` (outside `describe`) for tests that need to share the same server lifecycle
+
+### 2026-03-09 20:46 — Parsely.Markflow
+- CodeMirror-based code inputs (from `state.ToCodeInput()`) use `.cm-content[contenteditable='true']` as the editable locator; type into them via `click()` then `page.keyboard.type()` rather than `.fill()`
+- For CodeMirror inputs, the second editor (read-only/disabled output) is accessed via `.cm-content` with `.nth(1)` index selector
+- Markdig's `ToHtml` with `UseAdvancedExtensions()` generates heading IDs like `id="hello-world"` — useful for asserting exact HTML output in tests
+- `Button.Disabled()` with a reactive condition correctly toggles the HTML `disabled` attribute, testable via `toBeDisabled()`/`toBeEnabled()`
+- Multi-line input in CodeMirror requires line-by-line `keyboard.type()` + `keyboard.press("Enter")` rather than pasting a single string with newlines
+- `Button.Variant(ButtonVariant.Ghost)` and `.Primary()` render as standard `role="button"` elements — no special locator strategy needed
+- After Clear button resets state, a `waitForTimeout(1000)` is needed before asserting the UI has updated
+
+### 2026-03-10 — ByteForge.UrlCraft
+- `state.ToSelectInput().Variant(SelectInputVariants.Toggle)` renders enum options as radio buttons with `role="radio"` and `aria-label` matching the enum value name
+- Toast messages from `client.Toast()` produce duplicate text nodes (visible div + aria-live span) — always use `{ exact: true }` with `getByText` for toast assertions
+- `state.ToTextareaInput()` renders as `<textarea>`, output via `new TextInput().Variant(TextInputVariants.Textarea).Disabled()` also renders as `<textarea>` — use `.first()` / `.nth(1)` to distinguish
+
+### 2026-03-10 — Nexus.PasswordForge2
+- `state.ToSliderInput()` renders Radix slider (`role="slider"`), not native range input — interact via keyboard: `focus()` then `ArrowRight`/`ArrowLeft` (step by 1), `Home`/`End` for min/max
+- `state.ToBoolInput().Variant(BoolInputVariants.Checkbox)` renders `<button role="checkbox">` but `getByRole("checkbox", { name })` and `getByLabel()` fail to locate them — the label `<label for="id">` association doesn't work for Playwright's accessible name resolution; use `page.locator('[role="checkbox"]').nth(N)` by DOM order
+- Clicking the checkbox label text via `getByText("Label").click()` also does NOT toggle the checkbox — must click the `<button>` element directly
+- `Progress` component with dynamic color shows correctly as a colored progress bar
+
+### 2026-03-10 — Skyline.RunwayCalculator
+- `new Card(content, header: Text.H3("X"))` card headers cause strict mode violations with `getByText("X")` when page also contains "Total X:" text — use `getByRole("heading", { name: "X" })` instead
+- `state.ToMoneyInput()` renders formatted currency inputs (e.g., "$850,000") — values visible as text with `$` and commas
+- `.ToDetails()` converts anonymous object properties to readable labels (PascalCase → spaced) and displays as key-value pairs
+- Stale dotnet processes from previous test runs can lock DLLs and prevent rebuilds — kill processes between runs; `taskkill /f` may fail, use `wmic process where "name='X.exe'" delete` as fallback
+
+### 2026-03-09 21:01 — Chromatica.Palettes2
+- `Layout.TopCenter()` serves as a top-aligned centered layout container; the app renders at root `/`
+- `state.ToTextInput()` renders as a standard `role="textbox"` element, locatable via `page.getByRole("textbox")` and compatible with `.fill()`
+- `.Primary()` and `.Outline()` button variants both render as standard `role="button"` elements; `.Disabled()` with reactive boolean correctly toggles HTML `disabled` attribute
+- Suggested prompt buttons that both set state and trigger an async action populate the input with lowercase text — assert `.toHaveValue("luxury spa")` not `"Luxury spa"`
+- For API-dependent tests, use `Promise.race()` with both success and error element waiters (30s timeout) to handle cases where API keys may not be configured
+- `Callout.Error()` renders error text locatable via `page.getByText(/Failed to generate/i)` — no special selector needed
+- `new Progress().Goal()` renders a loading indicator; the loading state is brief and may require immediate screenshot capture after click
+
+### 2026-03-10 — Numerix.Statistics
+- ValueTuple syntax in `Build()` crashes with `InvalidOperationException: uninitialized WidgetBase Id` — switched to `|` operator chaining
+- `.WithField().Label("Numbers")` on textarea also crashes in tuple context — replaced with separate `Text.Label("Numbers")`
+- `.ToDetails()` on anonymous object renders clean key-value pair table in a card
+- Spawning pre-built exe (`bin/Debug/net10.0/AppName.exe`) avoids `dotnet run` rebuild DLL lock issues
+- `Text.Label()` works as a standalone label element outside of `.WithField()`
+
+### 2026-03-10 — Ivy.TextAnnotate (Widget Library)
+- Widget library projects have `.samples/` subfolder with the runnable app — tests must use `samplesDir` not `projectRoot` for `dotnet run`
+- `[ExternalWidget]` components show "Unknown component type: Namespace.WidgetName" when the embedded JS bundle isn't served to the browser — this is a Framework issue, not a test issue
+- Ivy NuGet 1.2.17 is missing `Layout`, `Text`, `ButtonVariant`, `ChromeSettings`, `Server.UseCulture()` — these APIs only exist in source. Use `ProjectReference` to Ivy source if samples require them.
+- Generated sample code may use stale API patterns: `Button.Style()` → `.Variant()`, `ButtonStyle` → `ButtonVariant`, `HandleClick` → `.OnClick()`, `HandleChange(state.Set)` → `HandleChange(v => state.Set(v))` (Set returns T, not void)
+- Without `UseChrome()`, Ivy SPA doesn't support URL-based app routing — `/app-name` shows the default app. Must enable Chrome for multi-app navigation.
+- `powershell -Command "Get-Process -Name 'X' -ErrorAction SilentlyContinue | Stop-Process -Force"` is more reliable than `taskkill /f /im` for killing stale processes on Windows
+
+### 2026-03-10 — Nexus.HumanCore
+- Ivy Chrome tabs apps: navigation is via sidebar nav items, NOT `role="tab"` — use `page.getByText("AppName").first().click()` or locate the sidebar link
+- `UseChrome(new ChromeSettings().UseTabs())` renders apps as tabs in the top bar — but the tab element might match `getByRole("tab")` or just be clickable text
+- `ToSearchInput().Placeholder("Search")` — all list blades in this project used the same generic "Search" placeholder, NOT entity-specific placeholders
+- `Icons.Plus.ToButton().Ghost().Tooltip("Create X").ToTrigger(...)` — the tooltip text becomes the button's accessible name, locatable via `getByRole("button", { name: /Create X/i })`
+- Ivy `ListItem` does not have a `data-ivy-list-item` attribute — fallback selectors are needed to click list items in tests
+- CRUD apps with `UseBlades()` pattern: list blade on left, detail blade opens on right when item clicked — the blade push/pop pattern
+- `MetricView` renders as cards with title, icon, value, and trend percentage — fully functional with seeded data
+- Chart views (LineChart, PieChart, BarChart, AreaChart) wrapped in Card with Skeleton loading — charts may be empty for short date ranges with no matching data
+- `HeaderLayout(header, body)` pattern used for Dashboard — header contains the date range toggle, body contains the content
