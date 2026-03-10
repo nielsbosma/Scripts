@@ -12,7 +12,7 @@ $promptFile = PrepareFirmware $PSScriptRoot $args $logFile
 
 Write-Host "Starting Claude Code..."
 Push-Location $programFolder
-claude --dangerously-skip-permissions --initial-prompt (Get-Content $promptFile -Raw)
+claude --dangerously-skip-permissions -- (Get-Content $promptFile -Raw)
 Pop-Location
 
 Remove-Item $promptFile

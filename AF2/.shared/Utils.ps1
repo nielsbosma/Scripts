@@ -37,7 +37,10 @@ function PrepareFirmware {
     $firmware = Get-Content "$ScriptRoot\.shared\Firmware.md" -Raw
     $firmware = $firmware.Replace("[ARGS]", ($Args -join ", "))
     $firmware = $firmware.Replace("[LOGFILE]", $LogFile)
-    return $firmware
+
+    $promptFile = [System.IO.Path]::GetTempFileName()
+    Set-Content -Path $promptFile -Value $firmware -NoNewline
+    return $promptFile
 }
 
 function CollectArgs {
