@@ -1,67 +1,95 @@
 # IvyAgentDebug
 
-Investigate an Ivy Agent session and generate plans for any findings.
+Analyze review data from an Ivy Agent session and generate actionable improvement plans.
 
 ## Context
 
-Args contains the session/trace ID and any additional investigation prompt from the user.
+By the time you run, these review scripts have already completed and produced files in `{WorkDir}/.ivy/`:
 
-Read about the important paths and files in ../.shared/Paths.md
+- **ReviewBuild** → `review-build.md`
+- **ReviewLangfuse** → `langfuse-timeline.md`, `langfuse-build-errors.md`, `langfuse-docs.md`, `langfuse-hallucinations.md`, `langfuse-questions.md`, `langfuse-reference-connections.md`, `langfuse-workflows.md`
+- **ReviewSpec** → `review-spec.md`
+- **ReviewTests** → `review-tests.md`, `review-ux.md`
 
-Read `/Memory/Langfuse.md` for detailed Langfuse analysis steps, JSON path cheat sheets, and debugging recipes.
+Read about the important paths and files in `../.shared/Paths.md`
+
+Read `/Memory/Langfuse.md` for Langfuse JSON structure reference if you need to inspect raw data.
 
 Plans are stored in `D:\Repos\_Ivy\.plans\`. Each plan gets a sequential numeric ID from the counter file `.counter` in that directory.
 
 ## Execution Steps
 
-### 1. Get Debug Folder
+### 1. Read All Reviews
 
-```
-powershell -Command '[Environment]::GetEnvironmentVariable("IVY_AGENT_DEBUG_FOLDER", "User")'
-```
-If empty, try Machine scope.
+Read every review file in `{WorkDir}/.ivy/`:
 
-### 2. Fetch Session Data
+- `.ivy/spec.md` — the original spec
+- `.ivy/review-build.md` — build review
+- `.ivy/review-spec.md` — spec compliance review
+- `.ivy/review-tests.md` — test results, project fixes applied, external issues
+- `.ivy/review-ux.md` — UX/screenshot review
+- `.ivy/langfuse-timeline.md` — session timeline
+- `.ivy/langfuse-build-errors.md` — all build errors
+- `.ivy/langfuse-docs.md` — docs read by the agent (and 404s)
+- `.ivy/langfuse-hallucinations.md` — hallucination analysis
+- `.ivy/langfuse-questions.md` — IvyQuestion Q&A log
+- `.ivy/langfuse-reference-connections.md` — reference connections used
+- `.ivy/langfuse-workflows.md` — workflow execution details
 
-- Check if a `langfuse` subfolder exists in the session folder
-- If not, fetch it: `ivy-agent langfuse session get <session-id>`
-- Run the compact timeline: `ivy-agent langfuse session timeline --session-id <session-id> -c`
-- If multiple traces exist, present them and focus on the most relevant one
+If a file is missing, note it and continue with what's available.
 
-IMPORTANT: Always use the `ivy-agent` CLI tool (in PATH). Do NOT use `dotnet run`.
+Also check for `.ivy/annotations.md` — this contains the client TUI output annotated by the user with `>>` prefixed lines. These annotations are the user's own observations about what went wrong and should be investigated with **highest priority**. Look for every `>>` line and address each one.
 
-### 3. Investigate: Hallucinations
+Check the logs:  
 
-- Find `BuildProjectResultMessage` observations with build errors
-- Look at the question sequences and code writes leading up to each failed build
-- Identify cases where the agent used a non-existent or incorrect **Ivy Framework** API
-- Ignore non-hallucination causes: missing assemblies, NuGet packages, target framework issues, transitive dependencies
-- Check if a refactoring rule in `IvyCSharpRefactoringService.cs` could prevent the hallucination
-- Document findings as plans (not direct edits to hallucinations.md)
+IVY_AGENT_DEBUG_FOLDER\<session-id>\
+  <session-id>-client-verbose.log
+  <session-id>-client-output.log
+  <session-id>-server-verbose.log
+  <task-trace-id>-client-verbose.log
+  <task-trace-id>-server-verbose.log
 
-### 4. Investigate: Questions
+Anything that stands out that we should look into?
 
-- Find `IvyQuestion` tool calls where the agent didn't get a satisfactory answer
-- Check if the Q&A should be added to `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Faq.md`
-- Check if the question is already in the FAQ — if so, assess if the existing answer needs improvement
-- Document findings as plans
+### 2. Investigate & Generate Plans
 
-### 5. Investigate: Workflows
+For each issue found across the reviews, investigate and create a plan. Search existing plans first to avoid duplicates.
 
-If the session involves workflows (`WorkflowStartMessage` events):
-- Read the workflow source code and prompt templates
-- Understand the intended flow vs what actually happened
-- Look for transition issues, incorrect question sequences, or tool feedback errors
+#### Hallucinations
+- If `langfuse-hallucinations.md` reports hallucinated APIs, check if a refactoring rule could prevent it
+- Check `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` for missing or unclear documentation
+- Add to `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Hallucinations.md`
+- Check if samples cover the misused pattern
 
-### 6. Investigate: Reflect
+#### Failed Questions
+- If `langfuse-questions.md` shows failed IvyQuestion calls, check if the answer should exist in:
+  - `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Faq.md`
+  - Or a dedicated doc page
+- Check if the question is already in the FAQ — if so, assess if the answer needs improvement
+- NOTE! Just because we have documented something in Faq.md doesn't mean that IvyMcp has been updated wiht that info yet.
 
-- Analyze the debugging session for areas of improvement
-- Consider: logging improvements, better tooling, clearer instructions
-- Document findings as plans
+#### Doc 404s
+- If `langfuse-docs.md` shows failed doc reads, check what path was requested and whether:
+  - The doc exists at a different path
+  - The doc should be created
+  - The agent's doc path resolution has a bug
 
-### 7. Generate Plans
+#### Build Errors
+- If `langfuse-build-errors.md` shows errors, cross-reference with `langfuse-hallucinations.md`
+- Distinguish: hallucination vs missing package vs framework bug vs user code bug
+- Could the build error be avoided by improving any part of the agent?
 
-For each finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
+#### Workflow Issues
+- If `langfuse-workflows.md` shows failures, read the workflow source files
+- Check state transitions and prompt templates for issues
+
+#### Test Failures & UX Issues
+- If `review-tests.md` shows external issues, document them as plans
+- If `review-ux.md` has recommendations, assess if they point to framework widget gaps - anything we can improve in the agent?
+
+### 3. Create Plan Files
+
+For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
 
 - Read the counter from `.counter` (default 200 if missing), allocate IDs, increment
 - Format: `<ID>-<RepositoryName>-Feature-<Title>.md`
@@ -72,13 +100,18 @@ Plan format:
 
 ```markdown
 ---
-source: <IVY_AGENT_DEBUG_FOLDER>\<session-id>\
+source: {WorkDir}/.ivy/
+session: {SessionId}
 ---
 # [Title]
 
 ## Problem
 
+[What went wrong, with evidence from review files]
+
 ## Solution
+
+[Concrete steps — include file paths, code patterns, API names]
 
 ## Clean up
 
@@ -87,8 +120,9 @@ source: <IVY_AGENT_DEBUG_FOLDER>\<session-id>\
 
 ### Rules
 
-- **Everything must be expressed as plans** — hallucination docs, FAQ edits, issue creation, improvements
+- **Everything must be expressed as plans** — hallucination fixes, FAQ edits, doc improvements, workflow fixes
 - ONE issue per plan file
 - Plans must include all paths and information for an LLM coding agent to execute end-to-end
 - Keep plans short and concise
 - Do NOT modify any source code directly — only read files and create plan files
+- Missing review files are not failures — analyze what's available
