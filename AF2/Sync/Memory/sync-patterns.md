@@ -7,6 +7,10 @@
 - **Scripts**: No .slnx files to build. Only needs git sync.
 - **Ivy-Agent-Test-Data**: No .slnx files to build. Only needs git sync.
 
+## Known Issues
+
+- **VBCSCompiler file locks**: `dotnet build` frequently fails on first attempt due to VBCSCompiler holding locks on DLLs. Retry usually succeeds. Consider killing VBCSCompiler processes before building.
+
 ## Build Strategy
 
 - Build main/root .slnx per repo first, then sub-solutions not covered by the main one.

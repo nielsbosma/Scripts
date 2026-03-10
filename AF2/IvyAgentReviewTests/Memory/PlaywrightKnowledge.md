@@ -61,6 +61,7 @@
 - `state.ToTextareaInput()` renders as a standard `<textarea>` element, locatable via `page.locator("textarea").first()`; disabled output textarea is the `.nth(1)`
 - Clipboard `writeText` fails in headless Chromium with "Write permission denied" — this is expected and not an app bug
 - `state.ToSliderInput()` renders as a Radix UI slider with `role="slider"`, NOT a native `<input type="range">` — use `page.getByRole("slider")` and keyboard interaction (ArrowRight/ArrowLeft to increment/decrement by step, Home/End for min/max)
+- `UseChrome()` renders a hidden sidebar search `<input type="search" data-testid="sidebar-search">` that is the first `input` in the DOM but outside the viewport — `page.locator("input").first()` will target it instead of app inputs. Use `input[type='text']` or label-based locators to target app inputs
 - `state.ToBoolInput().Variant(BoolInputVariants.Checkbox)` renders as `<button role="checkbox">` (Radix UI), NOT a native `<input type="checkbox">` — `getByRole("checkbox", { name: /.../ })` and `getByLabel()` do NOT work for locating these; use `page.locator('[role="checkbox"]').nth(N)` by index order instead
 - `new Card(content, header: Text.H3("Title"))` — the card header text (e.g., "Monthly Revenue") will match `getByText()` along with any content containing the same substring (e.g., "Total Monthly Revenue:"), causing strict mode violations. Always use `getByRole("heading", { name: "Title" })` for card headers
 - `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
@@ -152,12 +153,12 @@
 - `powershell -Command "Get-Process -Name 'X' -ErrorAction SilentlyContinue | Stop-Process -Force"` is more reliable than `taskkill /f /im` for killing stale processes on Windows
 
 ### 2026-03-10 — Nexus.HumanCore
-- Ivy Chrome tabs apps: navigation is via sidebar nav items, NOT `role="tab"` — use `page.getByText("AppName").first().click()` or locate the sidebar link
-- `UseChrome(new ChromeSettings().UseTabs())` renders apps as tabs in the top bar — but the tab element might match `getByRole("tab")` or just be clickable text
-- `ToSearchInput().Placeholder("Search")` — all list blades in this project used the same generic "Search" placeholder, NOT entity-specific placeholders
-- `Icons.Plus.ToButton().Ghost().Tooltip("Create X").ToTrigger(...)` — the tooltip text becomes the button's accessible name, locatable via `getByRole("button", { name: /Create X/i })`
+- **Chrome tabs start with NO tab open** — `UseChrome(new ChromeSettings().UseTabs())` renders a sidebar but the content area is blank on initial load. Tests MUST click a sidebar item (e.g., `page.getByText("Dashboard").first().click()`) before asserting content
+- Navigation is via sidebar nav items, NOT `role="tab"` — use `page.getByText("AppName").first().click()`
+- `Icons.Plus.ToButton().Ghost().Tooltip("Create X").ToTrigger(...)` — the tooltip text does NOT become the button's accessible name in Playwright. `getByRole("button", { name: /Create X/i })` fails. Use `page.locator("button").filter({ has: page.locator("svg") }).first()` instead
 - Ivy `ListItem` does not have a `data-ivy-list-item` attribute — fallback selectors are needed to click list items in tests
 - CRUD apps with `UseBlades()` pattern: list blade on left, detail blade opens on right when item clicked — the blade push/pop pattern
 - `MetricView` renders as cards with title, icon, value, and trend percentage — fully functional with seeded data
 - Chart views (LineChart, PieChart, BarChart, AreaChart) wrapped in Card with Skeleton loading — charts may be empty for short date ranges with no matching data
 - `HeaderLayout(header, body)` pattern used for Dashboard — header contains the date range toggle, body contains the content
+- Lists sorted alphabetically may push expected items below viewport — assert items visible at the TOP of the sorted list, not arbitrary ones
