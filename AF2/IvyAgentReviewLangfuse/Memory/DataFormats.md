@@ -7,7 +7,14 @@
 ## IvyQuestion (Request/Response Pair)
 - **Request**: `EVENT__local__IvyQuestion` — `input.question` has the question text
 - **Response**: `EVENT_LocalResponse` (next file) — `input.toolName = "IvyQuestion"`, `input.response.success`, `input.response.answer`, `input.response.error`
-- **AnswerAgent variant**: Sometimes questions go through `SPAN_AnswerAgent` → `GENERATION_AnswerAgent` instead. The SPAN has `input.question` and `input.document`. The generation output is the answer text.
+
+## WebFetch+AnswerAgent (Question via WebFetch)
+- When WebFetch is called with a `question` parameter, the server uses AnswerAgent to answer it from the fetched content.
+- **WebFetch event**: `EVENT_WebFetch` — `input.url`, `input.success`, `input.contentLength`
+- **AnswerAgent SPAN**: `SPAN_AnswerAgent` — `input.question`, `input.document`, `output.answer` (if successful)
+- **AnswerAgent GENERATION**: `GENERATION_AnswerAgent` — child of the SPAN, contains the LLM call
+- **WebFetch response**: `EVENT_LocalResponse` — `input.toolName = "WebFetch"`, `input.response.success`, `input.response.contentLength`
+- **Important**: AnswerAgent success/failure is determined by `output.answer` on the SPAN. This is NOT a ToolFeedback error. ToolFeedback only occurs for tool validation errors (e.g., missing `url` parameter).
 
 ## Workflows
 - `EVENT__out__WorkflowStartMessage` — `input.message.WorkflowName` (note: the tool reads WorkflowName from different fields)

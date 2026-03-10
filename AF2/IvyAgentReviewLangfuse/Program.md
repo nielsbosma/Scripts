@@ -89,7 +89,11 @@ Look for the pattern: IvyQuestion answer → WriteFile → Build FAIL. When a bu
 
 #### `langfuse-questions.md`
 
-All IvyQuestion calls and their answers. Use `Get-IvyQuestions.ps1`.
+All questions asked during the session (IvyQuestion and WebFetch+AnswerAgent). Use `Get-IvyQuestions.ps1`.
+
+The tool returns a `Source` field: `IvyQuestion` (local doc lookup) or `AnswerAgent` (WebFetch question answered by LLM).
+
+**Important**: Only label errors as "ToolFeedback" when an actual `EVENT_ToolFeedback` observation exists (with `input.feedback`). AnswerAgent failures are NOT ToolFeedback — they are LLM processing errors. Use the tool's `Success`/`Error` fields to determine status; do not infer status from other events in the timeline.
 
 ```markdown
 # IvyQuestion Log: {SessionId}
@@ -98,6 +102,7 @@ All IvyQuestion calls and their answers. Use `Get-IvyQuestions.ps1`.
 
 ### Q1: {question text}
 
+**Source**: IvyQuestion / AnswerAgent
 **Status**: ✅ Success / ❌ Failed
 **Answer length**: N chars
 **Error**: {if failed}
