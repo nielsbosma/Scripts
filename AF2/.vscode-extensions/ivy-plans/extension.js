@@ -32,7 +32,7 @@ function activate(context) {
             await saveAndClose(uri);
             const terminal = vscode.window.createTerminal('Update Plan');
             terminal.show();
-            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\UpdatePlan.ps1" "${uri.fsPath}" -ReadyToGo`);
+            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\UpdatePlan.ps1" "${uri.fsPath}" -ReadyToGo`);
         })
     );
 
@@ -74,7 +74,7 @@ function activate(context) {
             await saveAndClose(uri);
             const terminal = vscode.window.createTerminal('Split Plan');
             terminal.show();
-            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\SplitPlan.ps1" "${uri.fsPath}" -ReadyToGo`);
+            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\SplitPlan.ps1" "${uri.fsPath}" -ReadyToGo`);
         })
     );
 
@@ -111,7 +111,7 @@ function activate(context) {
         vscode.commands.registerCommand('ivy.makePlan', () => {
             const terminal = vscode.window.createTerminal('Make Plan');
             terminal.show();
-            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\MakePlan.ps1"`);
+            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\MakePlan.ps1"`);
         })
     );
 }
