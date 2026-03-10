@@ -51,7 +51,23 @@ IVY_AGENT_DEBUG_FOLDER\<session-id>\
 
 Anything that stands out that we should look into?
 
-### 2. Investigate & Generate Plans
+### 2. Search GitHub Issues
+
+Before creating plans, search GitHub issues to check if a finding is already tracked or has a planned fix. This avoids creating workaround plans for things that are already being built.
+
+```bash
+# Search across all main Ivy repos
+gh search issues "<keyword>" --repo Ivy-Interactive/Ivy-Framework --repo Ivy-Interactive/Ivy-Agent --repo Ivy-Interactive/Ivy-Mcp --repo Ivy-Interactive/Ivy --json title,url,number,state
+```
+
+Key repos to search: `Ivy-Interactive/Ivy-Framework`, `Ivy-Interactive/Ivy-Agent`, `Ivy-Interactive/Ivy-Mcp`, `Ivy-Interactive/Ivy`, `Ivy-Interactive/Ivy-Inspectors`
+
+If a GitHub issue already covers a finding:
+- Reference the issue in the plan (e.g. `See: Ivy-Framework#2398`)
+- Don't create workaround plans (e.g. FAQ entries) for features that are already being built — instead note the issue is in progress
+- If the finding adds new context to an existing issue, consider commenting on the issue or creating a plan that references it
+
+### 3. Investigate & Generate Plans
 
 For each issue found across the reviews, investigate and create a plan. Search existing plans first to avoid duplicates.
 
@@ -87,7 +103,7 @@ For each issue found across the reviews, investigate and create a plan. Search e
 - If `review-tests.md` shows external issues, document them as plans
 - If `review-ux.md` has recommendations, assess if they point to framework widget gaps - anything we can improve in the agent?
 
-### 3. Create Plan Files
+### 4. Create Plan Files
 
 For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
 

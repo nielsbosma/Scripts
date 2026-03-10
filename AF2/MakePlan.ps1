@@ -10,11 +10,11 @@ Write-Host "Log file: $logFile"
 
 $sessionId = [guid]::NewGuid().ToString()
 
-$promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $args; WorkDir = (Get-Location).Path; SessionId = $sessionId }
+$promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $args; WorkDir = (Get-Location).Path; ClaudeSessionId = $sessionId }
 
 Write-Host "Starting Claude Code..."
 Push-Location $programFolder
-claude --dangerously-skip-permissions --session-id $sessionId --allowedTools "Read,Glob,Grep,Write,Agent,Bash,WebFetch,WebSearch" -- (Get-Content $promptFile -Raw)
+claude --dangerously-skip-permissions --session-id $sessionId -- (Get-Content $promptFile -Raw)
 Pop-Location
 
 Remove-Item $promptFile

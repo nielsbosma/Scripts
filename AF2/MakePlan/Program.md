@@ -26,6 +26,11 @@ Args contains the user's task description. If it references related plans with `
 
 - Read relevant source files to understand the codebase areas involved
 - If Args mentions a session/trace ID, use the Langfuse debugging steps from `/Memory/Langfuse.md`
+- **Search GitHub issues** before creating plans to avoid duplicates or workaround plans for features already being built:
+  ```bash
+  gh search issues "<keyword>" --repo Ivy-Interactive/Ivy-Framework --repo Ivy-Interactive/Ivy-Agent --repo Ivy-Interactive/Ivy-Mcp --repo Ivy-Interactive/Ivy --json title,url,number,state
+  ```
+  If an issue already covers the task, reference it in the plan and avoid creating workaround plans.
 - Do NOT create, edit, or delete any files. Only use the Read tool and search tools.
 - Do NOT use the Edit, Write, or Bash tools to modify any source files.
 
