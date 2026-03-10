@@ -1,5 +1,6 @@
 ---
 Args: [ARGS]
+WorkingDirectory: [WORKDIR]
 ---
 You are an agentic application that evolves over time. 
 

@@ -30,13 +30,15 @@ function GetNextLogFile {
 function PrepareFirmware {
     param(
         [string]$ScriptRoot,
-        [string[]]$Args,
-        [string]$LogFile
+        [string]$Args,
+        [string]$LogFile,
+        [string]$WorkDir = ""
     )
 
     $firmware = Get-Content "$ScriptRoot\.shared\Firmware.md" -Raw
-    $firmware = $firmware.Replace("[ARGS]", ($Args -join ", "))
+    $firmware = $firmware.Replace("[ARGS]", $Args)
     $firmware = $firmware.Replace("[LOGFILE]", $LogFile)
+    $firmware = $firmware.Replace("[WORKDIR]", $WorkDir)
 
     $promptFile = [System.IO.Path]::GetTempFileName()
     Set-Content -Path $promptFile -Value $firmware -NoNewline
@@ -49,24 +51,25 @@ function CollectArgs {
         [switch]$Optional
     )
 
-    $Arguments = $Arguments | Where-Object { $_.Trim() -ne "" }
+    $Arguments = $Arguments | Where-Object { $_ -ne $null -and $_.Trim() -ne "" }
+    $joined = ($Arguments -join " ").Trim()
 
-    if ($Arguments.Count -eq 0 -and $Optional) {
-        return @("(No Args)")
+    if ($joined -eq "" -and $Optional) {
+        return "(No Args)"
     }
 
-    if ($Arguments.Count -eq 0) {
+    if ($joined -eq "") {
         $tempFile = [System.IO.Path]::GetTempFileName()
         Write-Host "No arguments provided. Opening Notepad — save the file and close it to continue."
         Start-Process -FilePath "notepad.exe" -ArgumentList $tempFile -Wait
-        $Arguments = Get-Content $tempFile | Where-Object { $_.Trim() -ne "" }
+        $joined = ((Get-Content $tempFile) -join " ").Trim()
         Remove-Item $tempFile
     }
 
-    if ($Arguments.Count -eq 0) {
+    if ($joined -eq "") {
         Write-Host "No arguments provided. Exiting."
         exit
     }
 
-    return $Arguments
+    return $joined
 }

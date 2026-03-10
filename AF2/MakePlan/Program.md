@@ -1,0 +1,62 @@
+# MakePlan
+
+Create an implementation plan for a task described in args in the Ivy ecosystem.
+
+## Context
+
+Plans are stored in `D:\Repos\_Ivy\.plans\`. Each plan gets a sequential numeric ID from the counter file `.counter` in that directory.
+
+Read about the important paths and files in ../.shared/Paths.md
+
+## Execution Steps
+
+### 1. Parse Args
+
+Args contains the user's task description. If it references related plans with `[number]` syntax (e.g. `[205]`), find and read those plan files from `D:\Repos\_Ivy\.plans\` for context.
+
+### 2. Allocate Plan ID
+
+- Read the counter from `D:\Repos\_Ivy\.plans\.counter` (default 200 if missing)
+- Reserve the next ID and increment the counter
+- Format as 3-digit zero-padded (e.g. `205`)
+
+### 3. Research
+
+- Read relevant source files to understand the codebase areas involved
+- If Args mentions a session/trace ID, use the Langfuse debugging steps from `/Memory/Langfuse.md`
+- Do NOT create or write any project files during research
+
+### 4. Create Plan
+
+Write a single plan file to `D:\Repos\_Ivy\.plans\` with the naming convention:
+`<ID>-<RepositoryName>-Feature-<Title>.md`
+
+Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`, `Scripts` etc.
+
+Plan format:
+
+```markdown
+---
+source: <path-to-source-directory-if-applicable>
+---
+# [Title]
+
+## Problem
+
+## Solution
+
+## Tests
+
+## Finish
+
+Commit!
+```
+
+The `source:` frontmatter is optional — only include when the task references a specific source location. Omit the entire frontmatter block otherwise.
+
+### Rules
+
+- The plan must include all paths and information for an LLM coding agent to execute end-to-end without human intervention
+- Keep the plan short and concise
+- **!IMPORTANT: ONE issue per plan file — if multiple issues, create multiple plan files with separate IDs**
+- Do NOT modify any source code — only read files and create plan files

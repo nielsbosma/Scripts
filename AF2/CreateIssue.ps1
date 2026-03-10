@@ -2,7 +2,7 @@
 
 $programFolder = GetProgramFolder $PSCommandPath
 
-$args = CollectArgs $args -Optional
+$args = CollectArgs $args
 
 $logFile = GetNextLogFile $programFolder
 $args | Set-Content $logFile

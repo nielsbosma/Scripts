@@ -1,0 +1,46 @@
+# UpdatePlan
+
+Update an existing implementation plan by applying user comments.
+
+## Context
+
+Plans are stored in `D:\Repos\_Ivy\.plans\`. Args contains the path to the plan file to update.
+
+Read about the important paths and files in ../.shared/Paths.md
+
+## Execution Steps
+
+### 1. Parse Args
+
+Args contains the path to a plan file. Resolve it to an absolute path.
+
+### 2. Back Up
+
+- Copy the current plan to `D:\Repos\_Ivy\.plans\history\` (create if needed)
+
+### 3. Read the Plan
+
+- Read the plan file
+- Look for lines prefixed with `>>` — these are user comments/instructions
+- If no `>>` lines exist, report "No comments found" and stop
+
+### 4. Apply Comments
+
+- Incorporate the intent of each `>>` comment into the plan
+- Remove all `>>` lines after applying them
+- Read relevant source files if needed to improve accuracy
+- Preserve the plan's markdown structure, frontmatter, and detail level
+- The updated plan must be at least as comprehensive as the original
+
+### 5. Save Updated Plan
+
+- Version the filename: append `-v2`, or increment existing version (`-v2` → `-v3`, etc.)
+- Write the updated plan to `D:\Repos\_Ivy\.plans\` with the new versioned filename
+- Delete the original (unversioned) file since the history copy serves as backup
+
+### Rules
+
+- Preserve YAML frontmatter exactly as-is
+- Do NOT summarize, abbreviate, or skip sections
+- Do NOT modify any source code — only read files and update the plan file
+- The plan must remain self-contained with all paths and information for an LLM coding agent
