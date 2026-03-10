@@ -12,5 +12,5 @@ $firmware = PrepareFirmware $PSScriptRoot $args $logFile
 
 Write-Host "Starting Claude Code..."
 Push-Location $programFolder
-$firmware | claude --dangerously-skip-permissions -
+claude --dangerously-skip-permissions -p $firmware
 Pop-Location
