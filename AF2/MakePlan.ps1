@@ -8,11 +8,13 @@ $logFile = GetNextLogFile $programFolder
 $args | Set-Content $logFile
 Write-Host "Log file: $logFile"
 
-$promptFile = PrepareFirmware $PSScriptRoot $args $logFile -WorkDir (Get-Location).Path
+$sessionId = [guid]::NewGuid().ToString()
+
+$promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $args; WorkDir = (Get-Location).Path; SessionId = $sessionId }
 
 Write-Host "Starting Claude Code..."
 Push-Location $programFolder
-claude --dangerously-skip-permissions -- (Get-Content $promptFile -Raw)
+claude --dangerously-skip-permissions --session-id $sessionId -- (Get-Content $promptFile -Raw)
 Pop-Location
 
 Remove-Item $promptFile

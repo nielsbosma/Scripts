@@ -6,7 +6,7 @@ Split a multi-issue plan file into separate, self-contained plan files.
 
 Plans are stored in `D:\Repos\_Ivy\.plans\`. Each plan gets a sequential numeric ID from the counter file `.counter` in that directory.
 
-Args contains the path to the plan file to split.
+The input file has been moved to `D:\Repos\_Ivy\.plans\updating\` before this program runs. Args contains the path to the file in `updating/`. Output files must be written to `D:\Repos\_Ivy\.plans\` (the parent directory, not `updating/`).
 
 Read about the important paths and files in ../.shared/Paths.md
 

@@ -21,11 +21,20 @@ if ($content -notmatch '(?m)^\s*>>') {
     exit 1
 }
 
+# Move plan to updating/
+$updatingDir = Join-Path (Split-Path $resolved.Path) "updating"
+if (-not (Test-Path $updatingDir)) {
+    New-Item -ItemType Directory -Path $updatingDir | Out-Null
+}
+$updatingPath = Join-Path $updatingDir (Split-Path $resolved.Path -Leaf)
+Move-Item -Path $resolved.Path -Destination $updatingPath -Force
+Write-Host "Moved to: $updatingPath"
+
 $logFile = GetNextLogFile $programFolder
-$resolved.Path | Set-Content $logFile
+$updatingPath | Set-Content $logFile
 Write-Host "Log file: $logFile"
 
-$promptFile = PrepareFirmware $PSScriptRoot $resolved.Path $logFile -WorkDir (Get-Location).Path
+$promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $updatingPath; WorkDir = (Get-Location).Path }
 
 Write-Host "Starting Claude Code..."
 Push-Location $programFolder

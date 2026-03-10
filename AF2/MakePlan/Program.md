@@ -38,6 +38,7 @@ Plan format:
 ```markdown
 ---
 source: <path-to-source-directory-if-applicable>
+session: <SessionId from header>
 ---
 # [Title]
 
@@ -52,7 +53,7 @@ source: <path-to-source-directory-if-applicable>
 Commit!
 ```
 
-The `source:` frontmatter is optional — only include when the task references a specific source location. Omit the entire frontmatter block otherwise.
+The `source:` frontmatter is optional — only include when the task references a specific source location. The `session:` frontmatter should always be included — it contains the SessionId from the header args, allowing the user to resume this Claude session with `claude --resume <session-id>`.
 
 ### Rules
 

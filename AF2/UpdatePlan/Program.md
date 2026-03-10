@@ -4,7 +4,7 @@ Update an existing implementation plan by applying user comments.
 
 ## Context
 
-Plans are stored in `D:\Repos\_Ivy\.plans\`. Args contains the path to the plan file to update.
+Plans are stored in `D:\Repos\_Ivy\.plans\`. The input file has been moved to `D:\Repos\_Ivy\.plans\updating\` before this program runs. Args contains the path to the file in `updating/`. Output files must be written to `D:\Repos\_Ivy\.plans\` (the parent directory, not `updating/`).
 
 Read about the important paths and files in ../.shared/Paths.md
 
