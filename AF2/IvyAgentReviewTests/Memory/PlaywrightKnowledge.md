@@ -62,8 +62,12 @@
 - Clipboard `writeText` fails in headless Chromium with "Write permission denied" — this is expected and not an app bug
 - `state.ToSliderInput()` renders as a Radix UI slider with `role="slider"`, NOT a native `<input type="range">` — use `page.getByRole("slider")` and keyboard interaction (ArrowRight/ArrowLeft to increment/decrement by step, Home/End for min/max)
 - `UseChrome()` renders a hidden sidebar search `<input type="search" data-testid="sidebar-search">` that is the first `input` in the DOM but outside the viewport — `page.locator("input").first()` will target it instead of app inputs. Use `input[type='text']` or label-based locators to target app inputs
+- **Single-app Chrome auto-selection**: When `UseChrome().UseTabs()` is enabled and there's only ONE app registered, Chrome automatically opens that app's tab on page load — no need to click the sidebar nav item. Clicking it may cause a re-navigation that times out.
+- **Sidebar nav button name conflicts**: Chrome sidebar renders app names as `role="button"` elements. A button with text "C" will conflict with "Calculator" sidebar button when using `getByRole("button", { name: "C" })` — always use `{ exact: true }` for single-character button names
+- **`waitForServer` must use `http` module**, not `fetch` — `fetch` may not be available in all Node.js versions used by Playwright. Use `http.get()` with polling loop instead
 - `state.ToBoolInput().Variant(BoolInputVariants.Checkbox)` renders as `<button role="checkbox">` (Radix UI), NOT a native `<input type="checkbox">` — `getByRole("checkbox", { name: /.../ })` and `getByLabel()` do NOT work for locating these; use `page.locator('[role="checkbox"]').nth(N)` by index order instead
 - `new Card(content, header: Text.H3("Title"))` — the card header text (e.g., "Monthly Revenue") will match `getByText()` along with any content containing the same substring (e.g., "Total Monthly Revenue:"), causing strict mode violations. Always use `getByRole("heading", { name: "Title" })` for card headers
+- `new Card(content).Title("X")` — Card `.Title()` does NOT render as an HTML heading element (`<h1>`-`<h6>`), so `getByRole("heading", { name: "X" })` will fail. Use `getByText("X", { exact: true }).first()` instead. Only explicit `Text.H2()`/`Text.H3()` passed as card header render as headings.
 - `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
 - `.ToDetails()` on an anonymous object renders key-value pairs with PascalCase property names converted to spaced labels (e.g., `MonthlyNetBurn` → "Monthly Net Burn")
 
@@ -81,13 +85,49 @@
 - Always kill app processes after test runs on Windows — lingering processes lock DLLs and prevent rebuild on next run. Use `powershell.exe -NoProfile -Command 'Get-Process -Name "AppName" -ErrorAction SilentlyContinue | Stop-Process -Force'`
 - When stale processes lock DLLs and `dotnet run` fails repeatedly, spawn the pre-built exe directly: `spawn(path.join(projectRoot, "bin", "Debug", "net10.0", "AppName.exe"), ["--port", port], ...)`
 
+## Ivy App Construction
+
+- Ivy apps MUST have a parameterless constructor — `AppDescriptor.CreateApp()` uses `Activator.CreateInstance` without DI
+- Do NOT use primary constructor injection like `MyApp(IClientProvider client) : ViewBase` — causes `MissingMethodException` at runtime
+- Instead, use `var client = UseService<IClientProvider>()` inside the `Build()` method
+
+## Card Component
+
+- `new Card(content).Title("X")` renders the title as a `<span>`, NOT as a heading element — use `getByText("X", { exact: true })` to locate card titles, not `getByRole("heading")`
+- Card title text can cause strict mode violations if the same substring appears elsewhere — always use `{ exact: true }`
+- Note: `new Card(content, header: Text.H3("X"))` renders a heading (see Skyline entry), but `.Title("X")` does not
+
 ## Ivy Component Test Patterns
 
 - `AsQueryable().ToDataTable()` renders using glide-data-grid — a virtualized grid where cells have `role="gridcell"` but may not be "visible" (outside virtual viewport). Use `toBeAttached()` instead of `toBeVisible()` for these cells.
 - `state.ToNumberInput().Variant(NumberInputVariants.Slider)` renders similarly to `ToSliderInput()` — a Radix slider with `role="slider"`.
 - `state.ToSelectInput(options).Variant(SelectInputVariants.Toggle)` with string arrays renders radio buttons — use `getByRole("radio", { name: "OptionName" })`.
+- `state.ToSelectInput([new Option<T>("Label", Value), ...])` (without Toggle variant) renders as a dropdown with `role="combobox"` — click to open, then `getByRole("option", { name: "Label" }).click()` to select
+- `.ToTable()` on anonymous object collections renders as a standard HTML `<table>` — buttons in table cells are locatable via `page.locator("table button")`
+
+## DateInput (ToDateInput) Calendar Popover
+
+- `state.ToDateInput()` renders as a `<button data-slot="calendar">` trigger that opens a Radix Popover with a react-day-picker Calendar
+- It is NOT a native `<input type="date">` — do NOT use `input[type="date"]` selectors
+- The trigger button shows the formatted date or placeholder text, with a CalendarIcon
+- **Calendar navigation**: The calendar caption has a `MonthYearInput` component with two `<input>` fields:
+  - Month input: `input[placeholder="M"]` (width w-6)
+  - Year input: `input[placeholder="YYYY"]` (width w-10)
+  - Fill month number and year, press Enter to navigate to that month/year
+- **Day selection**: Day buttons are inside `div[data-slot="calendar"]` (the calendar root, NOT the trigger button). Use `page.locator('div[data-slot="calendar"]').locator("button").filter({ hasText: /^15$/ }).first().click()`
+- The popover content renders via Radix Portal at document root — selectors like `input[placeholder="M"]` work globally
+- The calendar trigger button selector: `page.locator('button[data-slot="calendar"]').first()`
+- After selecting a day, the popover auto-closes and the trigger button shows the formatted date
+- `nullable` dates show a clear (X) button when a value is set
 
 ## Run History
+
+### 2026-03-10 — Tempus.AgeCalc
+- `state.ToDateInput()` renders as a `<button data-slot="calendar">` popover trigger, NOT a native date input
+- Calendar month/year navigation via `input[placeholder="M"]` and `input[placeholder="YYYY"]` + Enter
+- Day buttons inside `div[data-slot="calendar"]` (calendar root) — filter by exact day number regex
+- `Card.Title("X")` does NOT render as a heading — `getByRole("heading")` fails; use `getByText("X").last()` to skip sidebar/tab matches
+- `getByText("Birthdate")` matched 3 elements (label, placeholder "Select your birthdate", message "Enter your birthdate...") — use `{ exact: true }`
 
 ### 2026-03-10 — Polyglot.TypeTrainer
 - `new Html(...)` component renders raw HTML content but it appears invisible — the word display area is completely blank in all screenshots. Likely renders in an iframe without CSS custom property inheritance (`var(--foreground)` etc. resolve to nothing). Hardcoded colors or native Ivy components would fix this.
@@ -152,6 +192,20 @@
 - Without `UseChrome()`, Ivy SPA doesn't support URL-based app routing — `/app-name` shows the default app. Must enable Chrome for multi-app navigation.
 - `powershell -Command "Get-Process -Name 'X' -ErrorAction SilentlyContinue | Stop-Process -Force"` is more reliable than `taskkill /f /im` for killing stale processes on Windows
 
+### 2026-03-10 — Calc.Desktop
+- Single-app Chrome auto-opens the only app — clicking sidebar nav item is unnecessary and can cause timeout
+- `getByRole("button", { name: "C" })` conflicts with "Calculator" sidebar button — use `{ exact: true }` for short button names
+- `Layout.Grid().Columns(4).Gap(4).Width(Size.Units(280))` renders buttons with excessive horizontal spacing — grid cells expand to fill container width
+- `GridRowSpan(2)` on a button doesn't produce a visually distinct two-row button in the rendered output
+- `http.get()` is more reliable than `fetch()` for server health checks in Playwright test setup
+
+### 2026-03-10 — Nexus.DecisionMatrix
+- Card `.Title("X")` does NOT render as HTML heading — `getByRole("heading")` fails; use `getByText("X", { exact: true }).first()` instead
+- Badge `.OnClick()` works for removable items — clicking badge text triggers the click handler
+- `NumberInput<int>` renders as a standard text input with `placeholder` attribute — locatable via `input[placeholder="1-10"]`
+- `.ToNumberInput()` on state renders similarly with placeholder support
+- App had no runtime errors — clean first run, only test locator fixes needed
+
 ### 2026-03-10 — Nexus.HumanCore
 - **Chrome tabs start with NO tab open** — `UseChrome(new ChromeSettings().UseTabs())` renders a sidebar but the content area is blank on initial load. Tests MUST click a sidebar item (e.g., `page.getByText("Dashboard").first().click()`) before asserting content
 - Navigation is via sidebar nav items, NOT `role="tab"` — use `page.getByText("AppName").first().click()`
@@ -162,3 +216,19 @@
 - Chart views (LineChart, PieChart, BarChart, AreaChart) wrapped in Card with Skeleton loading — charts may be empty for short date ranges with no matching data
 - `HeaderLayout(header, body)` pattern used for Dashboard — header contains the date range toggle, body contains the content
 - Lists sorted alphabetically may push expected items below viewport — assert items visible at the TOP of the sorted list, not arbitrary ones
+
+### 2026-03-10 — Nexus.CrmPortal
+- Complex CRUD app with 4 apps (Dashboard, Contacts, Deals, Activities), Chrome sidebar + tabs, blade navigation, SQLite EF Core
+- All 15 tests passed after 1 fix round (test assertion corrections only, no project fixes needed)
+- **List sort order matters**: `UseQuery` with `OrderByDescending(e => e.CreatedAt)` means newest items appear first — don't assume alphabetical sort when asserting visible list items
+- `Icons.Plus.ToButton().Ghost().Tooltip("Create X").ToTrigger(...)` — tooltip text does NOT become accessible name; use `page.locator("button").filter({ has: page.locator("svg") }).first()` (confirmed from HumanCore)
+- Backend parsing error `Must specify valid information for parsing in the string` appeared once — non-crashing, likely null value in metric calculation
+- `SelectInput` with async options (entity dropdowns in create/edit forms) works — opens dialog/sheet with form fields
+- Chrome sidebar with multiple apps starts blank — must click sidebar item to open app tab
+
+### 2026-03-10 — Clockwise.MeetingCost
+- Primary constructor injection `MyApp(IClientProvider client)` crashes with `MissingMethodException` — Ivy uses `Activator.CreateInstance` (parameterless). Fix: use `UseService<IClientProvider>()` in `Build()`
+- Card `.Title("X")` renders `<span>` not heading — use `getByText("X", { exact: true })`, confirmed same as Nexus.DecisionMatrix finding
+- `ToSelectInput([new Option<T>()])` (no Toggle variant) renders `role="combobox"` dropdown — open with click, select via `getByRole("option", { name })`
+- `.ToTable()` renders standard HTML `<table>` with buttons in cells locatable via `page.locator("table button")`
+- `UseEffect` with `System.Threading.Timer` works for real-time updates (1-second polling)
