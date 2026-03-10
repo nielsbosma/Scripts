@@ -51,7 +51,8 @@ while ($true) {
 if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
     $namespace = New-TempNamespace -Prompt $Prompt
     if (-not $namespace) { exit 1 }
-    $targetDir = Join-Path "D:\Temp\IvyAgentRun" $namespace
+    $dateFolder = Get-Date -Format "yyyy-MM-dd"
+    $targetDir = Join-Path "D:\Temp\IvyAgentRun" $dateFolder $namespace
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 } elseif ($WorkingDirectory -eq ".") {
     $targetDir = Get-Location
