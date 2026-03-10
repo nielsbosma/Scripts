@@ -133,10 +133,11 @@ function Review-Commit($selected) {
         Write-Host "  o) Open all source files in VS Code" -ForegroundColor Magenta
         Write-Host "  m) Make a plan from this commit" -ForegroundColor Magenta
         Write-Host "  s) Show full commit summary" -ForegroundColor Magenta
+        Write-Host "  p) Create PR from this commit" -ForegroundColor Magenta
         Write-Host "  q) Back to commit list" -ForegroundColor Magenta
         Write-Host ""
 
-        $input = Read-Host "Select file (1-$($fileList.Count)), or a/s/q"
+        $input = Read-Host "Select file (1-$($fileList.Count)), or a/o/m/s/p/q"
 
         if ($input -eq 'q' -or $input -eq '') { return }
 
@@ -180,6 +181,45 @@ $fileListText
             Write-Host ""
             git -C $selected.Path show $selected.Hash --stat
             Write-Host ""
+            continue
+        }
+
+        if ($input -eq 'p') {
+            # Derive branch name from commit message
+            $sanitized = ($selected.Commit -replace '[^a-zA-Z0-9]+', '-').Trim('-').ToLower()
+            $sanitized = $sanitized.Substring(0, [Math]::Min(50, $sanitized.Length))
+            $branchName = "pr/$($selected.Hash.Substring(0,8))-$sanitized"
+
+            # Get the default branch for the repo
+            $defaultBranch = git -C $selected.Path rev-parse --abbrev-ref origin/HEAD 2>$null
+            if ($defaultBranch) {
+                $defaultBranch = $defaultBranch -replace '^origin/', ''
+            } else {
+                $defaultBranch = "main"
+            }
+
+            # Create a new branch at this commit
+            Write-Host "Creating branch '$branchName'..." -ForegroundColor Yellow
+            git -C $selected.Path branch $branchName $selected.Hash
+
+            # Push the branch
+            Write-Host "Pushing branch to origin..." -ForegroundColor Yellow
+            git -C $selected.Path push -u origin $branchName
+
+            # Create PR using gh
+            Write-Host "Creating PR..." -ForegroundColor Yellow
+            $repoUrl = git -C $selected.Path remote get-url origin
+            $prUrl = gh pr create --repo $repoUrl --head $branchName --base $defaultBranch --title $selected.Commit --body "Created from commit $($selected.Hash)" --json url --jq '.url' 2>&1
+
+            if ($LASTEXITCODE -eq 0 -and $prUrl) {
+                Write-Host "PR created: $prUrl" -ForegroundColor Green
+                Start-Process $prUrl
+            } else {
+                Write-Host "Failed to create PR: $prUrl" -ForegroundColor Red
+                # Clean up: delete the remote branch and local branch
+                git -C $selected.Path push origin --delete $branchName 2>$null
+                git -C $selected.Path branch -D $branchName 2>$null
+            }
             continue
         }
 
