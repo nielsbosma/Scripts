@@ -73,6 +73,9 @@ function activate(context) {
     // Split Plan - runs SplitPlan.ps1 on the selected .md file
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.splitPlan', async (uri) => {
+            if (!uri && vscode.window.activeTextEditor) {
+                uri = vscode.window.activeTextEditor.document.uri;
+            }
             if (!uri) return;
             await saveAndClose(uri);
             const terminal = vscode.window.createTerminal({ name: 'Split Plan', shellPath: 'pwsh' });
@@ -84,6 +87,9 @@ function activate(context) {
     // Skip Plan - moves .md file to skipped/ subdirectory
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.skipPlan', async (uri) => {
+            if (!uri && vscode.window.activeTextEditor) {
+                uri = vscode.window.activeTextEditor.document.uri;
+            }
             if (!uri) return;
             await saveAndClose(uri);
             const filePath = uri.fsPath;

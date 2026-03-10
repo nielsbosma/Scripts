@@ -57,6 +57,16 @@
         "command": "ivy.approvePlan",
         "key": "ctrl+alt+a",
         "when": "editorTextFocus && resourceExtname == .md"
+      },
+      {
+        "command": "ivy.splitPlan",
+        "key": "ctrl+alt+s",
+        "when": "editorTextFocus && resourceExtname == .md"
+      },
+      {
+        "command": "ivy.skipPlan",
+        "key": "ctrl+alt+k",
+        "when": "editorTextFocus && resourceExtname == .md"
       }
     ]
   }
