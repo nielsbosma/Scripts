@@ -13,7 +13,8 @@
       { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan" },
       { "command": "ivy.splitPlan", "title": "Ivy: Split Plan" },
       { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan" },
-      { "command": "ivy.makePlan", "title": "Ivy: Make Plan" }
+      { "command": "ivy.makePlan", "title": "Ivy: Make Plan" },
+      { "command": "ivy.createIvyFrameworkIssue", "title": "Ivy: Create Ivy-Framework Issue" }
     ],
     "menus": {
       "explorer/context": [
@@ -40,6 +41,11 @@
         {
           "command": "ivy.makePlan",
           "group": "2_workspace@5"
+        },
+        {
+          "command": "ivy.createIvyFrameworkIssue",
+          "when": "resourceExtname == .md",
+          "group": "2_workspace@6"
         }
       ]
     },
@@ -66,6 +72,11 @@
       {
         "command": "ivy.skipPlan",
         "key": "ctrl+alt+k",
+        "when": "editorTextFocus && resourceExtname == .md"
+      },
+      {
+        "command": "ivy.createIvyFrameworkIssue",
+        "key": "ctrl+alt+i",
         "when": "editorTextFocus && resourceExtname == .md"
       }
     ]

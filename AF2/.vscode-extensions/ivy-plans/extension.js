@@ -115,6 +115,40 @@ function activate(context) {
         })
     );
 
+    // Create Ivy-Framework Issue - prepends issue header and moves to approved/
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ivy.createIvyFrameworkIssue', async (uri) => {
+            if (!uri && vscode.window.activeTextEditor) {
+                uri = vscode.window.activeTextEditor.document.uri;
+            }
+            if (!uri) return;
+            await saveAndClose(uri);
+            const filePath = uri.fsPath;
+            const fileName = path.basename(filePath);
+
+            // Prepend issue header
+            const content = fs.readFileSync(filePath, 'utf8');
+            const header = '> DO NOT IMPLEMENT - ADD AS A GITHUB ISSUE IN IVY-FRAMEWORK REPO\n> Add label "api-review-required"\n\n';
+            fs.writeFileSync(filePath, header + content, 'utf8');
+
+            // Move to approved
+            const approvedDir = path.join(path.dirname(filePath), 'approved');
+            if (!fs.existsSync(approvedDir)) {
+                fs.mkdirSync(approvedDir, { recursive: true });
+            }
+            const dest = path.join(approvedDir, fileName);
+            if (fs.existsSync(dest)) {
+                const overwrite = await vscode.window.showWarningMessage(
+                    `"${fileName}" already exists in approved/. Overwrite?`,
+                    'Yes', 'No'
+                );
+                if (overwrite !== 'Yes') return;
+            }
+            fs.renameSync(filePath, dest);
+            vscode.window.showInformationMessage(`Created Ivy-Framework issue: ${fileName}`);
+        })
+    );
+
     // Make Plan - runs MakePlan.ps1 (opens Notepad for input)
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.makePlan', () => {
