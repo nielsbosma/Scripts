@@ -1,8 +1,16 @@
 . "$PSScriptRoot\.shared\Utils.ps1"
 
-$args = CollectArgs $args
+$programFolder = GetProgramFolder $PSCommandPath
 
-Write-Host "Arguments:"
-for ($i = 0; $i -lt $args.Count; $i++) {
-    Write-Host "  [$i]: $($args[$i])"
-}
+$args = CollectArgs $args -Optional
+
+$logFile = GetNextLogFile $programFolder
+$args | Set-Content $logFile
+Write-Host "Log file: $logFile"
+
+$firmware = PrepareFirmware $PSScriptRoot $args $logFile
+
+Write-Host "Starting Claude Code..."
+Push-Location $programFolder
+$firmware | claude --dangerously-skip-permissions -
+Pop-Location
