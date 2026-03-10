@@ -198,9 +198,29 @@ $fileListText
                 $defaultBranch = "main"
             }
 
-            # Create a new branch at this commit
+            # Remember current branch to restore later
+            $originalBranch = git -C $selected.Path rev-parse --abbrev-ref HEAD
+
+            # Delete any leftover local branch from a previous attempt
+            $existingBranch = git -C $selected.Path rev-parse --verify $branchName 2>$null
+            if ($existingBranch) {
+                git -C $selected.Path branch -D $branchName 2>$null
+            }
+
+            # Create a new branch off the default branch and cherry-pick the single commit
             Write-Host "Creating branch '$branchName'..." -ForegroundColor Yellow
-            git -C $selected.Path branch $branchName $selected.Hash
+            git -C $selected.Path branch $branchName "origin/$defaultBranch"
+            git -C $selected.Path checkout $branchName
+            Write-Host "Cherry-picking commit $($selected.Hash.Substring(0,8))..." -ForegroundColor Yellow
+            $cherryResult = git -C $selected.Path cherry-pick $selected.Hash 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "Cherry-pick failed: $cherryResult" -ForegroundColor Red
+                git -C $selected.Path cherry-pick --abort 2>$null
+                git -C $selected.Path checkout $originalBranch 2>$null
+                git -C $selected.Path branch -D $branchName 2>$null
+                continue
+            }
+            git -C $selected.Path checkout $originalBranch 2>$null
 
             # Push the branch
             Write-Host "Pushing branch to origin..." -ForegroundColor Yellow
@@ -209,11 +229,22 @@ $fileListText
             # Create PR using gh
             Write-Host "Creating PR..." -ForegroundColor Yellow
             $repoUrl = git -C $selected.Path remote get-url origin
-            $prUrl = gh pr create --repo $repoUrl --head $branchName --base $defaultBranch --title $selected.Commit --body "Created from commit $($selected.Hash)" --json url --jq '.url' 2>&1
+            $prUrl = gh pr create --repo $repoUrl --head $branchName --base $defaultBranch --title $selected.Commit --body "Created from commit $($selected.Hash)" 2>&1
 
             if ($LASTEXITCODE -eq 0 -and $prUrl) {
                 Write-Host "PR created: $prUrl" -ForegroundColor Green
                 Start-Process $prUrl
+
+                # Drop the commit from the original branch
+                Write-Host "Dropping commit from '$originalBranch'..." -ForegroundColor Yellow
+                git -C $selected.Path checkout $originalBranch 2>$null
+                git -C $selected.Path rebase --onto "$($selected.Hash)^" $selected.Hash $originalBranch 2>$null
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "Warning: Could not automatically drop commit from $originalBranch. You may need to do this manually." -ForegroundColor Red
+                    git -C $selected.Path rebase --abort 2>$null
+                } else {
+                    Write-Host "Commit dropped from '$originalBranch'." -ForegroundColor Green
+                }
             } else {
                 Write-Host "Failed to create PR: $prUrl" -ForegroundColor Red
                 # Clean up: delete the remote branch and local branch
