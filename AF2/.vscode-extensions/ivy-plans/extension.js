@@ -32,7 +32,7 @@ function activate(context) {
             await saveAndClose(uri);
             const terminal = vscode.window.createTerminal('Update Plan');
             terminal.show();
-            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\UpdatePlan.ps1" "${uri.fsPath}" -ReadyToGo`);
+            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\UpdatePlan.ps1" "${uri.fsPath}"`);
         })
     );
 
@@ -74,7 +74,7 @@ function activate(context) {
             await saveAndClose(uri);
             const terminal = vscode.window.createTerminal('Split Plan');
             terminal.show();
-            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\SplitPlan.ps1" "${uri.fsPath}" -ReadyToGo`);
+            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\SplitPlan.ps1" "${uri.fsPath}"`);
         })
     );
 
