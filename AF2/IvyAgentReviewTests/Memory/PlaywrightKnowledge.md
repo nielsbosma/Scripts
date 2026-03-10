@@ -84,6 +84,9 @@
 - For shared server: put all tests in one `test.describe`, or use top-level `test()` calls outside describe blocks which share the file-level `beforeAll`.
 - Always kill app processes after test runs on Windows — lingering processes lock DLLs and prevent rebuild on next run. Use `powershell.exe -NoProfile -Command 'Get-Process -Name "AppName" -ErrorAction SilentlyContinue | Stop-Process -Force'`
 - When stale processes lock DLLs and `dotnet run` fails repeatedly, spawn the pre-built exe directly: `spawn(path.join(projectRoot, "bin", "Debug", "net10.0", "AppName.exe"), ["--port", port], ...)`
+- Screenshot/log path resolution: use `path.resolve(__dirname)` in spec files, NOT `process.cwd()` — Playwright may resolve cwd differently than expected, causing silent file write failures
+- Clicking `ListItem` in Ivy lists: extract the visible item title text from the page (e.g., via regex on body text) and use `getByText(name, { exact: true }).dispatchEvent("click")`. Filtering parent divs by `hasText` matches too many ancestors
+- `page.goBack()` in Ivy SPA may not reliably restore blade state — prefer re-navigating or keeping blade context
 
 ## Ivy App Construction
 
@@ -120,6 +123,10 @@
 - After selecting a day, the popover auto-closes and the trigger button shows the formatted date
 - `nullable` dates show a clear (X) button when a value is set
 
+- `state.ToSelectInput(options)` WITHOUT `.Variant(SelectInputVariants.Toggle)` renders as a Radix dropdown (not native `<select>`) — click the trigger text to open, then `getByText("Option", { exact: true }).first().click()` to select.
+- `page.goto()` with `waitUntil: "networkidle"` hangs on Ivy apps because WebSocket connections keep the network active — use `waitUntil: "domcontentloaded"` instead.
+- `UseChrome().UseTabs(preventDuplicates: true)` with a single app auto-opens the tab — no sidebar click needed for navigation.
+
 ## Run History
 
 ### 2026-03-10 — Tempus.AgeCalc
@@ -128,6 +135,13 @@
 - Day buttons inside `div[data-slot="calendar"]` (calendar root) — filter by exact day number regex
 - `Card.Title("X")` does NOT render as a heading — `getByRole("heading")` fails; use `getByText("X").last()` to skip sidebar/tab matches
 - `getByText("Birthdate")` matched 3 elements (label, placeholder "Select your birthdate", message "Enter your birthdate...") — use `{ exact: true }`
+
+### 2026-03-10 — ReversiForge.AI
+- Single-app Chrome tabs with `preventDuplicates: true` auto-opens the app — no sidebar navigation needed
+- `page.goto` with `waitUntil: "networkidle"` hangs indefinitely on Ivy apps (WebSocket keeps network active) — always use `"domcontentloaded"`
+- `ToSelectInput(enumOptions)` without `.Variant(Toggle)` renders as Radix dropdown, not native `<select>` or radio buttons
+- `ToBoolInput()` checkbox buttons: clicking label text still does NOT toggle — must click `[role="checkbox"]` button directly (confirmed again)
+- Grid of buttons with `Layout.Grid().Columns(8)` renders fine — empty ghost buttons are invisible (no background/border), only occupied cells visible
 
 ### 2026-03-10 — Polyglot.TypeTrainer
 - `new Html(...)` component renders raw HTML content but it appears invisible — the word display area is completely blank in all screenshots. Likely renders in an iframe without CSS custom property inheritance (`var(--foreground)` etc. resolve to nothing). Hardcoded colors or native Ivy components would fix this.
@@ -208,7 +222,7 @@
 
 ### 2026-03-10 — Nexus.HumanCore
 - **Chrome tabs start with NO tab open** — `UseChrome(new ChromeSettings().UseTabs())` renders a sidebar but the content area is blank on initial load. Tests MUST click a sidebar item (e.g., `page.getByText("Dashboard").first().click()`) before asserting content
-- Navigation is via sidebar nav items, NOT `role="tab"` — use `page.getByText("AppName").first().click()`
+- Navigation is via sidebar nav items, NOT `role="tab"` — use `page.getByText("AppName").first().click()`. **BUT** sidebar items may be outside the viewport in headless mode — `click()` and `click({ force: true })` both fail with "Element is outside of the viewport". Use `dispatchEvent("click")` instead, or use sidebar search first to filter then `dispatchEvent("click")`
 - `Icons.Plus.ToButton().Ghost().Tooltip("Create X").ToTrigger(...)` — the tooltip text does NOT become the button's accessible name in Playwright. `getByRole("button", { name: /Create X/i })` fails. Use `page.locator("button").filter({ has: page.locator("svg") }).first()` instead
 - Ivy `ListItem` does not have a `data-ivy-list-item` attribute — fallback selectors are needed to click list items in tests
 - CRUD apps with `UseBlades()` pattern: list blade on left, detail blade opens on right when item clicked — the blade push/pop pattern
@@ -232,3 +246,17 @@
 - `ToSelectInput([new Option<T>()])` (no Toggle variant) renders `role="combobox"` dropdown — open with click, select via `getByRole("option", { name })`
 - `.ToTable()` renders standard HTML `<table>` with buttons in cells locatable via `page.locator("table button")`
 - `UseEffect` with `System.Threading.Timer` works for real-time updates (1-second polling)
+
+### 2026-03-10 — PawByte.Tamadog
+- Simple single-app project with Chrome tabs — clean pass, no runtime errors, no project fixes needed
+- Sidebar search + `dispatchEvent("click")` pattern works reliably for navigating to apps in Chrome tabs mode when items are outside viewport
+- `Progress` component with `.Color()` renders correctly for stat bars
+- `UseEffect` with `System.Threading.Timer` works for periodic stat decay — no issues observed
+
+### 2026-03-10 — HoofTrack.StableVault
+- CRUD app with `UseBlades()` and Chrome tabs — clean pass, no runtime errors, no project fixes needed
+- `Card.Title("Horse Details")` renders as text, NOT `role="heading"` — use `getByText()` not `getByRole("heading")`
+- `ListItem` click by parent div `filter({ hasText })` fails — matches too many ancestors. Must extract specific title text and use `getByText(name, { exact: true }).dispatchEvent("click")`
+- Screenshot path must use `path.resolve(__dirname)` not `process.cwd()` — the latter silently fails to write files in Playwright context
+- `safeClick` pattern: try `.click({ timeout: 3000 })`, catch and fall back to `.dispatchEvent("click")` — handles both in-viewport and out-of-viewport elements
+- `page.goBack()` after blade push doesn't restore previous blade — SPA routing doesn't map 1:1 to browser history for blade navigation
