@@ -1,5 +1,7 @@
 # MakePlan
 
+> **⚠️ READ-ONLY MODE: You must NEVER create, edit, or delete any files outside of `D:\Repos\_Ivy\.plans\`. You may only READ source files. The ONLY files you are allowed to write are plan files in `.plans\` and the `.plans\.counter` file.**
+
 Create an implementation plan for a task described in args in the Ivy ecosystem.
 
 ## Context
@@ -24,7 +26,8 @@ Args contains the user's task description. If it references related plans with `
 
 - Read relevant source files to understand the codebase areas involved
 - If Args mentions a session/trace ID, use the Langfuse debugging steps from `/Memory/Langfuse.md`
-- Do NOT create or write any project files during research
+- Do NOT create, edit, or delete any files. Only use the Read tool and search tools.
+- Do NOT use the Edit, Write, or Bash tools to modify any source files.
 
 ### 4. Create Plan
 
@@ -60,4 +63,8 @@ The `source:` frontmatter is optional — only include when the task references 
 - The plan must include all paths and information for an LLM coding agent to execute end-to-end without human intervention
 - Keep the plan short and concise
 - **!IMPORTANT: ONE issue per plan file — if multiple issues, create multiple plan files with separate IDs**
-- Do NOT modify any source code — only read files and create plan files
+- **!CRITICAL: This agent is READ-ONLY for all source code. You must NEVER use Edit, Write, or Bash to create, modify, or delete any file outside `D:\Repos\_Ivy\.plans\`. The ONLY writable paths are:**
+  - `D:\Repos\_Ivy\.plans\*.md` (plan files)
+  - `D:\Repos\_Ivy\.plans\.counter`
+  - Your own Memory/ and Tools/ directories
+  - Your log file
