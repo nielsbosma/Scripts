@@ -49,6 +49,11 @@
         "key": "ctrl+alt+m"
       },
       {
+        "command": "ivy.updatePlan",
+        "key": "ctrl+alt+u",
+        "when": "editorTextFocus && resourceExtname == .md"
+      },
+      {
         "command": "ivy.approvePlan",
         "key": "ctrl+alt+a",
         "when": "editorTextFocus && resourceExtname == .md"
