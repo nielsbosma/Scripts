@@ -1,3 +1,11 @@
+# Ensure claude CLI is on the PATH
+$claudeDir = Join-Path $env:USERPROFILE ".local\bin"
+if (Test-Path $claudeDir) {
+    if ($env:PATH -notlike "*$claudeDir*") {
+        $env:PATH = "$claudeDir;$env:PATH"
+    }
+}
+
 function GetProgramFolder {
     param([string]$ScriptPath)
 
@@ -30,19 +38,36 @@ function GetNextLogFile {
 function PrepareFirmware {
     param(
         [string]$ScriptRoot,
-        [string]$Args,
         [string]$LogFile,
-        [string]$WorkDir = ""
+        [hashtable]$Values = @{}
     )
 
+    $header = ($Values.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key): $($_.Value)" }) -join "`n"
+
     $firmware = Get-Content "$ScriptRoot\.shared\Firmware.md" -Raw
-    $firmware = $firmware.Replace("[ARGS]", $Args)
+    $firmware = $firmware.Replace("[HEADER]", $header)
     $firmware = $firmware.Replace("[LOGFILE]", $LogFile)
-    $firmware = $firmware.Replace("[WORKDIR]", $WorkDir)
 
     $promptFile = [System.IO.Path]::GetTempFileName()
     Set-Content -Path $promptFile -Value $firmware -NoNewline
     return $promptFile
+}
+
+function GetLatestSessionId {
+    param([string]$Path = (Join-Path (Get-Location).Path ".ivy\session.ldjson"))
+
+    if (-not (Test-Path $Path)) {
+        Write-Host "Error: $Path not found." -ForegroundColor Red
+        exit 1
+    }
+
+    $lastLine = (Get-Content $Path -Tail 1).Trim()
+    if ($lastLine -eq "") {
+        Write-Host "Error: $Path is empty." -ForegroundColor Red
+        exit 1
+    }
+
+    return ($lastLine | ConvertFrom-Json).sessionId
 }
 
 function CollectArgs {
@@ -60,7 +85,7 @@ function CollectArgs {
 
     if ($joined -eq "") {
         $tempFile = [System.IO.Path]::GetTempFileName()
-        Write-Host "No arguments provided. Opening Notepad — save the file and close it to continue."
+        Write-Host "No arguments provided. Opening Notepad - save the file and close it to continue."
         Start-Process -FilePath "notepad.exe" -ArgumentList $tempFile -Wait
         $joined = ((Get-Content $tempFile) -join " ").Trim()
         Remove-Item $tempFile

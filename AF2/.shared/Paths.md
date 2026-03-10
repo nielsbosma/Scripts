@@ -67,3 +67,16 @@ D:\Repos\_Ivy\Ivy\Ivy.Internals\Workflows\Internal\Workflows\CreateOrEditWorkflo
 # Reference Connections
 
 D:\Repos\_Ivy\Ivy\connections
+
+# Scripts
+
+My personal scripts are stored under:
+
+D:\Repos\_Personal\Scripts\
+D:\Repos\_Personal\Scripts\AF2\
+
+When refering to scripts this is almost always where they are stored.
+
+# Vscode Extension
+
+D:\Repos\_Personal\Scripts\AF2\.vscode-extensions
