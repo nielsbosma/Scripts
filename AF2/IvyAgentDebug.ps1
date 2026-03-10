@@ -1,5 +1,6 @@
 param(
-    [switch]$Annotate
+    [switch]$Annotate,
+    [switch]$Force
 )
 
 . "$PSScriptRoot\.shared\Utils.ps1"
@@ -50,10 +51,15 @@ $logContent
 
 # --- Phase 1: Run ReviewBuild (must complete first) ---
 Write-Host "=== Phase 1: ReviewBuild ===" -ForegroundColor Cyan
-$reviewBuildScript = Join-Path $PSScriptRoot "IvyAgentReviewBuild.ps1"
-& pwsh -ExecutionPolicy Bypass -File $reviewBuildScript
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Warning: ReviewBuild exited with code $LASTEXITCODE" -ForegroundColor Yellow
+$buildReportExists = (-not $Force) -and (Test-Path (Join-Path $workDir ".ivy\review-build.md"))
+if ($buildReportExists) {
+    Write-Host "Skipping ReviewBuild — review-build.md already exists" -ForegroundColor DarkGray
+} else {
+    $reviewBuildScript = Join-Path $PSScriptRoot "IvyAgentReviewBuild.ps1"
+    & pwsh -ExecutionPolicy Bypass -File $reviewBuildScript
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Warning: ReviewBuild exited with code $LASTEXITCODE" -ForegroundColor Yellow
+    }
 }
 
 # --- Phase 2: Run ReviewLangfuse, ReviewSpec, ReviewTests in parallel ---
@@ -67,14 +73,37 @@ $reviewTestsScript = Join-Path $PSScriptRoot "IvyAgentReviewTests.ps1"
 $jobs = @()
 $jobs += Start-Job -Name "ReviewLangfuse" -ScriptBlock {
     Set-Location $using:workDir
+    $ivyDir = Join-Path $using:workDir ".ivy"
+    $langfuseFiles = @(
+        "langfuse-timeline.md", "langfuse-hallucinations.md", "langfuse-questions.md",
+        "langfuse-workflows.md", "langfuse-reference-connections.md", "langfuse-docs.md",
+        "langfuse-build-errors.md"
+    )
+    $allExist = (-not $using:Force) -and ($langfuseFiles | ForEach-Object { Test-Path (Join-Path $ivyDir $_) }) -notcontains $false
+    if ($allExist) {
+        Write-Host "Skipping ReviewLangfuse — reports already exist" -ForegroundColor DarkGray
+        return
+    }
     & pwsh -ExecutionPolicy Bypass -File $using:reviewLangfuseScript
 }
 $jobs += Start-Job -Name "ReviewSpec" -ScriptBlock {
     Set-Location $using:workDir
+    $ivyDir = Join-Path $using:workDir ".ivy"
+    $specExists = (-not $using:Force) -and (Test-Path (Join-Path $ivyDir "review-spec.md"))
+    if ($specExists) {
+        Write-Host "Skipping ReviewSpec — review-spec.md already exists" -ForegroundColor DarkGray
+        return
+    }
     & pwsh -ExecutionPolicy Bypass -File $using:reviewSpecScript
 }
 $jobs += Start-Job -Name "ReviewTests" -ScriptBlock {
     Set-Location $using:workDir
+    $ivyDir = Join-Path $using:workDir ".ivy"
+    $testsExist = (-not $using:Force) -and (Test-Path (Join-Path $ivyDir "review-tests.md")) -and (Test-Path (Join-Path $ivyDir "review-ux.md"))
+    if ($testsExist) {
+        Write-Host "Skipping ReviewTests — reports already exist" -ForegroundColor DarkGray
+        return
+    }
     & pwsh -ExecutionPolicy Bypass -File $using:reviewTestsScript
 }
 
@@ -113,7 +142,7 @@ $promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $args; WorkDir = 
 
 Write-Host "Starting Claude Code..."
 Push-Location $programFolder
-claude --dangerously-skip-permissions -p -- (Get-Content $promptFile -Raw)
+claude --dangerously-skip-permissions --output-format stream-json -p -- (Get-Content $promptFile -Raw)
 Pop-Location
 
 Remove-Item $promptFile
