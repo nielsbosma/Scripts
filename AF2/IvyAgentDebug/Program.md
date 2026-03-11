@@ -38,7 +38,9 @@ Read every review file in `{WorkDir}/.ivy/`:
 
 If a file is missing, note it and continue with what's available.
 
-Also check for `.ivy/annotations.md` — this contains the client TUI output annotated by the user with `>>` prefixed lines. These annotations are the user's own observations about what went wrong and should be investigated with **highest priority**. Look for every `>>` line and address each one.
+Also check for `.ivy/annotated.md` — this contains the client TUI output annotated by the user with `>>` prefixed lines. These annotations are the user's own observations about what went wrong and should be investigated with **highest priority**. Look for every `>>` line and address each one.
+
+Also check for `.ivy/feedback.md` — this contains free-form feedback from the user. Like annotations, this feedback should be treated with **highest priority** and should influence your analysis and plan generation in Step 3.
 
 Check the logs:  
 
@@ -131,6 +133,13 @@ For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
 - Format: `<ID>-<RepositoryName>-Feature-<Title>.md`
 - Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`
 - Before creating a plan, search existing plans to avoid duplicates — update existing plans if they partially cover the finding
+- Read `{WorkDir}/.ivy/plans.md` if it exists — this lists plans created in previous runs of this script. Skip creating plans already listed there
+- After creating new plans, append their paths to `{WorkDir}/.ivy/plans.md` (create the file if it doesn't exist) using this format:
+  ```markdown
+  # Created Plans
+
+  - D:\Repos\_Ivy\.plans\268-Scripts-Feature-Example.md
+  ```
 
 Plan format:
 

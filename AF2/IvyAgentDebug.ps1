@@ -1,5 +1,6 @@
 param(
     [switch]$Annotate,
+    [switch]$Feedback,
     [switch]$Force
 )
 
@@ -46,6 +47,25 @@ $logContent
     if ([string]::IsNullOrWhiteSpace($annotationContent)) {
         Write-Host "No annotations provided. Continuing without." -ForegroundColor Yellow
         $annotationContent = ""
+    }
+}
+
+# --- Feedback: open empty Notepad for free-form feedback ---
+$feedbackContent = ""
+if ($Feedback) {
+    $tempFeedbackFile = [System.IO.Path]::GetTempFileName() + ".txt"
+    Set-Content -Path $tempFeedbackFile -Value ""
+
+    Write-Host "Opening Notepad for feedback — write your feedback, save, and close..." -ForegroundColor Cyan
+    $process = Start-Process notepad $tempFeedbackFile -PassThru
+    $process.WaitForExit()
+
+    $feedbackContent = (Get-Content -Path $tempFeedbackFile -Raw).Trim()
+    Remove-Item -Path $tempFeedbackFile -Force
+
+    if ([string]::IsNullOrWhiteSpace($feedbackContent)) {
+        Write-Host "No feedback provided. Aborting." -ForegroundColor Red
+        exit 0
     }
 }
 
@@ -129,9 +149,16 @@ if ($args -eq "(No Args)") {
 
 # Write annotations to .ivy/ so the agent can read them
 if ($annotationContent -ne "") {
-    $annotationFile = Join-Path $workDir ".ivy\annotations.md"
+    $annotationFile = Join-Path $workDir ".ivy\annotated.md"
     Set-Content -Path $annotationFile -Value $annotationContent
     Write-Host "Annotations saved to: $annotationFile"
+}
+
+# Write feedback to .ivy/ so the agent can read them
+if ($feedbackContent -ne "") {
+    $feedbackFile = Join-Path $workDir ".ivy\feedback.md"
+    Set-Content -Path $feedbackFile -Value $feedbackContent
+    Write-Host "Feedback saved to: $feedbackFile"
 }
 
 $logFile = GetNextLogFile $programFolder
