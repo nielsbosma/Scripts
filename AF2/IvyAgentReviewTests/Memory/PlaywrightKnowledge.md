@@ -301,3 +301,20 @@
 - To generate valid PNG images for Playwright tests: use `zlib.deflateSync()` on raw pixel data (filter byte 0 + RGB per row), then construct PNG chunks (IHDR, IDAT, IEND) with proper CRC32 checksums. Invalid/minimal base64 PNGs will cause `InvalidImageContentException`
 - After `dotnet build` + code changes, `dotnet run` may need a rebuild that exceeds 30s — set `beforeAll` timeout to 120s with `testInfo.setTimeout(120000)` for safety
 - 12 tests passed after 1 fix round (project fix: added try-catch for corrupt image loading in AsciiArtConverter)
+
+### 2026-03-11 — Meridian.StockGrid
+- `AsQueryable().ToDataTable()` with empty data renders column headers as `role="columnheader"` elements but they are "hidden" (glide-data-grid virtual rendering) — use `toBeAttached()` not `toBeVisible()` for column headers too, not just gridcells
+- When `StockDataService` catches all per-ticker exceptions and returns empty list, `UseQuery` resolves with empty data (not null, not error) — app enters "data loaded" path with empty metrics showing "No data available"
+- YahooFinanceApi v2.3.3 confirmed broken again (same as Pinnacle.StockGrid) — all tickers fail silently
+- No project fixes needed — app handles empty data gracefully without crashes
+- 8 tests passed after 1 fix round (test fix only: column header visibility assertion)
+
+### 2026-03-11 — StockFlow.Inventory
+- Complex CRUD app with 6 apps (Dashboard, Categories, Products, Orders, Suppliers, Warehouses), Chrome sidebar + tabs, blade navigation, SQLite EF Core with Bogus seeder
+- **`ToAsyncSelectInput` with nullable state types**: When form property is `int?` (nullable), the search/lookup delegates MUST use `Option<int?>` (not `Option<int>`). Using `Option<int>` causes `InvalidCastException: Null object cannot be converted to a value type` at runtime. The lookup delegate must also handle null input: `if (id == null) return null;`
+- `data-testid="list-item"` does NOT exist in Ivy list rendering — click list items by visible text content using `getByText(name, { exact: true }).first().dispatchEvent("click")`
+- Regex-based text extraction from `page.textContent("body")` for supplier names is fragile — regex can match too much text. Prefer regex locators like `page.locator("text=/\\w+ Inc$/").first()` for pattern-matching visible elements
+- Chrome sidebar with multiple apps starts blank (no auto-open) — confirmed same as HumanCore/CrmPortal pattern
+- `HeaderLayout(header, body)` pattern used in Dashboard — header contains date range toggle
+- Dashboard `SelectInput<DateRange>` with `Variant(SelectInputVariant.Toggle)` renders as radio buttons — same Toggle variant pattern
+- All 15 tests passed after 1 project fix round (3 files fixed: OrderCreateDialog, OrderItemCreateDialog, OrderShipmentCreateDialog)

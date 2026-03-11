@@ -36,7 +36,7 @@ Write-Host "Log file: $logFile"
 
 $promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $updatingPath; WorkDir = (Get-Location).Path }
 
-Write-Host "Starting Claude Code..."
+Write-Host "Starting Agent..."
 Push-Location $programFolder
 claude --dangerously-skip-permissions -- (Get-Content $promptFile -Raw)
 Pop-Location

@@ -16,3 +16,4 @@ claude --dangerously-skip-permissions -- (Get-Content $promptFile -Raw)
 Pop-Location
 
 Remove-Item $promptFile
+    

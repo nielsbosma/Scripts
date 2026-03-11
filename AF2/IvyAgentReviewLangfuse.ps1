@@ -48,7 +48,7 @@ $promptFile = PrepareFirmware $PSScriptRoot $logFile @{
     LangfuseDir = $langfuseDir
 }
 
-Write-Host "Starting Claude Code..."
+Write-Host "Starting Agent..."
 Push-Location $programFolder
 claude --dangerously-skip-permissions -p -- (Get-Content $promptFile -Raw)
 Pop-Location
