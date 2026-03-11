@@ -6,7 +6,8 @@
 
 ## IvyQuestion (Request/Response Pair)
 - **Request**: `EVENT__local__IvyQuestion` — `input.question` has the question text
-- **Response**: `EVENT_LocalResponse` (next file) — `input.toolName = "IvyQuestion"`, `input.response.success`, `input.response.answer`, `input.response.error`
+- **Response**: `EVENT_LocalResponse` (next file) — `input.toolName = "IvyQuestion"`, `input.response.success`, `input.response.answerLength` (int), `input.response.error`
+- Note: The response does NOT contain the answer text itself, only `answerLength` (character count)
 
 ## WebFetch+AnswerAgent (Question via WebFetch)
 - When WebFetch is called with a `question` parameter, the server uses AnswerAgent to answer it from the fetched content.

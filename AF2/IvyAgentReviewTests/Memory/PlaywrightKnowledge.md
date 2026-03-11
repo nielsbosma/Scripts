@@ -84,6 +84,9 @@
 - For shared server: put all tests in one `test.describe`, or use top-level `test()` calls outside describe blocks which share the file-level `beforeAll`.
 - Always kill app processes after test runs on Windows — lingering processes lock DLLs and prevent rebuild on next run. Use `powershell.exe -NoProfile -Command 'Get-Process -Name "AppName" -ErrorAction SilentlyContinue | Stop-Process -Force'`
 - When stale processes lock DLLs and `dotnet run` fails repeatedly, spawn the pre-built exe directly: `spawn(path.join(projectRoot, "bin", "Debug", "net10.0", "AppName.exe"), ["--port", port], ...)`
+- Screenshot/log path resolution: use `path.resolve(__dirname)` in spec files, NOT `process.cwd()` — Playwright may resolve cwd differently than expected, causing silent file write failures
+- Clicking `ListItem` in Ivy lists: extract the visible item title text from the page (e.g., via regex on body text) and use `getByText(name, { exact: true }).dispatchEvent("click")`. Filtering parent divs by `hasText` matches too many ancestors
+- `page.goBack()` in Ivy SPA may not reliably restore blade state — prefer re-navigating or keeping blade context
 
 ## Ivy App Construction
 
@@ -120,6 +123,11 @@
 - After selecting a day, the popover auto-closes and the trigger button shows the formatted date
 - `nullable` dates show a clear (X) button when a value is set
 
+- `state.ToSelectInput(options)` WITHOUT `.Variant(SelectInputVariants.Toggle)` renders as a Radix dropdown (not native `<select>`) — click the trigger text to open, then `getByText("Option", { exact: true }).first().click()` to select.
+- `page.goto()` with `waitUntil: "networkidle"` hangs on Ivy apps because WebSocket connections keep the network active — use `waitUntil: "domcontentloaded"` instead.
+- `UseChrome().UseTabs(preventDuplicates: true)` with a single app auto-opens the tab — no sidebar click needed for navigation.
+- `state.ToBoolInput().Label("X")` WITHOUT explicit `.Variant()` renders as `role="checkbox"` (NOT `role="switch"`) — use `page.locator('[role="checkbox"]').first()` to click. Clicking the label text does NOT toggle the checkbox. Use dynamic detection: check `[role="checkbox"]` count first, then `[role="switch"]`, then fallback to `dispatchEvent("click")`.
+
 ## Run History
 
 ### 2026-03-10 — Tempus.AgeCalc
@@ -128,6 +136,13 @@
 - Day buttons inside `div[data-slot="calendar"]` (calendar root) — filter by exact day number regex
 - `Card.Title("X")` does NOT render as a heading — `getByRole("heading")` fails; use `getByText("X").last()` to skip sidebar/tab matches
 - `getByText("Birthdate")` matched 3 elements (label, placeholder "Select your birthdate", message "Enter your birthdate...") — use `{ exact: true }`
+
+### 2026-03-10 — ReversiForge.AI
+- Single-app Chrome tabs with `preventDuplicates: true` auto-opens the app — no sidebar navigation needed
+- `page.goto` with `waitUntil: "networkidle"` hangs indefinitely on Ivy apps (WebSocket keeps network active) — always use `"domcontentloaded"`
+- `ToSelectInput(enumOptions)` without `.Variant(Toggle)` renders as Radix dropdown, not native `<select>` or radio buttons
+- `ToBoolInput()` checkbox buttons: clicking label text still does NOT toggle — must click `[role="checkbox"]` button directly (confirmed again)
+- Grid of buttons with `Layout.Grid().Columns(8)` renders fine — empty ghost buttons are invisible (no background/border), only occupied cells visible
 
 ### 2026-03-10 — Polyglot.TypeTrainer
 - `new Html(...)` component renders raw HTML content but it appears invisible — the word display area is completely blank in all screenshots. Likely renders in an iframe without CSS custom property inheritance (`var(--foreground)` etc. resolve to nothing). Hardcoded colors or native Ivy components would fix this.
@@ -208,7 +223,7 @@
 
 ### 2026-03-10 — Nexus.HumanCore
 - **Chrome tabs start with NO tab open** — `UseChrome(new ChromeSettings().UseTabs())` renders a sidebar but the content area is blank on initial load. Tests MUST click a sidebar item (e.g., `page.getByText("Dashboard").first().click()`) before asserting content
-- Navigation is via sidebar nav items, NOT `role="tab"` — use `page.getByText("AppName").first().click()`
+- Navigation is via sidebar nav items, NOT `role="tab"` — use `page.getByText("AppName").first().click()`. **BUT** sidebar items may be outside the viewport in headless mode — `click()` and `click({ force: true })` both fail with "Element is outside of the viewport". Use `dispatchEvent("click")` instead, or use sidebar search first to filter then `dispatchEvent("click")`
 - `Icons.Plus.ToButton().Ghost().Tooltip("Create X").ToTrigger(...)` — the tooltip text does NOT become the button's accessible name in Playwright. `getByRole("button", { name: /Create X/i })` fails. Use `page.locator("button").filter({ has: page.locator("svg") }).first()` instead
 - Ivy `ListItem` does not have a `data-ivy-list-item` attribute — fallback selectors are needed to click list items in tests
 - CRUD apps with `UseBlades()` pattern: list blade on left, detail blade opens on right when item clicked — the blade push/pop pattern
@@ -232,3 +247,74 @@
 - `ToSelectInput([new Option<T>()])` (no Toggle variant) renders `role="combobox"` dropdown — open with click, select via `getByRole("option", { name })`
 - `.ToTable()` renders standard HTML `<table>` with buttons in cells locatable via `page.locator("table button")`
 - `UseEffect` with `System.Threading.Timer` works for real-time updates (1-second polling)
+
+### 2026-03-10 — PawByte.Tamadog
+- Simple single-app project with Chrome tabs — clean pass, no runtime errors, no project fixes needed
+- Sidebar search + `dispatchEvent("click")` pattern works reliably for navigating to apps in Chrome tabs mode when items are outside viewport
+- `Progress` component with `.Color()` renders correctly for stat bars
+- `UseEffect` with `System.Threading.Timer` works for periodic stat decay — no issues observed
+
+### 2026-03-10 — Flowcraft.MermaidStudio
+- Clean first-pass run — all 11 tests passed, no project fixes needed
+- `new Markdown(markdownPreview)` with mermaid code blocks renders SVG diagrams via client-side Mermaid.js — preview updates reactively when code state changes
+- `UseDownload(factory, mimeType, fileName)` returns a nullable URL — renders as `role="link"` when non-null, locatable via `getByRole("link", { name: /Download/i })`
+- `SelectInput<string>` with `.Placeholder()` and `options.ToOptions()` renders as Radix dropdown — same pattern as other `ToSelectInput()` without Toggle variant
+
+### 2026-03-10 — Patternix.RegexLens
+- `ToBoolInput().Label("X")` without explicit Variant renders as `role="checkbox"`, NOT `role="switch"` — clicking label text does NOT toggle; must click the `[role="checkbox"]` element directly
+- Dynamic checkbox/switch detection pattern: check `[role="checkbox"]` count, then `[role="switch"]`, then fallback `dispatchEvent("click")` — robust across all BoolInput variants
+- `new Html(...)` with inline styles (background-color, color) renders but highlighting is invisible — likely iframe CSS isolation issue; the yellow background match highlighting doesn't display
+- `Expandable` component works as expected for collapsible sections — click text to toggle
+- `Box` with `.Padding()`, `.BorderThickness()`, `.BorderStyle()` renders bordered containers correctly for match items
+- Clean run: 10 tests passed, no project fixes needed, no runtime errors, logs clean
+
+### 2026-03-10 — HoofTrack.StableVault
+- CRUD app with `UseBlades()` and Chrome tabs — clean pass, no runtime errors, no project fixes needed
+- `Card.Title("Horse Details")` renders as text, NOT `role="heading"` — use `getByText()` not `getByRole("heading")`
+- `ListItem` click by parent div `filter({ hasText })` fails — matches too many ancestors. Must extract specific title text and use `getByText(name, { exact: true }).dispatchEvent("click")`
+- Screenshot path must use `path.resolve(__dirname)` not `process.cwd()` — the latter silently fails to write files in Playwright context
+- `safeClick` pattern: try `.click({ timeout: 3000 })`, catch and fall back to `.dispatchEvent("click")` — handles both in-viewport and out-of-viewport elements
+- `page.goBack()` after blade push doesn't restore previous blade — SPA routing doesn't map 1:1 to browser history for blade navigation
+
+### 2026-03-10 — Folio.TextMiner
+- File upload app with `UseUpload(MemoryStreamUploadHandler.Create(state))` — `page.locator('input[type="file"]').setInputFiles(path)` works for Playwright file upload testing
+- `ToFileInput(upload).Placeholder(...)` renders a dashed dropzone with the placeholder text
+- `ToCodeInput().Language(Languages.Text).Disabled()` renders as a read-only CodeMirror editor — `.cm-content` locator works
+- Clean pass, no runtime errors, no project fixes needed
+
+### 2026-03-10 — Pinnacle.StockGrid
+- `YahooFinanceApi` v2.3.3 NuGet package returns 401 Unauthorized from Yahoo Finance v7 download API — package likely outdated/broken
+- Unhandled async exceptions in button click handlers (`async () => await FetchStockData()`) crash the server process with `IsTerminating: True` — always wrap external API calls in try/catch, not just try/finally
+- Fix: added `catch (Exception ex)` with `errorMessage` state + `Callout.Error()` display — app stays stable on API failure
+- When external APIs are expected to fail, use `Promise.race()` pattern in tests to detect either data load OR error callout, with `test.skip()` for data-dependent tests
+
+### 2026-03-10 — Archiva.ZipForge
+- `FileUpload<byte[]>.ToTable()` with `.Remove(e => e.Content)` throws `KeyNotFoundException` — `byte[]` properties are not registered in `TableBuilder`'s field dictionary. Fix: remove the `.Remove(e => e.Content)` call
+- `ToFileInput(upload).Placeholder(...)` renders a dashed dropzone with hidden `input[type="file"]` — `page.locator('input[type="file"]').setInputFiles({name, mimeType, buffer})` works for Playwright testing (confirmed from Folio.TextMiner pattern)
+- `FileUpload<T>` exposes `FileName`, `ContentType`, `Length`, `Progress`, `Id`, `Content` — `.ToTable()` creates columns for all simple-type properties; `byte[]` Content is excluded from the field dictionary but other fields like ContentType and the upload Status enum still show
+- 8 tests passed after 1 fix round (project fix only)
+
+### 2026-03-10 — Pixelforge.AsciiCraft
+- `Layout.Tabs(new Tab("Name", view).Icon(Icons.X), ...)` renders tab UI — tabs are clickable via `getByText("Tab Name").first().click()`
+- `UseDownload()` with sync factory renders as `role="link"` (anchor tag with href), not `role="button"` — use `getByRole("link", { name: /Download/i })`
+- `new CodeBlock(content, Languages.Text).ShowCopyButton()` renders with a copy icon button and `<code>` element for the content
+- To generate valid PNG images for Playwright tests: use `zlib.deflateSync()` on raw pixel data (filter byte 0 + RGB per row), then construct PNG chunks (IHDR, IDAT, IEND) with proper CRC32 checksums. Invalid/minimal base64 PNGs will cause `InvalidImageContentException`
+- After `dotnet build` + code changes, `dotnet run` may need a rebuild that exceeds 30s — set `beforeAll` timeout to 120s with `testInfo.setTimeout(120000)` for safety
+- 12 tests passed after 1 fix round (project fix: added try-catch for corrupt image loading in AsciiArtConverter)
+
+### 2026-03-11 — Meridian.StockGrid
+- `AsQueryable().ToDataTable()` with empty data renders column headers as `role="columnheader"` elements but they are "hidden" (glide-data-grid virtual rendering) — use `toBeAttached()` not `toBeVisible()` for column headers too, not just gridcells
+- When `StockDataService` catches all per-ticker exceptions and returns empty list, `UseQuery` resolves with empty data (not null, not error) — app enters "data loaded" path with empty metrics showing "No data available"
+- YahooFinanceApi v2.3.3 confirmed broken again (same as Pinnacle.StockGrid) — all tickers fail silently
+- No project fixes needed — app handles empty data gracefully without crashes
+- 8 tests passed after 1 fix round (test fix only: column header visibility assertion)
+
+### 2026-03-11 — StockFlow.Inventory
+- Complex CRUD app with 6 apps (Dashboard, Categories, Products, Orders, Suppliers, Warehouses), Chrome sidebar + tabs, blade navigation, SQLite EF Core with Bogus seeder
+- **`ToAsyncSelectInput` with nullable state types**: When form property is `int?` (nullable), the search/lookup delegates MUST use `Option<int?>` (not `Option<int>`). Using `Option<int>` causes `InvalidCastException: Null object cannot be converted to a value type` at runtime. The lookup delegate must also handle null input: `if (id == null) return null;`
+- `data-testid="list-item"` does NOT exist in Ivy list rendering — click list items by visible text content using `getByText(name, { exact: true }).first().dispatchEvent("click")`
+- Regex-based text extraction from `page.textContent("body")` for supplier names is fragile — regex can match too much text. Prefer regex locators like `page.locator("text=/\\w+ Inc$/").first()` for pattern-matching visible elements
+- Chrome sidebar with multiple apps starts blank (no auto-open) — confirmed same as HumanCore/CrmPortal pattern
+- `HeaderLayout(header, body)` pattern used in Dashboard — header contains date range toggle
+- Dashboard `SelectInput<DateRange>` with `Variant(SelectInputVariant.Toggle)` renders as radio buttons — same Toggle variant pattern
+- All 15 tests passed after 1 project fix round (3 files fixed: OrderCreateDialog, OrderItemCreateDialog, OrderShipmentCreateDialog)

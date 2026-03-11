@@ -12,7 +12,7 @@ $sessionId = [guid]::NewGuid().ToString()
 
 $promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $args; WorkDir = (Get-Location).Path; ClaudeSessionId = $sessionId }
 
-Write-Host "Starting Claude Code..."
+Write-Host "Starting Agent..."
 Push-Location $programFolder
 claude --dangerously-skip-permissions --session-id $sessionId -- (Get-Content $promptFile -Raw)
 Pop-Location

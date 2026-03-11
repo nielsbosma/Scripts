@@ -107,7 +107,7 @@ foreach ($traceFolder in $traceFolders) {
             if ($input.response) {
                 $success = $input.response.success -eq $true
                 $answerLen = $input.response.answerLength
-                $error = $input.response.error
+                $errMsg = $input.response.error
                 $results += [PSCustomObject]@{
                     TraceName = $traceFolder.Name
                     ObservationFile = $fileName
@@ -116,7 +116,7 @@ foreach ($traceFolder in $traceFolders) {
                     Question = $null
                     Success = $success
                     AnswerLength = $answerLen
-                    Error = $error
+                    Error = $errMsg
                 }
             }
         } catch {}

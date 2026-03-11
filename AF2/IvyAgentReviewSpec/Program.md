@@ -47,7 +47,40 @@ Specific checks:
 - UI layout matches what was specified
 - Features listed in the spec are present in the code
 - Icon, Group, and Layout metadata match the spec
-### 5. Generate Result
+
+### 5. Run --describe, --describe-connection, --test-connection
+
+> dotnet run --describe
+apps:
+- name: App Not Found
+  id: $error-not-found
+  isVisible: false
+- name: Mermaid Editor
+  id: mermaid-editor
+  isVisible: true
+- name: Chrome
+  id: $chrome
+  isVisible: false
+connections: []
+secrets: []
+services:
+- serviceType: Ivy.ServerArgs
+  implementationType: Ivy.ServerArgs
+  lifetime: Singleton
+  description:
+- serviceType: Microsoft.Extensions.Configuration.IConfiguration
+  implementationType: Microsoft.Extensions.Configuration.ConfigurationRoot
+  lifetime: Singleton
+  description:
+- serviceType: Ivy.IThemeService
+  implementationType: Ivy.ThemeService
+  lifetime: Singleton
+  description:
+
+>dotnet run --decribe-connection <ConnectionName>
+>dotnet run --test-connection <ConnectionName>
+
+### 6. Generate Result
 
 Write the result to `.ivy\review-spec.md` in the project folder.
 
