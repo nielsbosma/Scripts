@@ -69,26 +69,25 @@ If a GitHub issue already covers a finding:
 
 ### 3. Investigate & Generate Plans
 
+This is a very large task. Feel free to split this up in multiple sub tasks.
+
+Now to the main goal: by analysing all the collected data your task is to come up with plans for how to improve the outcome of the Ivy Agent. 
+
+This can be achieve in many ways:
+
+- Change Ivy-Framework (fix bugs, update APIs to match hallucinations)
+- Did the agent struggle in any way to implement a specific design goal - are we missing any API for this?
+- Improve Ivy-Agent (fix bugs, improve token usage, performance, tool instructions, persona usage, ...)
+- Make sure to review <session-id>-client-output.log for any sign of the session not being a "one-shot"
+- Fix bugs in agent clients (Ivy Studio, Tui, NonInteractive)
+- Strengthen documentation
+- Improve agent workflows and reference connections to provide better context to agent when used
+- Add refactorings after code generation
+- Add analysers to Ivy.Analyser to make common runtime errors into compile time errors. We really want to avoid runtime errors!
+
 For each issue found across the reviews, investigate and create a plan. Search existing plans first to avoid duplicates.
 
-#### Hallucinations
-- If `langfuse-hallucinations.md` reports hallucinated APIs, check if a refactoring rule could prevent it
-- Check `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` for missing or unclear documentation
-- Add to `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Hallucinations.md`
-- Check if samples cover the misused pattern
-
-#### Failed Questions
-- If `langfuse-questions.md` shows failed IvyQuestion calls, check if the answer should exist in:
-  - `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Faq.md`
-  - Or a dedicated doc page
-- Check if the question is already in the FAQ — if so, assess if the answer needs improvement
-- NOTE! Just because we have documented something in Faq.md doesn't mean that IvyMcp has been updated wiht that info yet.
-
-#### Doc 404s
-- If `langfuse-docs.md` shows failed doc reads, check what path was requested and whether:
-  - The doc exists at a different path
-  - The doc should be created
-  - The agent's doc path resolution has a bug
+NOTES:
 
 #### Build Errors
 - If `langfuse-build-errors.md` shows errors, cross-reference with `langfuse-hallucinations.md`
@@ -102,6 +101,27 @@ For each issue found across the reviews, investigate and create a plan. Search e
 #### Test Failures & UX Issues
 - If `review-tests.md` shows external issues, document them as plans
 - If `review-ux.md` has recommendations, assess if they point to framework widget gaps - anything we can improve in the agent?
+
+#### Hallucinations
+- If `langfuse-hallucinations.md` reports hallucinated APIs, check if a refactoring rule could prevent it
+- Check `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` for missing or unclear documentation
+- Add to `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Hallucinations.md` (if not already there)
+- Check if samples cover the misused pattern
+- When updating Hallucinations.md we should also check if some sections can be removed. We might have updated the APIs in Ivy-Framework. 
+
+#### Failed Questions
+- If `langfuse-questions.md` shows failed IvyQuestion calls, check if the answer should exist in:
+  - `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Faq.md`
+  - Or a dedicated doc page
+- Check if the question is already in the FAQ — if so, assess if the answer needs improvement
+- NOTE! Just because we have documented something in Faq.md doesn't mean that IvyMcp has been updated wiht that info yet.
+- When updating FAQ.md we should also check if some sections can be removed. We might have updated the APIs in Ivy-Framework. 
+
+#### Doc 404s
+- If `langfuse-docs.md` shows failed doc reads, check what path was requested and whether:
+  - The doc exists at a different path
+  - The doc should be created
+  - The agent's doc path resolution has a bug
 
 ### 4. Create Plan Files
 
@@ -142,3 +162,14 @@ session: {SessionId}
 - Keep plans short and concise
 - Do NOT modify any source code directly — only read files and create plan files
 - Missing review files are not failures — analyze what's available
+
+## Finally 
+
+Give that you are an orchestrator - feel free to make improvements to:
+
+D:\Repos\_Personal\Scripts\AF2\IvyAgentReviewBuild
+D:\Repos\_Personal\Scripts\AF2\IvyAgentReviewLangfuse
+D:\Repos\_Personal\Scripts\AF2\IvyAgentReviewSpec
+D:\Repos\_Personal\Scripts\AF2\IvyAgentReviewTests
+
+According to the the D:\Repos\_Personal\Scripts\AF2\.shared\Firmware.md instructors if you feel that the output from these skills can be improved for you to optimize your future performance. 

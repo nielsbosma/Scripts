@@ -22,6 +22,36 @@ Read about the important paths and files in ../.shared/Paths.md
 - If not, report the error and stop
 - Identify the project name from the `.csproj` filename
 
+Run the following  to describe what Apps a project contains.
+
+> dotnet run --describe
+apps:
+- name: App Not Found
+  id: $error-not-found
+  isVisible: false
+- name: Mermaid Editor
+  id: mermaid-editor
+  isVisible: true
+- name: Chrome
+  id: $chrome
+  isVisible: false
+connections: []
+secrets: []
+services:
+- serviceType: Ivy.ServerArgs
+  implementationType: Ivy.ServerArgs
+  lifetime: Singleton
+  description:
+- serviceType: Microsoft.Extensions.Configuration.IConfiguration
+  implementationType: Microsoft.Extensions.Configuration.ConfigurationRoot
+  lifetime: Singleton
+  description:
+- serviceType: Ivy.IThemeService
+  implementationType: Ivy.ThemeService
+  lifetime: Singleton
+  description:
+
+
 ### 3. Collect Project Source
 
 - Read all `.cs` and `.csproj` files recursively (excluding `bin/`, `obj/`, `.ivy/` directories)
@@ -43,6 +73,9 @@ Read about the important paths and files in ../.shared/Paths.md
 - Ensure `.ivy/tests/` and `.ivy/tests/screenshots/` directories exist in the project
 
 ### 7. Generate Tests
+
+When writing tests it's very useful to test one Ivy app at at time with out the chrome.
+http://localhost:<port>/<app-id>?chrome=false
 
 Write the following files directly to `.ivy/tests/`:
 
