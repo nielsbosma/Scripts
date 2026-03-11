@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 param(
     [switch]$Debug
 )
@@ -26,7 +27,7 @@ foreach ($line in $lines) {
     if ($Debug) {
         $runArgs += "-Debug"
     }
-    Start-Process powershell -ArgumentList $runArgs
+    Start-Process pwsh -ArgumentList $runArgs
      Start-Sleep -Seconds 30
 }
 
