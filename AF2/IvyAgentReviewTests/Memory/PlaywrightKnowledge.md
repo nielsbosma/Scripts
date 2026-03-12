@@ -71,6 +71,12 @@
 - `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
 - `.ToDetails()` on an anonymous object renders key-value pairs with PascalCase property names converted to spaced labels (e.g., `MonthlyNetBurn` → "Monthly Net Burn")
 
+## WithConfirm Dialog
+
+- `button.WithConfirm("message", "title")` renders a custom Dialog with "Cancel" (outline) and "Ok" (primary) buttons
+- The confirm button text is always **"Ok"** — use `getByRole("button", { name: "Ok" })` to click it
+- The dialog title and message are customizable, but button labels are hardcoded in `WithConfirmView`
+
 ## Critical: ValueTuple Crash Pattern
 
 - **NEVER** use C# ValueTuple syntax `Layout.Vertical() | (item1, item2, ...)` when the tuple contains widgets — `DefaultContentBuilder.Format()` calls `ValueTuple.ToString()` which triggers `PrintMembers()` → `get_Id()` on uninitialized widgets, causing `InvalidOperationException`
@@ -99,6 +105,12 @@
 - `new Card(content).Title("X")` renders the title as a `<span>`, NOT as a heading element — use `getByText("X", { exact: true })` to locate card titles, not `getByRole("heading")`
 - Card title text can cause strict mode violations if the same substring appears elsewhere — always use `{ exact: true }`
 - Note: `new Card(content, header: Text.H3("X"))` renders a heading (see Skyline entry), but `.Title("X")` does not
+
+## Form (.ToForm / .ToDialog / .ToSheet) Patterns
+
+- `.ToForm()` with `[Required]` fields renders labels as "FieldName *" (with asterisk suffix) — `getByText("Code", { exact: true })` won't match "Code *". Use input element locators (`input[type='text']`, `input[type='number']`) instead of label text for asserting form field presence
+- `.ToDialog(isOpen, title, submitTitle)` renders a dialog with custom title and submit button text
+- `.ToSheet(isOpen, title)` renders a slide-in sheet with Save/Cancel buttons
 
 ## Ivy Component Test Patterns
 
@@ -318,3 +330,47 @@
 - `HeaderLayout(header, body)` pattern used in Dashboard — header contains date range toggle
 - Dashboard `SelectInput<DateRange>` with `Variant(SelectInputVariant.Toggle)` renders as radio buttons — same Toggle variant pattern
 - All 15 tests passed after 1 project fix round (3 files fixed: OrderCreateDialog, OrderItemCreateDialog, OrderShipmentCreateDialog)
+
+### 2026-03-11 — Meridian.ClockFace
+- `new Html(clockFaceHtml)` with CSS custom properties (`var(--foreground)`, `var(--border)`, etc.) renders completely invisible in the iframe — confirmed same pattern as Polyglot.TypeTrainer and Patternix.RegexLens
+- **Real-time state updates via `UseEffect` + `System.Threading.Timer` are NOT reliably observable in Playwright**: `page.locator("h3").textContent()` polled every 500ms for 5+ seconds returned the same value despite the timer updating state every 1000ms. Screenshots confirm the time displays correctly, so it's a Playwright DOM snapshot timing issue, not an app bug. Avoid asserting real-time clock/timer updates in tests — instead verify format, timezone correctness, and static state.
+- `ToSelectInput(options)` without Toggle variant renders as dropdown with `role="option"` — `getByRole("option", { name: "Tokyo" })` works for selection (confirmed again)
+- `ToSwitchInput().Label(running.Value ? "Running" : "Stopped")` — label text changes reactively with state, testable via `getByText("Stopped")`
+- Clean run: 12 tests passed, no project fixes, no runtime errors, logs clean
+
+### 2026-03-11 — NexTask.TodoSync
+- CRUD Todo app with UseBlades, SQLite EF Core, Chrome tabs (single app, auto-opens)
+- **`WithConfirm` dialog uses "Ok" as the confirm button text** — NOT "Continue", "Confirm", or "Delete". Use `getByRole("button", { name: "Ok" })` to click the confirm button
+- Form `.ToDialog()` renders field labels (e.g., "Title *") but `getByText("Title", { exact: true })` may fail — use input element locators (`input[type='text']`) instead for reliability
+- `.ToDetails().Multiline(e => e.Description).RemoveEmpty().Builder(e => e.Id, e => e.CopyToClipboard())` renders clean key-value pairs with copy button on Id
+- `ListItem` with `onClick` and `tag` — click items via `getByText(title, { exact: true }).first().dispatchEvent("click")` (confirmed pattern)
+- Clean run: 12 tests passed after 2 test-only fix rounds, no project fixes, no runtime errors, logs clean
+
+### 2026-03-11 — LinguaFlow.Translator
+- Single-app translator using GTranslate NuGet for Google Translate, Chrome tabs (single app, auto-opens)
+- `UseEffect` with async translation triggered reactively by inputText and selectedLanguage states — translation happens automatically on state change, no submit button needed
+- `ToSelectInput(languageOptions)` without Toggle variant renders as Radix dropdown with 100+ language options — confirmed `getByRole("option", { name: "French", exact: true })` needed because "French" and "French (Canada)" both exist (same pattern as Polyglot.TypeTrainer prefix collisions)
+- `Layout.Vertical().Background(Colors.White)` for text boxes inside cards creates low-contrast containers — white-on-white blends with card surface
+- Clean run: 12 tests passed after 1 test-only fix round, no project fixes, no runtime errors, logs clean
+
+### 2026-03-11 — GridQuest.Pathfinder
+- `UseState<T>(T?)` vs `UseState<T>(Func<T>)` is ambiguous when T is a nullable reference type (e.g., `CellType[][]`, `string?`) — fix by using explicit typed variables: `CellType[][] val = ...; UseState(val);` or switch to non-nullable types (e.g., `string` with `string.IsNullOrEmpty()`)
+- `NumberInput<int>.Variant(NumberInputVariant.Slider)` renders identical to `ToSliderInput()` — Radix slider with `role="slider"`, keyboard Home/End/ArrowRight/ArrowLeft work (confirmed)
+- `Box` with `.Color()`, `.Size()`, `.BorderThickness()`, `.BorderColor()` renders colored div cells — no special selectors needed, just visual
+- Clean first-pass run: 14 tests passed, 1 project fix (UseState build ambiguity), no runtime errors, logs clean
+
+### 2026-03-12 — CourtVision.Analytics
+- NBA statistics dashboard with data table (glide-data-grid), position/college dropdown filters, age/salary slider filters, and bar charts
+- **CSV with decimal numbers**: The NBA CSV from geeksforgeeks uses `25.0`, `7730337.0` notation. C# `int.TryParse("25.0")` returns false — must use `double.TryParse()` + cast to int for CSV numeric parsing
+- Filter boundary bug: `>` / `<` (strict inequality) excluded boundary values (age 18/50, salary 0). Changed to `>=` / `<=`
+- `ToSelectInput(options).Searchable()` renders dropdown with search input — works correctly for long option lists (colleges)
+- `.ToBarChart().Dimension().Measure().Toolbox()` renders ECharts bar charts with toolbox icons (save, switch chart type)
+- 10 tests passed after 2 project fix rounds (ParseInt decimal parsing + filter inequality), no runtime errors, logs clean
+
+### 2026-03-12 — Meridian.ProductVault
+- Standard CRUD app with UseBlades, Chrome tabs (single app, auto-opens), SQLite EF Core, Bogus seeder (100 products)
+- `.ToForm()` renders field labels with `*` suffix for `[Required]` fields (e.g., "Code *") — `getByText("Code", { exact: true })` fails; use `input[type='text']` locators instead
+- `[Required]` on non-nullable `int Quantity` causes value 0 to fail validation (standard .NET DataAnnotations behavior) — not an Ivy bug
+- `.ToDetails().RemoveEmpty().Builder(e => e.Id, e => e.CopyToClipboard())` renders clean key-value pairs with copy button on Id field
+- `ProductEditSheet` uses `.ToForm().Remove(e => e.Id, e => e.CreatedAt, e => e.UpdatedAt)` — correctly hides non-editable fields
+- Clean run: 12 tests passed after 1 test-only fix round, no project fixes, no runtime errors, logs clean
