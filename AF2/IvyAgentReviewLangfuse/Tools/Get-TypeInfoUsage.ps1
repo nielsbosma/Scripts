@@ -37,15 +37,23 @@ foreach ($traceFolder in $traceFolders) {
     $requests = @() # array of @{Index; Search; SearchType; MaxResults; Source; Matched}
     for ($i = 0; $i -lt $observations.Count; $i++) {
         $obs = $observations[$i]
-        # EVENT__local__GetTypeInfo with input.search
-        if ($obs.File.Name -match 'GetTypeInfo' -and $obs.Json.input.search) {
-            $requests += [PSCustomObject]@{
-                Index      = $i
-                Search     = $obs.Json.input.search
-                SearchType = $obs.Json.input.searchType
-                MaxResults = $obs.Json.input.maxResults
-                Source     = 'EVENT'
-                Matched    = $false
+        # EVENT GetTypeInfoMessage with input.message.search or input.search
+        if ($obs.File.Name -match 'GetTypeInfo' -and -not ($obs.File.Name -match 'Result')) {
+            $search = $obs.Json.input.message.search
+            if (-not $search) { $search = $obs.Json.input.search }
+            if ($search) {
+                $searchType = $obs.Json.input.message.searchType
+                if (-not $searchType) { $searchType = $obs.Json.input.searchType }
+                $maxResults = $obs.Json.input.message.maxResults
+                if (-not $maxResults) { $maxResults = $obs.Json.input.maxResults }
+                $requests += [PSCustomObject]@{
+                    Index      = $i
+                    Search     = $search
+                    SearchType = $searchType
+                    MaxResults = $maxResults
+                    Source     = 'EVENT'
+                    Matched    = $false
+                }
             }
         }
         # GENERATION output with GetTypeInfo tool call
@@ -65,8 +73,8 @@ foreach ($traceFolder in $traceFolders) {
         }
     }
 
-    # Deduplicate: if an EVENT and GENERATION have the same search, keep only the EVENT
-    $deduped = @()
+    # Deduplicate: if an EVENT and GENERATION have the same search at the same index range, keep only the EVENT
+    $deduped = [System.Collections.Generic.List[object]]::new()
     $seenSearches = @{}
     foreach ($req in ($requests | Sort-Object Index)) {
         $key = "$($req.Search)|$($req.SearchType)"
@@ -77,28 +85,34 @@ foreach ($traceFolder in $traceFolders) {
             $existingIsEvent = $existing.Source -eq 'EVENT'
             # Keep EVENT over GENERATION
             if ($isEvent -and -not $existingIsEvent) {
-                $deduped = $deduped | Where-Object { "$($_.Search)|$($_.SearchType)" -ne $key }
-                $deduped += $req
+                $toRemove = @($deduped | Where-Object { "$($_.Search)|$($_.SearchType)" -eq $key -and $_.Source -eq 'GENERATION' })
+                foreach ($r in $toRemove) { $deduped.Remove($r) | Out-Null }
+                $deduped.Add($req)
                 $seenSearches[$key] = $req
             }
             # If both are events with same search (re-search), keep both
             elseif ($isEvent -and $existingIsEvent) {
-                $deduped += $req
+                $deduped.Add($req)
             }
             # Otherwise skip (duplicate from generation)
         } else {
-            $deduped += $req
+            $deduped.Add($req)
             $seenSearches[$key] = $req
         }
     }
-    $requests = $deduped | Sort-Object Index
+    $requests = @($deduped | Sort-Object Index)
 
     # For each response, match to nearest preceding unmatched request
     for ($i = 0; $i -lt $observations.Count; $i++) {
         $obs = $observations[$i]
         $input = $obs.Json.input
         if (-not $input) { continue }
-        if ($input.toolName -ne 'GetTypeInfo' -or -not $input.response) { continue }
+        # Match both old format (input.toolName/input.response) and new format (input.message.$type=GetTypeInfoResultMessage)
+        $isOldFormat = ($input.toolName -eq 'GetTypeInfo' -and $input.response)
+        $isNewFormat = ($input.message -and $input.message.'$type' -eq 'GetTypeInfoResultMessage')
+        if (-not $isOldFormat -and -not $isNewFormat) { continue }
+        # Normalize: for new format, use input.message as the response data
+        $responseData = if ($isNewFormat) { $input.message } else { $input.response }
 
         $fileName = [System.IO.Path]::GetFileNameWithoutExtension($obs.File.Name)
 
@@ -124,10 +138,11 @@ foreach ($traceFolder in $traceFolders) {
 
         # Extract type names from response
         $typeNames = $null
-        if ($input.response.types -is [array]) {
+        if ($responseData.types -is [array]) {
             $names = @()
-            foreach ($t in $input.response.types) {
+            foreach ($t in $responseData.types) {
                 if ($t.Name) { $names += $t.Name }
+                elseif ($t.name) { $names += $t.name }
             }
             if ($names.Count -gt 0) {
                 $typeNames = $names -join ', '
@@ -140,11 +155,11 @@ foreach ($traceFolder in $traceFolders) {
             Search          = $search
             SearchType      = $searchType
             MaxResults      = $maxResults
-            Success         = $input.response.success -eq $true
-            TotalMatches    = $input.response.totalMatches
+            Success         = $responseData.success -eq $true
+            TotalMatches    = $responseData.totalMatches
             TypeNames       = $typeNames
-            Error           = $input.response.errorMessage
-            Warning         = $input.response.warningMessage
+            Error           = $responseData.errorMessage
+            Warning         = $responseData.warningMessage
         }
     }
 }

@@ -80,3 +80,7 @@ When refering to scripts this is almost always where they are stored.
 # Vscode Extension
 
 D:\Repos\_Personal\Scripts\AF2\.vscode-extensions
+
+# Test Manager
+
+ D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Test.Manager

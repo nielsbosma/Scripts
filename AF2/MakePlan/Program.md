@@ -37,9 +37,10 @@ Args contains the user's task description. If it references related plans with `
 ### 4. Create Plan
 
 Write a single plan file to `D:\Repos\_Ivy\.plans\` with the naming convention:
-`<ID>-<RepositoryName>-Feature-<Title>.md`
+`<ID>-<Queue>-<Title>.md`
 
-Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`, `Scripts`, `VsExtension`
+Queue: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`, `Scripts`, `VsExtension`, `TestManager`, `IvyMcp`, ...
+Every project is executed sequentially in a queue of it's own to avoid build errors and conflicting changes.  
 
 Plan format:
 

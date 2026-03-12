@@ -140,6 +140,12 @@
 - `UseChrome().UseTabs(preventDuplicates: true)` with a single app auto-opens the tab — no sidebar click needed for navigation.
 - `state.ToBoolInput().Label("X")` WITHOUT explicit `.Variant()` renders as `role="checkbox"` (NOT `role="switch"`) — use `page.locator('[role="checkbox"]').first()` to click. Clicking the label text does NOT toggle the checkbox. Use dynamic detection: check `[role="checkbox"]` count first, then `[role="switch"]`, then fallback to `dispatchEvent("click")`.
 
+## Enum ToOptions() Display Text
+
+- `typeof(MyEnum).ToOptions()` converts PascalCase enum names to spaced display text: `V1` → "V 1", `V3` → "V 3", `V4` → "V 4", etc.
+- This means `getByText("V1")` will NOT match — must use `getByText("V 1", { exact: true })` with the space
+- Same pattern applies to all enum values where PascalCase splitting inserts spaces between uppercase letters and digits
+
 ## Run History
 
 ### 2026-03-10 — Tempus.AgeCalc
@@ -374,3 +380,21 @@
 - `.ToDetails().RemoveEmpty().Builder(e => e.Id, e => e.CopyToClipboard())` renders clean key-value pairs with copy button on Id field
 - `ProductEditSheet` uses `.ToForm().Remove(e => e.Id, e => e.CreatedAt, e => e.UpdatedAt)` — correctly hides non-editable fields
 - Clean run: 12 tests passed after 1 test-only fix round, no project fixes, no runtime errors, logs clean
+
+### 2026-03-12 — Test.DataVisualization
+- `DataTableBuilder.Header(r => r.Values[colIndex], columns[i])` crashes with `ArgumentException: Invalid expression` — `GetNameFromMemberExpression` (Utils.cs:467) only handles simple member access, not indexer/array expressions
+- `DataTableBuilder` does NOT have a `.Remove()` method (unlike `FormBuilder` and `TableBuilder`) — `builder.Remove(expressions)` resolves to `CollectionExtensions.Remove<TKey,TValue>` and fails to compile
+- Workaround for dynamic-column DataTable: replace `ToDataTable()` with manual `Layout.Horizontal/Vertical` table using `Text.Label` headers and `Text.P` cells — loses virtualization/row-actions but avoids the API limitation
+- Alternative DynRow approach (record with C0-C19 properties + `Header()` rename) compiles and `Header()` works, but can't hide unused columns without `Remove()`, making it impractical
+- `FileUpload<byte[]>` with `MemoryStreamUploadHandler` + `UseEffect` on fileState correctly triggers parsing when `Status == FileUploadStatus.Finished`
+- `Button.Url(downloadUrl)` with `UseDownload()` renders as a standard button (not `role="link"`) — locatable via `getByRole("button", { name: /Export CSV/i })` or `getByText("Export CSV")`
+- `file.setInputFiles({ name, mimeType, buffer })` works for programmatic file upload in Playwright — buffer is `Buffer.from(csvString, "utf-8")`
+- 11 tests passed after 1 project fix round (replaced DataTable with manual layout)
+
+### 2026-03-12 — Test.UUIDGenerator2
+- `typeof(UuidVersion).ToOptions()` converts enum names with PascalCase splitting: `V1` → "V 1", `V4` → "V 4" — `getByText("V1")` fails, must use `getByText("V 1", { exact: true })`
+- `ToSelectInput(options)` without Toggle: `getByRole("combobox").first().click()` opens dropdown, then `getByText("Option Text", { exact: true }).first().click()` to select — `getByRole("option")` does NOT work for Radix dropdown items (confirmed)
+- UUID V1/V6/V7 generation with `SwapGuidEndianness` byte-swaps bytes 6-7 containing the version nibble — version identifier appears in non-standard position in string representation (not an app crash, just RFC non-compliance)
+- `.ToTable()` on `List<UuidEntry>` renders standard HTML table with copy icon buttons per row — `.Builder(u => u.Uuid, f => f.CopyToClipboard())` works correctly
+- `UseDownload()` for TXT/JSON/CSV export renders as `Button.Url()` links — visible and functional
+- Clean run: 13 tests passed after test-only fix rounds, no project fixes, no runtime errors, logs clean
