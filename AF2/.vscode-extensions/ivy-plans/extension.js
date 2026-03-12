@@ -127,6 +127,7 @@ function activate(context) {
 
             fs.renameSync(filePath, dest);
             vscode.window.showInformationMessage(`Skipped: ${fileName}`);
+            await openNextPlan(dir, fileName);
         })
     );
 
