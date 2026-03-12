@@ -202,6 +202,31 @@ All build errors throughout the session. Use `Get-BuildErrors.ps1`.
 | Unique error codes | CS1234, CS5678 |
 ```
 
+#### `langfuse-system-reminders.md`
+
+System reminder events fired by context window analysers. Use `Get-SystemReminders.ps1`.
+
+```markdown
+# System Reminders: {SessionId}
+
+## Reminders
+
+### Reminder N
+
+**Time**: {timestamp}
+**Analyser**: {analyser class name}
+**Message**: {reminder text}
+**Next Action**: {preview of what agent did next}
+
+## Summary
+
+| Analyser | Count |
+|----------|-------|
+| RepeatedBuildFailureAnalyser | N |
+| BuildErrorScopeAnalyser | N |
+| RepeatedToolFeedbackAnalyser | N |
+```
+
 ### 3. Summary
 
 Present the user with:
