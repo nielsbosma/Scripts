@@ -7,7 +7,7 @@ Analyze review data from an Ivy Agent session and generate actionable improvemen
 By the time you run, these review scripts have already completed and produced files in `{WorkDir}/.ivy/`:
 
 - **ReviewBuild** → `review-build.md`
-- **ReviewLangfuse** → `langfuse-timeline.md`, `langfuse-build-errors.md`, `langfuse-docs.md`, `langfuse-hallucinations.md`, `langfuse-questions.md`, `langfuse-reference-connections.md`, `langfuse-workflows.md`
+- **ReviewLangfuse** → `langfuse-timeline.md`, `langfuse-build-errors.md`, `langfuse-docs.md`, `langfuse-hallucinations.md`, `langfuse-questions.md`, `langfuse-reference-connections.md`, `langfuse-workflows.md`, `langfuse-system-reminders.md`
 - **ReviewSpec** → `review-spec.md`
 - **ReviewTests** → `review-tests.md`, `review-ux.md`
 
@@ -35,6 +35,7 @@ Read every review file in `{WorkDir}/.ivy/`:
 - `.ivy/langfuse-questions.md` — IvyQuestion Q&A log
 - `.ivy/langfuse-reference-connections.md` — reference connections used
 - `.ivy/langfuse-workflows.md` — workflow execution details
+- `.ivy/langfuse-system-reminders.md` — system reminder events and effectiveness
 
 If a file is missing, note it and continue with what's available.
 
@@ -80,6 +81,7 @@ This can be achieve in many ways:
 - Change Ivy-Framework (fix bugs, update APIs to match hallucinations)
 - Did the agent struggle in any way to implement a specific design goal - are we missing any API for this?
 - Improve Ivy-Agent (fix bugs, improve token usage, performance, tool instructions, persona usage, ...)
+- How many tokens where wasted becasue the agent had bad instructions? Can we optimize this?
 - Make sure to review <session-id>-client-output.log for any sign of the session not being a "one-shot"
 - Fix bugs in agent clients (Ivy Studio, Tui, NonInteractive)
 - Strengthen documentation
@@ -112,12 +114,21 @@ NOTES:
 - When updating Hallucinations.md we should also check if some sections can be removed. We might have updated the APIs in Ivy-Framework. 
 
 #### Failed Questions
-- If `langfuse-questions.md` shows failed IvyQuestion calls, check if the answer should exist in:
-  - `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Faq.md`
-  - Or a dedicated doc page
-- Check if the question is already in the FAQ — if so, assess if the answer needs improvement
-- NOTE! Just because we have documented something in Faq.md doesn't mean that IvyMcp has been updated wiht that info yet.
-- When updating FAQ.md we should also check if some sections can be removed. We might have updated the APIs in Ivy-Framework. 
+- If `langfuse-questions.md` shows failed IvyQuestion calls, the answer should be added as a FAQ entry on the **relevant doc page** (not the central Faq.md):
+  - Find the most relevant doc page under `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` (e.g., a widget doc, hook doc, or concept page)
+  - Append the Q&A under a `## Faq` section at the end of that doc page (create the section if it doesn't exist)
+  - Use `### <question>` format for each entry within the Faq section
+  - Only add to `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Faq.md` if the question is truly cross-cutting and doesn't belong on any specific doc page
+- Check if the question is already answered in a doc page's Faq section — if so, assess if the answer needs improvement
+- NOTE! Just because we have documented something in a doc page's Faq section doesn't mean that IvyMcp has been updated with that info yet.
+- When adding FAQ entries, also check if existing Faq sections have entries that can be removed because APIs have been updated in Ivy-Framework
+
+#### System Reminders
+- If `langfuse-system-reminders.md` shows reminders firing, check:
+  - Are reminders firing excessively? (>3 of same type = agent likely stuck)
+  - Did the agent change behavior after the reminder? If not, the analyser text may need improvement
+  - Check the analyser source in `D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent\Agents\Analysers\` for prompt quality
+  - Consider if the analyser threshold is too low (firing too early) or too high (firing too late)
 
 #### Doc 404s
 - If `langfuse-docs.md` shows failed doc reads, check what path was requested and whether:
