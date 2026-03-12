@@ -39,7 +39,7 @@ Args contains the user's task description. If it references related plans with `
 Write a single plan file to `D:\Repos\_Ivy\.plans\` with the naming convention:
 `<ID>-<RepositoryName>-Feature-<Title>.md`
 
-Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`, `Scripts` etc.
+Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`, `Scripts`, `VsExtension`
 
 Plan format:
 
