@@ -7,7 +7,8 @@
     - OR: GENERATION output containing tool call with name=GetTypeInfo
     - Response: EVENT_LocalResponse files with input.toolName="GetTypeInfo" and input.response
 
-    For each response, walks backwards to find the nearest unmatched request.
+    For each response, matches to the request using messageId/responseTo correlation,
+    falling back to nearest preceding unmatched request if messageId is unavailable.
 .PARAMETER LangfuseDir
     Path to the langfuse data folder.
 .OUTPUTS
@@ -46,6 +47,7 @@ foreach ($traceFolder in $traceFolders) {
                 if (-not $searchType) { $searchType = $obs.Json.input.searchType }
                 $maxResults = $obs.Json.input.message.maxResults
                 if (-not $maxResults) { $maxResults = $obs.Json.input.maxResults }
+                $messageId = $obs.Json.input.message.messageId
                 $requests += [PSCustomObject]@{
                     Index      = $i
                     Search     = $search
@@ -53,6 +55,7 @@ foreach ($traceFolder in $traceFolders) {
                     MaxResults = $maxResults
                     Source     = 'EVENT'
                     Matched    = $false
+                    MessageId  = $messageId
                 }
             }
         }
@@ -67,6 +70,7 @@ foreach ($traceFolder in $traceFolders) {
                         MaxResults = $tc.arguments.maxResults
                         Source     = 'GENERATION'
                         Matched    = $false
+                        MessageId  = $null
                     }
                 }
             }
@@ -116,14 +120,21 @@ foreach ($traceFolder in $traceFolders) {
 
         $fileName = [System.IO.Path]::GetFileNameWithoutExtension($obs.File.Name)
 
-        # Find nearest preceding unmatched request
+        # Match response to request by messageId correlation, fall back to index-based
         $matchedReq = $null
-        foreach ($req in $requests) {
-            if ($req.Index -lt $i -and -not $req.Matched) {
-                $matchedReq = $req
-                # Don't break - we want the latest unmatched request before this response
+        $responseTo = $responseData.responseTo
+        if (-not $responseTo) { $responseTo = $input.message.responseTo }
+        if ($responseTo) {
+            $matchedReq = $requests | Where-Object { $_.MessageId -eq $responseTo -and -not $_.Matched } | Select-Object -First 1
+        }
+        if (-not $matchedReq) {
+            # Fall back: nearest preceding unmatched request
+            foreach ($req in $requests) {
+                if ($req.Index -lt $i -and -not $req.Matched) {
+                    $matchedReq = $req
+                }
+                if ($req.Index -ge $i) { break }
             }
-            if ($req.Index -ge $i) { break }
         }
 
         $search = '(unknown)'
