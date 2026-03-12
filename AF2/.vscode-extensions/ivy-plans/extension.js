@@ -24,9 +24,9 @@ async function saveAndClose(uri) {
     }
 }
 
-async function openNextPlan(plansDir) {
+async function openNextPlan(plansDir, excludeFile) {
     const files = fs.readdirSync(plansDir)
-        .filter(f => f.endsWith('.md'))
+        .filter(f => f.endsWith('.md') && f !== excludeFile)
         .sort();
     if (files.length > 0) {
         const nextUri = vscode.Uri.file(path.join(plansDir, files[0]));
@@ -48,7 +48,7 @@ function activate(context) {
             const terminal = vscode.window.createTerminal({ name: 'Update Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\UpdatePlan.ps1" "${uri.fsPath}"`);
-            await openNextPlan(path.dirname(uri.fsPath));
+            await openNextPlan(path.dirname(uri.fsPath), path.basename(uri.fsPath));
         })
     );
 
@@ -80,7 +80,7 @@ function activate(context) {
 
             fs.renameSync(filePath, dest);
             vscode.window.showInformationMessage(`Approved: ${fileName}`);
-            await openNextPlan(dir);
+            await openNextPlan(dir, fileName);
         })
     );
 
@@ -95,6 +95,7 @@ function activate(context) {
             const terminal = vscode.window.createTerminal({ name: 'Split Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\SplitPlan.ps1" "${uri.fsPath}"`);
+            await openNextPlan(path.dirname(uri.fsPath), path.basename(uri.fsPath));
         })
     );
 
