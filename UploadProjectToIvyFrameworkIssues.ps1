@@ -87,7 +87,7 @@ if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Write-Host "`nCreating $zipName ..." -ForegroundColor Cyan
 
 $items = Get-ChildItem -Path . -Force |
-    Where-Object { $_.Name -notin 'bin', 'obj', '.vs' -and $_.Name -ne $zipName }
+    Where-Object { $_.Name -notin 'bin', 'obj', '.vs', '.git', '.ivy' -and $_.Name -ne $zipName }
 
 Compress-Archive -Path $items.FullName -DestinationPath $zipPath -Force
 
