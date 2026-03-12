@@ -10,7 +10,7 @@ $programFolder = GetProgramFolder $PSCommandPath
 $workDir = (Get-Location).Path
 
 # --- Test Run detection: look for test.yaml in parent folder ---
-$testManagerExe = "D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Test.Manager"
+$testManagerExe = "D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Test.Manager\bin\Debug\net10.0\ivy-agent-test-manager.exe"
 $testYamlPath = Join-Path (Split-Path $workDir -Parent) "test.yaml"
 $testRunId = $null
 if (Test-Path $testYamlPath) {
@@ -19,7 +19,7 @@ if (Test-Path $testYamlPath) {
     if ($parentName -match "^(\d+)-") {
         $testRunId = $Matches[1]
         Write-Host "Detected test run ID: $testRunId" -ForegroundColor Cyan
-        & dotnet run --project $testManagerExe -- run set-state $testRunId Debugging
+        & $testManagerExe run set-state $testRunId Debugging
     }
 }
 
@@ -185,6 +185,7 @@ if ($debugFolder) {
             "webSearchCount: $($summary.WebSearchCount)"
             "lspCount: $($summary.LspCount)"
             "toolFeedbackCount: $($summary.ToolFeedbackCount)"
+            "totalCost: $($summary.TotalCost)"
             "oneShotScore: $($summary.OneShotScore)"
             "workflows: [$($summary.WorkflowNames -join ', ')]"
         )
@@ -232,5 +233,5 @@ Remove-Item $promptFile
 
 # --- Set Ready if in a test run context ---
 if ($testRunId) {
-    & dotnet run --project $testManagerExe -- run set-state $testRunId Ready
+    & $testManagerExe run set-state $testRunId Ready
 }

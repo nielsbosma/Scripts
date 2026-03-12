@@ -37,6 +37,7 @@ $stats = @{
     WebSearchCount = 0
     LspCount = 0
     ToolFeedbackCount = 0
+    TotalCost = [decimal]0
 }
 
 foreach ($traceFolder in $traceFolders) {
@@ -53,6 +54,11 @@ foreach ($traceFolder in $traceFolders) {
                 if ($json.usageDetails) {
                     if ($json.usageDetails.input) { $stats.TotalInputTokens += [long]$json.usageDetails.input }
                     if ($json.usageDetails.output) { $stats.TotalOutputTokens += [long]$json.usageDetails.output }
+                }
+                if ($json.costDetails -and $json.costDetails.total) {
+                    $stats.TotalCost += [decimal]$json.costDetails.total
+                } elseif ($json.calculatedTotalCost) {
+                    $stats.TotalCost += [decimal]$json.calculatedTotalCost
                 }
                 continue
             }
@@ -127,6 +133,7 @@ $partialSummary = [PSCustomObject]@{
     WebSearchCount = $stats.WebSearchCount
     LspCount = $stats.LspCount
     ToolFeedbackCount = $stats.ToolFeedbackCount
+    TotalCost = $stats.TotalCost
 }
 $oneShotScore = & "$PSScriptRoot\Get-OneShotScore.ps1" -Summary $partialSummary
 
@@ -153,5 +160,6 @@ return [PSCustomObject]@{
     WebSearchCount = $stats.WebSearchCount
     LspCount = $stats.LspCount
     ToolFeedbackCount = $stats.ToolFeedbackCount
+    TotalCost = $stats.TotalCost
     OneShotScore = $oneShotScore
 }
