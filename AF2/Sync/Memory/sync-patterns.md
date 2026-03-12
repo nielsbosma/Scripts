@@ -25,6 +25,6 @@
 | Repo | Main Solution | Additional Solutions |
 |---|---|---|
 | Ivy-Agent | Ivy-Agent.slnx | Ivy-Agent-Client-Test.slnx, Ivy.Agent.Eval.slnx, Ivy.Lsp.Console.slnx, Ivy.Lsp.Tests.ExampleSolution.slnx |
-| Ivy | Ivy.slnx | connections.slnx, Resend.slnx, Ivy.Console.slnx, Ivy.DotNet.Watch.slnx, Ivy.Hosting.Sliplane.slnx |
+| Ivy | Ivy.slnx | connections/connections.slnx, connections/Resend/Resend.slnx, Ivy.Console/Ivy.Console.slnx, Ivy.DotNet.Watch/Ivy.DotNet.Watch.slnx, Ivy.Hosting.Sliplane/Ivy.Hosting.Sliplane.slnx |
 | Ivy-Framework | src/Ivy-Framework.slnx | src/Ivy.Analyser/Ivy.Analyser.slnx, src/Ivy.Samples/Ivy.Samples.slnx |
 | Ivy-Mcp | Ivy.Mcp.slnx | - |
