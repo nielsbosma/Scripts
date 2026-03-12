@@ -58,12 +58,14 @@ function GetLatestSessionId {
 
     if (-not (Test-Path $Path)) {
         Write-Host "Error: $Path not found." -ForegroundColor Red
+        Read-Host "Press Enter to exit"
         exit 1
     }
 
     $lastLine = (Get-Content $Path -Tail 1).Trim()
     if ($lastLine -eq "") {
         Write-Host "Error: $Path is empty." -ForegroundColor Red
+        Read-Host "Press Enter to exit"
         exit 1
     }
 
