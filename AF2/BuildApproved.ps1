@@ -177,6 +177,12 @@ try {
                     }
                 }
 
+                # Append failure reason to plan file before moving to failed
+                if (-not $success -and $reason -and (Test-Path $info.File)) {
+                    $failureNote = "`n`n## Failed`n`n$reason`n"
+                    Add-Content -Path $info.File -Value $failureNote -Encoding utf8
+                }
+
                 # Move plan file
                 $destDir  = if ($success) { $DonePath } else { $FailPath }
                 $fileName = [IO.Path]::GetFileName($info.File)
