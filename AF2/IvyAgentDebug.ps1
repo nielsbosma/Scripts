@@ -185,6 +185,7 @@ if ($debugFolder) {
             "webSearchCount: $($summary.WebSearchCount)"
             "lspCount: $($summary.LspCount)"
             "toolFeedbackCount: $($summary.ToolFeedbackCount)"
+            "oneShotScore: $($summary.OneShotScore)"
             "workflows: [$($summary.WorkflowNames -join ', ')]"
         )
         $yamlLines | Set-Content (Join-Path $ivyDir "summary.yaml")

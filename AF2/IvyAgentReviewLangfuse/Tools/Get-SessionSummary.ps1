@@ -105,6 +105,31 @@ foreach ($traceFolder in $traceFolders) {
     }
 }
 
+# Calculate OneShotScore via LLM judgement
+$partialSummary = [PSCustomObject]@{
+    GenerationCount = $stats.GenerationCount
+    TotalInputTokens = $stats.TotalInputTokens
+    TotalOutputTokens = $stats.TotalOutputTokens
+    IvyQuestionCount = $stats.IvyQuestionCount
+    IvyQuestionFailCount = $stats.IvyQuestionFailCount
+    IvyDocsCount = $stats.IvyDocsCount
+    IvyDocsFailCount = $stats.IvyDocsFailCount
+    BuildAttempts = $stats.BuildAttempts
+    BuildFailures = $stats.BuildFailures
+    WriteFileCount = $stats.WriteFileCount
+    UniqueFilesWritten = $stats.UniqueFilesWritten.Count
+    BashCount = $stats.BashCount
+    BashFailures = $stats.BashFailures
+    ReadFileCount = $stats.ReadFileCount
+    GrepCount = $stats.GrepCount
+    GlobCount = $stats.GlobCount
+    WebFetchCount = $stats.WebFetchCount
+    WebSearchCount = $stats.WebSearchCount
+    LspCount = $stats.LspCount
+    ToolFeedbackCount = $stats.ToolFeedbackCount
+}
+$oneShotScore = & "$PSScriptRoot\Get-OneShotScore.ps1" -Summary $partialSummary
+
 return [PSCustomObject]@{
     TraceCount = $stats.TraceCount
     GenerationCount = $stats.GenerationCount
@@ -128,4 +153,5 @@ return [PSCustomObject]@{
     WebSearchCount = $stats.WebSearchCount
     LspCount = $stats.LspCount
     ToolFeedbackCount = $stats.ToolFeedbackCount
+    OneShotScore = $oneShotScore
 }
