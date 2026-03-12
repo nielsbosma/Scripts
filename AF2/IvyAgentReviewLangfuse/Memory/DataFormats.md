@@ -33,5 +33,8 @@
 - **Request**: `EVENT__local__GetTypeInfo` — `input.search` (search term), `input.searchType` ("Type"/"Method"), `input.maxResults`
 - **Response**: `EVENT_LocalResponse` (next file) — `input.toolName = "GetTypeInfo"`, `input.response.success`, `input.response.totalMatches`, `input.response.types` (array of TypeInfo objects with `.Name`, `.FullName`, `.Kind`, etc.), `input.response.errorMessage`, `input.response.warningMessage`
 
+## CSharpRefactoring (Standalone Event)
+- **Event**: `EVENT` with `name = "CSharpRefactoring"` — `metadata.FilePath` has the file path, `metadata.Rules` is an array of applied rule names (e.g. `["ReplaceInvalidColors", "RemoveComments"]`)
+
 ## Tool Pairing Pattern
 Most local tools follow: `EVENT__local__{ToolName}` (request) → `EVENT_LocalResponse` (response with `input.toolName`)

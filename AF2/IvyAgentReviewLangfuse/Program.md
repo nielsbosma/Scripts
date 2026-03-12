@@ -269,6 +269,29 @@ System reminder events fired by context window analysers. Use `Get-SystemReminde
 | RepeatedToolFeedbackAnalyser | N |
 ```
 
+#### `langfuse-refactorings.md`
+
+CSharp refactoring rules applied during the session. Use `Get-CSharpRefactorings.ps1`.
+
+```markdown
+# CSharp Refactorings: {SessionId}
+
+## Refactorings
+
+| Trace | File | Rules Applied | Count |
+|-------|------|---------------|-------|
+| 001_... | Components/Button.cs | ReplaceInvalidColors, RemoveComments | 2 |
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total files refactored | N |
+| Total rule applications | N |
+| Most frequent rules | Rule1 (N), Rule2 (N), ... (top 5) |
+| High rule-count files | file.cs (N rules) |
+```
+
 ### 3. Summary
 
 Present the user with:
@@ -279,6 +302,7 @@ Present the user with:
 - Hallucination count
 - Workflow summary
 - IvyQuestion summary
+- CSharp refactoring summary
 
 ### Rules
 
