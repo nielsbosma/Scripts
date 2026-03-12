@@ -30,14 +30,22 @@ LLMs hallucinate enum values that don't exist. Rules auto-fix:
 | `TextVariant.Default` | → `TextVariant.Literal` |
 | `CardHoverVariant.Default` | → `CardHoverVariant.None` |
 | `TabsVariant.Default` | → `TabsVariant.Content` |
-| `SelectInputVariants.Default` | → `SelectInputVariants.Select` |
-| `TextInputVariants.Default` | → `TextInputVariants.Text` |
-| `BoolInputVariants.Default` | → `BoolInputVariants.Checkbox` |
-| `ColorInputVariants.Default` | → `ColorInputVariants.Text` |
-| `DateTimeInputVariants.Default` | → `DateTimeInputVariants.Date` |
-| `FileInputVariants.Default` | → `FileInputVariants.Drop` |
-| `NumberInputVariants.Default` | → `NumberInputVariants.Number` |
-| `FeedbackInputVariants.Default` | → `FeedbackInputVariants.Stars` |
+| `SelectInputVariant.Default` | → `SelectInputVariant.Select` |
+| `TextInputVariant.Default` | → `TextInputVariant.Text` |
+| `BoolInputVariant.Default` | → `BoolInputVariant.Checkbox` |
+| `ColorInputVariant.Default` | → `ColorInputVariant.Text` |
+| `DateTimeInputVariant.Default` | → `DateTimeInputVariant.Date` |
+| `FileInputVariant.Default` | → `FileInputVariant.Drop` |
+| `NumberInputVariant.Default` | → `NumberInputVariant.Number` |
+| `FeedbackInputVariant.Default` | → `FeedbackInputVariant.Stars` |
+| `ColorInputVariants` | → `ColorInputVariant` (type rename) |
+| `DateTimeInputVariants` | → `DateTimeInputVariant` (type rename) |
+| `BoolInputVariants` | → `BoolInputVariant` (type rename) |
+| `SelectInputVariants` | → `SelectInputVariant` (type rename) |
+| `TextInputVariants` | → `TextInputVariant` (type rename) |
+| `NumberInputVariants` | → `NumberInputVariant` (type rename) |
+| `FileInputVariants` | → `FileInputVariant` (type rename) |
+| `FeedbackInputVariants` | → `FeedbackInputVariant` (type rename) |
 | `Languages.PlainText/Plain/Http` | → `Languages.Text` |
 
 ### Method Renames (Old API → New)
