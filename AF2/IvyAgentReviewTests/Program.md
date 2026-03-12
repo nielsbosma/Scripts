@@ -81,7 +81,7 @@ Write the following files directly to `.ivy/tests/`:
 
 **package.json** — minimal, with `@playwright/test` dependency
 
-**playwright.config.ts** — Chromium only, single worker, no retries, uses `process.env.APP_PORT` for base URL
+**playwright.config.ts** — Chromium only, single worker, no retries, uses `process.env.APP_PORT` for base URL, viewport `{ width: 1920, height: 1080 }`
 
 **`<app-name>.spec.ts`** — one spec file per app found in the spec and source code:
 - `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
