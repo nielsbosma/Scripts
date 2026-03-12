@@ -202,6 +202,48 @@ All build errors throughout the session. Use `Get-BuildErrors.ps1`.
 | Unique error codes | CS1234, CS5678 |
 ```
 
+#### `langfuse-gettypeinfo.md`
+
+GetTypeInfo tool usage analysis. Use `Get-TypeInfoUsage.ps1`.
+
+```markdown
+# GetTypeInfo Usage: {SessionId}
+
+## Lookups
+
+### Lookup N
+
+**Search**: `{search term}`
+**Type**: Type / Method
+**Trace**: {TraceName}
+**Status**: ✅ {totalMatches} matches / ❌ Failed
+**Results**: {comma-separated type names}
+**Warning**: {if any}
+
+## Patterns
+
+### Repeated Searches
+{List search terms that appear more than once, with count}
+
+### Failed Lookups
+{List searches with success=false or totalMatches=0}
+
+### Method Searches
+{List all Method-type searches}
+
+## Summary
+
+| Metric | Count |
+|--------|-------|
+| Total GetTypeInfo calls | N |
+| Successful | N |
+| Failed / 0 results | N |
+| Unique search terms | N |
+| Type searches | N |
+| Method searches | N |
+| Repeated searches | N |
+```
+
 #### `langfuse-system-reminders.md`
 
 System reminder events fired by context window analysers. Use `Get-SystemReminders.ps1`.
