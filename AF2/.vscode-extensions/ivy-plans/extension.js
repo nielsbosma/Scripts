@@ -24,6 +24,18 @@ async function saveAndClose(uri) {
     }
 }
 
+async function openNextPlan(plansDir) {
+    const files = fs.readdirSync(plansDir)
+        .filter(f => f.endsWith('.md'))
+        .sort();
+    if (files.length > 0) {
+        const nextUri = vscode.Uri.file(path.join(plansDir, files[0]));
+        await vscode.window.showTextDocument(nextUri);
+    } else {
+        vscode.window.showInformationMessage('No more plans in queue');
+    }
+}
+
 function activate(context) {
     // Update Plan - runs UpdatePlan.ps1 on the selected .md file
     context.subscriptions.push(
@@ -36,6 +48,7 @@ function activate(context) {
             const terminal = vscode.window.createTerminal({ name: 'Update Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\UpdatePlan.ps1" "${uri.fsPath}"`);
+            await openNextPlan(path.dirname(uri.fsPath));
         })
     );
 
@@ -67,6 +80,7 @@ function activate(context) {
 
             fs.renameSync(filePath, dest);
             vscode.window.showInformationMessage(`Approved: ${fileName}`);
+            await openNextPlan(dir);
         })
     );
 
