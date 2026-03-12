@@ -13,12 +13,14 @@ $workDir = (Get-Location).Path
 $testManagerExe = "D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Test.Manager\bin\Debug\net10.0\ivy-agent-test-manager.exe"
 $testYamlPath = Join-Path (Split-Path $workDir -Parent) "test.yaml"
 $testRunId = $null
+$taskDescription = ""
 if (Test-Path $testYamlPath) {
-    # Parse run ID from the parent folder name (format: {runId:D5}-{testName})
+    # Parse run ID and test name from the parent folder name (format: {runId:D5}-{testName})
     $parentName = Split-Path (Split-Path $workDir -Parent) -Leaf
-    if ($parentName -match "^(\d+)-") {
+    if ($parentName -match "^(\d+)-(.+)$") {
         $testRunId = $Matches[1]
-        Write-Host "Detected test run ID: $testRunId" -ForegroundColor Cyan
+        $taskDescription = $Matches[2] -replace '-', ' '
+        Write-Host "Detected test run ID: $testRunId, task: $taskDescription" -ForegroundColor Cyan
         & $testManagerExe run set-state $testRunId Debugging
     }
 }
@@ -158,7 +160,9 @@ if ($debugFolder) {
     if (Test-Path $langfuseDir) {
         Write-Host "Generating summary.yaml..." -ForegroundColor Cyan
         $summaryScript = Join-Path $PSScriptRoot "IvyAgentReviewLangfuse\Tools\Get-SessionSummary.ps1"
-        $summary = & $summaryScript -LangfuseDir $langfuseDir
+        $summaryArgs = @{ LangfuseDir = $langfuseDir }
+        if ($taskDescription) { $summaryArgs.TaskDescription = $taskDescription }
+        $summary = & $summaryScript @summaryArgs
 
         $ivyDir = Join-Path $workDir ".ivy"
         if (-not (Test-Path $ivyDir)) { New-Item -ItemType Directory -Path $ivyDir | Out-Null }

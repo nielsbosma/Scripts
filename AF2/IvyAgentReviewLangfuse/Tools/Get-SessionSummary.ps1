@@ -3,13 +3,16 @@
     Produces aggregate summary statistics for a langfuse session.
 .PARAMETER LangfuseDir
     Path to the langfuse data folder.
+.PARAMETER TaskDescription
+    Optional task description passed through to the one-shot scorer for complexity-adjusted scoring.
 .OUTPUTS
     Single object with: TraceCount, GenerationCount, TotalInputTokens, TotalOutputTokens,
     IvyQuestionCount, IvyQuestionFailCount, IvyDocsCount, BuildAttempts, BuildFailures,
     WriteFileCount, UniqueFilesWritten, WorkflowNames, BashCount, ReadFileCount, GrepCount, GlobCount
 #>
 param(
-    [Parameter(Mandatory)][string]$LangfuseDir
+    [Parameter(Mandatory)][string]$LangfuseDir,
+    [string]$TaskDescription = ""
 )
 
 $traceFolders = Get-ChildItem -Path $LangfuseDir -Directory | Sort-Object Name
@@ -135,7 +138,9 @@ $partialSummary = [PSCustomObject]@{
     ToolFeedbackCount = $stats.ToolFeedbackCount
     TotalCost = $stats.TotalCost
 }
-$oneShotScore = & "$PSScriptRoot\Get-OneShotScore.ps1" -Summary $partialSummary
+$oneShotScoreArgs = @{ Summary = $partialSummary }
+if ($TaskDescription) { $oneShotScoreArgs.TaskDescription = $TaskDescription }
+$oneShotScore = & "$PSScriptRoot\Get-OneShotScore.ps1" @oneShotScoreArgs
 
 return [PSCustomObject]@{
     TraceCount = $stats.TraceCount
