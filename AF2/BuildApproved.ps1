@@ -60,21 +60,24 @@ function Format-Duration([TimeSpan]$ts) {
 function Show-Status {
     # Build output as a single string buffer, then clear+write in one shot
     $buf = [System.Text.StringBuilder]::new()
+    $rst = "`e[0m"
+    $check = [char]0x2714
+    $cross = [char]0x2718
 
     $null = $buf.AppendLine("")
-    $null = $buf.AppendLine("  BuildApproved")
-    $null = $buf.AppendLine("  $([string]::new([char]0x2500, 60))")
-    $null = $buf.AppendLine("  Watching: $WatchPath")
+    $null = $buf.AppendLine("  `e[1;36mBuildApproved$rst")
+    $null = $buf.AppendLine("  `e[90m$([string]::new([char]0x2500, 60))$rst")
+    $null = $buf.AppendLine("  `e[37mWatching: `e[97m$WatchPath$rst")
     $null = $buf.AppendLine("")
 
     # Active
     if ($active.Count -gt 0) {
-        $null = $buf.AppendLine("  RUNNING")
+        $null = $buf.AppendLine("  `e[1;33mRUNNING$rst")
         foreach ($q in $active.Keys | Sort-Object) {
             $info    = $active[$q]
             $elapsed = Format-Duration ((Get-Date) - $info.Start)
             $name    = [IO.Path]::GetFileName($info.File)
-            $null = $buf.AppendLine("    > $($q.PadRight(18))$($name.PadRight(46))$elapsed")
+            $null = $buf.AppendLine("    > `e[33m$($q.PadRight(18))`e[97m$($name.PadRight(46))`e[33m$elapsed$rst")
         }
         $null = $buf.AppendLine("")
     }
@@ -82,11 +85,11 @@ function Show-Status {
     # Pending
     $pendingQueues = @($queues.Keys | Where-Object { $queues[$_].Count -gt 0 } | Sort-Object)
     if ($pendingQueues.Count -gt 0) {
-        $null = $buf.AppendLine("  PENDING")
+        $null = $buf.AppendLine("  `e[1;34mPENDING$rst")
         foreach ($q in $pendingQueues) {
             foreach ($f in $queues[$q]) {
                 $name = [IO.Path]::GetFileName($f)
-                $null = $buf.AppendLine("    - $($q.PadRight(18))$name")
+                $null = $buf.AppendLine("    `e[34m- $($q.PadRight(18))$name$rst")
             }
         }
         $null = $buf.AppendLine("")
@@ -94,17 +97,17 @@ function Show-Status {
 
     # History (last 20)
     if ($history.Count -gt 0) {
-        $null = $buf.AppendLine("  COMPLETED")
+        $null = $buf.AppendLine("  `e[1;32mCOMPLETED$rst")
         $start = [Math]::Max(0, $history.Count - 20)
         for ($i = $start; $i -lt $history.Count; $i++) {
             $entry = $history[$i]
             $name  = [IO.Path]::GetFileName($entry.File)
             $dur   = Format-Duration $entry.Duration
-            $icon  = if ($entry.Status -eq "Done") { "+" } else { "x" }
+            $icon  = if ($entry.Status -eq "Done") { "`e[32m$check" } else { "`e[31m$cross" }
             $logName = [IO.Path]::GetFileName($entry.LogFile)
-            $null = $buf.AppendLine("    $icon $($name.PadRight(56))[$dur]  $logName")
+            $null = $buf.AppendLine("    $icon $($name.PadRight(56))`e[90m[$dur]  $logName$rst")
             if ($entry.Reason) {
-                $null = $buf.AppendLine("      Reason: $($entry.Reason)")
+                $null = $buf.AppendLine("      `e[31mReason: $($entry.Reason)$rst")
             }
         }
         $null = $buf.AppendLine("")
@@ -115,7 +118,8 @@ function Show-Status {
     $totalFailed  = @($history | Where-Object Status -eq "Failed").Count
     $totalRunning = $active.Count
     $totalPending = ($queues.Values | ForEach-Object { $_.Count } | Measure-Object -Sum).Sum
-    $null = $buf.AppendLine("  Done: $totalDone  |  Failed: $totalFailed  |  Running: $totalRunning  |  Pending: $totalPending")
+    $failColor = if ($totalFailed -gt 0) { "`e[31m" } else { "`e[90m" }
+    $null = $buf.AppendLine("  `e[32mDone: $totalDone$rst  |  ${failColor}Failed: $totalFailed$rst  |  `e[33mRunning: $totalRunning$rst  |  `e[34mPending: $totalPending$rst")
 
     # Atomic screen update: clear then write buffer
     Clear-Host
