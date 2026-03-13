@@ -81,6 +81,46 @@ function Show-CommitList {
     Write-Host ""
 }
 
+function Show-UncommittedFiles {
+    $hasUncommitted = $false
+
+    foreach ($repo in $repos) {
+        $name = Split-Path $repo -Leaf
+        if (-not (Test-Path $repo)) { continue }
+
+        $status = git -C $repo status --porcelain 2>$null
+        if (-not $status) { continue }
+
+        if (-not $hasUncommitted) {
+            Write-Host ""
+            Write-Host "Uncommitted files:" -ForegroundColor Cyan
+            Write-Host ""
+            $hasUncommitted = $true
+        }
+
+        Write-Host "  $name" -ForegroundColor Yellow
+        foreach ($line in $status) {
+            $indicator = $line.Substring(0, 2)
+            $file = $line.Substring(3)
+            $color = switch -Wildcard ($indicator.Trim()) {
+                'A'  { 'Green' }
+                'D'  { 'Red' }
+                'M'  { 'Yellow' }
+                'R'  { 'Magenta' }
+                '??' { 'DarkGray' }
+                default { 'White' }
+            }
+            Write-Host "    $indicator $file" -ForegroundColor $color
+        }
+        Write-Host ""
+    }
+
+    if (-not $hasUncommitted) {
+        Write-Host ""
+        Write-Host "No uncommitted files." -ForegroundColor DarkGray
+    }
+}
+
 function Show-FileList($selected) {
     $files = git -C $selected.Path diff-tree --no-commit-id --name-status -r $selected.Hash
     $fileList = @()
@@ -304,6 +344,7 @@ $fileListText
 
 # Main loop
 while ($true) {
+    Show-UncommittedFiles
     Show-CommitList
 
     $selection = Read-Host "Select commit (1-$($commits.Count)), or press Enter to quit"
