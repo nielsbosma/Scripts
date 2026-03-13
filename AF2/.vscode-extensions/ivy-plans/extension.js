@@ -165,12 +165,51 @@ function activate(context) {
         })
     );
 
-    // Make Plan - runs MakePlan.ps1 (opens Notepad for input)
+    // Make Plan - opens temp .md file in VSCode, then passes content to MakePlan.ps1
     context.subscriptions.push(
-        vscode.commands.registerCommand('ivy.makePlan', () => {
-            const terminal = vscode.window.createTerminal({ name: 'Make Plan', shellPath: 'pwsh' });
-            terminal.show();
-            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\MakePlan.ps1"`);
+        vscode.commands.registerCommand('ivy.makePlan', async () => {
+            const os = require('os');
+            const crypto = require('crypto');
+
+            // Create temp file with .md extension
+            const tmpDir = os.tmpdir();
+            const tmpFileName = `makeplan-${crypto.randomUUID()}.md`;
+            const tmpPath = path.join(tmpDir, tmpFileName);
+
+            // Create empty file
+            fs.writeFileSync(tmpPath, '', 'utf8');
+
+            // Open in VSCode
+            const doc = await vscode.workspace.openTextDocument(tmpPath);
+            const editor = await vscode.window.showTextDocument(doc);
+
+            // Set up a listener for when the document is closed
+            const closeHandler = vscode.workspace.onDidCloseTextDocument(async (closedDoc) => {
+                if (closedDoc.uri.toString() === doc.uri.toString()) {
+                    closeHandler.dispose();
+
+                    // Read the content from the document (even if not saved)
+                    const content = closedDoc.getText().trim();
+
+                    // Clean up temp file
+                    try {
+                        fs.unlinkSync(tmpPath);
+                    } catch (err) {
+                        // Ignore cleanup errors
+                    }
+
+                    // Only proceed if user wrote something
+                    if (content) {
+                        const terminal = vscode.window.createTerminal({ name: 'Make Plan', shellPath: 'pwsh' });
+                        terminal.show();
+                        // Escape content for PowerShell - replace " with `"
+                        const escapedContent = content.replace(/"/g, '`"');
+                        terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\MakePlan.ps1" "${escapedContent}"`);
+                    } else {
+                        vscode.window.showInformationMessage('Make Plan cancelled - no content provided');
+                    }
+                }
+            });
         })
     );
 }
