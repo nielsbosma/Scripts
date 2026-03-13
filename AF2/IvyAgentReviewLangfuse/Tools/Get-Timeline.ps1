@@ -75,23 +75,30 @@ foreach ($traceFolder in $traceFolders) {
             $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
             $fileName = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
 
-            # Workflow tracking
+            # Workflow tracking - check both input.message (old) and metadata.message (new)
             $input = $json.input
+            $message = $null
             if ($input -and $input.message -and $input.message.'$type') {
-                $msgType = $input.message.'$type'
+                $message = $input.message
+            } elseif ($json.metadata -and $json.metadata.message -and $json.metadata.message.'$type') {
+                $message = $json.metadata.message
+            }
+
+            if ($message) {
+                $msgType = $message.'$type'
                 switch ($msgType) {
                     'WorkflowStartMessage' {
-                        $wfName = Get-JsonString $input.message 'workflowName'
+                        $wfName = Get-JsonString $message 'workflowName'
                         if ($wfName) { $workflowStack.Push($wfName); $lastState = $null }
                     }
                     'WorkflowTransitionMessage' {
-                        $wfName = Get-JsonString $input.message 'workflowName'
+                        $wfName = Get-JsonString $message 'workflowName'
                         if ($wfName -and ($workflowStack.Count -eq 0 -or $workflowStack.Peek() -ne $wfName)) {
                             $workflowStack.Push($wfName)
                         }
                         $lastState = $null
                     }
-                    'WorkflowStateMessage' { $lastState = Get-JsonString $input.message 'stateName' }
+                    'WorkflowStateMessage' { $lastState = Get-JsonString $message 'stateName' }
                     { $_ -in 'WorkflowFinishedMessage','WorkflowFailedMessage' } {
                         if ($workflowStack.Count -gt 0) { $workflowStack.Pop() | Out-Null }
                         $lastState = $null
@@ -153,28 +160,28 @@ foreach ($traceFolder in $traceFolders) {
                         if (-not $q) { $q = Get-JsonString $input.request 'path' }
                         if ($q) { $preview = "${toolName}: $(Truncate $q 50)" }
                         else { $preview = $toolName }
-                    } elseif ($input.message -and $input.message.'$type') {
-                        $mt = $input.message.'$type'
+                    } elseif ($message) {
+                        $mt = $message.'$type'
                         $preview = switch ($mt) {
-                            'WriteFileMessage' { "Write: $(ShortPath $input.message.filePath)" }
-                            'ReadFileMessage' { "Read: $(ShortPath $input.message.filePath)" }
+                            'WriteFileMessage' { "Write: $(ShortPath $message.filePath)" }
+                            'ReadFileMessage' { "Read: $(ShortPath $message.filePath)" }
                             'BuildProjectResultMessage' {
-                                $s = $input.message.success -eq $true
+                                $s = $message.success -eq $true
                                 if ($s) { "Build: OK" } else { "Build: FAILED" }
                             }
-                            'BashMessage' { "Bash: $(Truncate $input.message.command 50)" }
-                            'WorkflowStartMessage' { "-> $(Get-JsonString $input.message 'workflowName')" }
-                            'WorkflowFinishedMessage' { if ($input.message.success) { "[ok] finished" } else { "[FAIL] failed" } }
-                            'WorkflowFailedMessage' { "[FAIL] $(Truncate (Get-JsonString $input.message 'prompt') 50)" }
-                            'WorkflowStateMessage' { "State: $(Get-JsonString $input.message 'stateName')" }
-                            'WorkflowReferenceMessage' { "Ref: $(Get-JsonString $input.message 'name')" }
+                            'BashMessage' { "Bash: $(Truncate $message.command 50)" }
+                            'WorkflowStartMessage' { "-> $(Get-JsonString $message 'workflowName')" }
+                            'WorkflowFinishedMessage' { if ($message.success) { "[ok] finished" } else { "[FAIL] failed" } }
+                            'WorkflowFailedMessage' { "[FAIL] $(Truncate (Get-JsonString $message 'prompt') 50)" }
+                            'WorkflowStateMessage' { "State: $(Get-JsonString $message 'stateName')" }
+                            'WorkflowReferenceMessage' { "Ref: $(Get-JsonString $message 'name')" }
                             'WorkflowReferenceResultMessage' {
-                                $n = Get-JsonString $input.message 'name'
-                                $s = $input.message.success -eq $true
-                                if ($s -and $input.message.content) { "Ref: $n ($($input.message.content.Length) chars)" }
+                                $n = Get-JsonString $message 'name'
+                                $s = $message.success -eq $true
+                                if ($s -and $message.content) { "Ref: $n ($($message.content.Length) chars)" }
                                 else { "Ref: $n $(if ($s) { '[ok]' } else { '[FAIL]' })" }
                             }
-                            'ToolFeedback' { "[!] $(Get-JsonString $input.message 'toolName'): $(Truncate (Get-JsonString $input.message 'feedback') 40)" }
+                            'ToolFeedback' { "[!] $(Get-JsonString $message 'toolName'): $(Truncate (Get-JsonString $message 'feedback') 40)" }
                             default { $mt }
                         }
                     }
@@ -184,8 +191,8 @@ foreach ($traceFolder in $traceFolders) {
             $isError = $preview -match '\[FAIL\]' -or $reason -eq 'HUNG' -or $reason -eq 'length'
 
             # Skip noise in compact mode
-            if ($Compact -and -not $isGeneration -and $input.message -and $input.message.'$type' -in $noiseTypes) {
-                if (-not ($input.feedback -or ($input.message -and $input.message.'$type' -eq 'ToolFeedback'))) {
+            if ($Compact -and -not $isGeneration -and $message -and $message.'$type' -in $noiseTypes) {
+                if (-not ($input.feedback -or ($message -and $message.'$type' -eq 'ToolFeedback'))) {
                     continue
                 }
             }

@@ -25,10 +25,18 @@ foreach ($traceFolder in $traceFolders) {
     foreach ($file in $obsFiles) {
         try {
             $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
-            $input = $json.input
-            if (-not $input -or -not $input.message -or -not $input.message.'$type') { continue }
 
-            $msgType = $input.message.'$type'
+            # Check both input.message (old format) and metadata.message (new format)
+            $message = $null
+            if ($json.input -and $json.input.message) {
+                $message = $json.input.message
+            } elseif ($json.metadata -and $json.metadata.message) {
+                $message = $json.metadata.message
+            }
+
+            if (-not $message -or -not $message.'$type') { continue }
+
+            $msgType = $message.'$type'
             $time = Format-Time $json.startTime
             $obsName = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
 
@@ -37,7 +45,7 @@ foreach ($traceFolder in $traceFolders) {
                     TraceName = $traceFolder.Name
                     ObservationFile = $obsName
                     Time = $time
-                    FilePath = $input.message.filePath
+                    FilePath = $message.filePath
                     Success = $null
                 }
             }
@@ -46,8 +54,8 @@ foreach ($traceFolder in $traceFolders) {
                     TraceName = $traceFolder.Name
                     ObservationFile = $obsName
                     Time = $time
-                    FilePath = $input.message.filePath
-                    Success = ($input.message.success -eq $true)
+                    FilePath = $message.filePath
+                    Success = ($message.success -eq $true)
                 }
             }
         } catch {}
