@@ -13,7 +13,12 @@ $promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $args; WorkDir = 
 
 Write-Host "Starting Agent..."
 Push-Location $programFolder
-claude --dangerously-skip-permissions -p -- (Get-Content $promptFile -Raw)
+$output = claude --dangerously-skip-permissions -p -- (Get-Content $promptFile -Raw) 2>&1
+$exitCode = $LASTEXITCODE
+if ($exitCode -ne 0) {
+    "`n## Failed`n`nClaude exited with code $exitCode`n`n$output" | Add-Content $logFile
+    Write-Host "Claude failed with exit code $exitCode" -ForegroundColor Red
+}
 Pop-Location
 
 Remove-Item $promptFile

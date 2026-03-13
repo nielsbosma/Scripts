@@ -214,6 +214,8 @@ try {
                 $job = Start-Job -ScriptBlock {
                     param($PlanFile, $WorkDir, $ReviewDir)
                     Set-Location $WorkDir
+                    # Allow nested Claude invocations (e.g. IvyFeatureTester.ps1)
+                    $env:CLAUDECODE = $null
                     $content = Get-Content $PlanFile -Raw
                     # Strip YAML frontmatter so --- isn't parsed as a CLI flag
                     $content = $content -replace '(?s)\A---\r?\n.*?\r?\n---\r?\n', ''
