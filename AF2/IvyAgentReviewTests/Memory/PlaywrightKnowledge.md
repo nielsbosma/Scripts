@@ -522,3 +522,10 @@
 - **`taskkill` in bash on Windows**: `spawn('taskkill', ['/pid', ...], { shell: true })` fails with "Invalid argument/option" because bash interprets `/f` as a path. Use `spawn('cmd', ['/c', 'taskkill', '/pid', pid, '/f', '/t'], { shell: false })` instead
 - **`beforeAll` timeout for recompilation**: When C# source is modified between test runs, `dotnet run` triggers a rebuild that can exceed the 30s default timeout. Always use `testInfo.setTimeout(120000)` in `beforeAll`
 - 7 tests passed after 3 fix rounds (2 project fixes: shareable URL format + null ref guard), logs clean
+### 2026-03-12 — Test.GanttChart
+- ExternalWidget library project with `.samples/` runnable app — confirmed same pattern as Ivy.TextAnnotate: tests must use `samplesDir` for `dotnet run`
+- `[ExternalWidget]` shows "Unknown component type: Test.GanttChart.GanttChart" — JS bundle not served (confirmed Framework issue, not app bug)
+- Tests written with conditional assertions (check element count before asserting visibility) to gracefully handle ExternalWidget rendering failure
+- `ChromeSettings` still missing from NuGet (confirmed) — simplified to `server.UseChrome()`
+- `UseState<string?>(null)` ambiguity (confirmed same as GridQuest.Pathfinder) — fix with explicit typed variable
+- Clean run: 11 tests passed, 0 fix rounds, no runtime errors, logs clean

@@ -82,7 +82,7 @@ LLMs hallucinate enum values that don't exist. Rules auto-fix:
 |------|------|
 | `RemoveComments` | Strips all comments |
 | `ConvertToFileScopedNamespace` | Block → file-scoped namespace |
-| `RemoveInvalidIvyUsings` | Removes hallucinated Ivy.* namespaces (Ivy.Apps, Ivy.Auth, Ivy.Core, Ivy.Hooks, Ivy.Services, Ivy.Shared, Ivy.Views, Ivy.Widgets, etc.) |
+| `RemoveInvalidIvyUsings` | Removes hallucinated Ivy.* namespaces (runs on ALL files, predicate `() => true`). **Known issue (Plan 496)**: list includes valid namespaces `Ivy.Shared` and `Ivy.Views` which are needed by external widget projects that reference Ivy via NuGet (no global usings). Previously also included `Ivy.Core.*` (fixed by Plan 431). |
 
 ## When to Suggest a New Rule
 

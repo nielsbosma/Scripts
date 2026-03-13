@@ -7,6 +7,10 @@
 - **Scripts**: No .slnx files to build. Only needs git sync.
 - **Ivy-Agent-Test-Data**: No .slnx files to build. Only needs git sync.
 
+## Cross-Repo Namespace Migration
+
+- **Ivy.Shared → Ivy**: Types in `Ivy-Framework/src/Ivy/Shared/` are being migrated from `namespace Ivy.Shared` to `namespace Ivy` (with `// ReSharper disable once CheckNamespace`). This affects downstream repos (Ivy-Mcp, Ivy) that `using Ivy.Shared`. When syncing, check for CS0234 errors referencing `Ivy.Shared` and update to `using Ivy`.
+
 ## Known Issues
 
 - **VBCSCompiler file locks**: `dotnet build` frequently fails on first attempt due to VBCSCompiler holding locks on DLLs. Retry usually succeeds. Consider killing VBCSCompiler processes before building.
