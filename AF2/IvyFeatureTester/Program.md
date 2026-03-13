@@ -16,6 +16,7 @@ Read about important paths and files in ../.shared/Paths.md
 
 ### 2. Research the Feature
 
+- Read `Memory/PlaywrightKnowledge.md` for accumulated Ivy testing knowledge (correct APIs, gotchas, patterns)
 - Read the Ivy Framework AGENTS.md for general Ivy knowledge: `D:\Repos\_Ivy\Ivy-Framework\AGENTS.md`
 - Read relevant source code for the feature from `D:\Repos\_Ivy\Ivy-Framework\src\`
 - Read docs if available: `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs`
@@ -34,9 +35,10 @@ Read about important paths and files in ../.shared/Paths.md
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Ivy.Framework" Version="*" />
+    <ProjectReference Include="D:\Repos\_Ivy\Ivy-Framework\src\Ivy\Ivy.csproj" />
   </ItemGroup>
 </Project>
 ```
@@ -44,9 +46,11 @@ Read about important paths and files in ../.shared/Paths.md
 **`Program.cs`:**
 ```csharp
 using Ivy;
+using System.Reflection;
 
-var server = new IvyServer();
-server.Start();
+var server = new Server();
+server.AddAppsFromAssembly(Assembly.GetExecutingAssembly());
+await server.RunAsync();
 ```
 
 ### 4. Create Demo Apps

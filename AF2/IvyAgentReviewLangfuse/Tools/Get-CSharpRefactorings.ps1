@@ -39,10 +39,17 @@ foreach ($traceFolder in $traceFolders) {
             $filePath = $null
             $rules = @()
 
+            # Check metadata first (legacy), then input (current format)
             if ($null -ne $json.metadata) {
                 $filePath = Get-JsonString $json.metadata "FilePath"
                 if ($null -ne $json.metadata.Rules) {
                     $rules = @($json.metadata.Rules)
+                }
+            }
+            if (-not $filePath -and $null -ne $json.input) {
+                $filePath = Get-JsonString $json.input "filePath"
+                if ($null -ne $json.input.rules) {
+                    $rules = @($json.input.rules)
                 }
             }
 

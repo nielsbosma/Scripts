@@ -58,18 +58,46 @@
 - Badges with strength/status text may appear multiple times; use `.first()`
 - `state.ToSelectInput().Variant(SelectInputVariants.Toggle)` renders as radio buttons — use `getByRole("radio", { name: "OptionName" })` to click them, NOT `getByText()` (the option text may appear in headings/descriptions too)
 - `IClientProvider.Toast()` renders both a visible `<div>` and an `aria-live` status `<span>` — use `getByText("message", { exact: true })` to avoid strict mode violations
+- **`Html` component inline styles don't render as expected** — `new Html(...)` with inline CSS properties like `background-color`, `border`, `color`, `width`, `height` are NOT applied to the actual DOM. Do NOT use `page.locator('div[style*="..."]')` selectors to target Html content. Instead use text-based assertions (`page.content().includes(...)`) or `getByText()` locators. Also do NOT check for hex color codes in `page.content()` — they won't appear in the rendered HTML.
+- **Stale server processes**: The `taskkill` in `afterAll` may not reliably kill all dotnet processes. After multiple test runs, stale `Test.*.exe` processes can lock the EXE and prevent rebuilding. Use `taskkill //im <name>.exe //f` to clean up before retrying.
 - `state.ToTextareaInput()` renders as a standard `<textarea>` element, locatable via `page.locator("textarea").first()`; disabled output textarea is the `.nth(1)`
 - Clipboard `writeText` fails in headless Chromium with "Write permission denied" — this is expected and not an app bug
 - `state.ToSliderInput()` renders as a Radix UI slider with `role="slider"`, NOT a native `<input type="range">` — use `page.getByRole("slider")` and keyboard interaction (ArrowRight/ArrowLeft to increment/decrement by step, Home/End for min/max)
 - `UseChrome()` renders a hidden sidebar search `<input type="search" data-testid="sidebar-search">` that is the first `input` in the DOM but outside the viewport — `page.locator("input").first()` will target it instead of app inputs. Use `input[type='text']` or label-based locators to target app inputs
 - **Single-app Chrome auto-selection**: When `UseChrome().UseTabs()` is enabled and there's only ONE app registered, Chrome automatically opens that app's tab on page load — no need to click the sidebar nav item. Clicking it may cause a re-navigation that times out.
+- **SelectInput trigger displays all option labels**: `SelectInput<T>` with many options renders ALL option display names concatenated in the trigger button (combobox). This makes `getByText("OptionName")` ambiguous — it matches both the trigger and the dropdown item. To click a dropdown option reliably: open the dropdown, then use `page.evaluate` to find the option element by text content + bounding rect (y > trigger height), and click by coordinates. The dropdown container has `role="listbox"`.
+- **SelectInput dropdown structure**: Ivy SelectInput dropdown uses Radix-like components. The trigger is a `<button role="combobox">`. The dropdown panel is `<div role="listbox">`. Items inside have NO `role="option"` — they are plain `<div>` elements with text content. Use `page.evaluate` + coordinate clicking for reliable selection when text-based locators are ambiguous.
 - **Sidebar nav button name conflicts**: Chrome sidebar renders app names as `role="button"` elements. A button with text "C" will conflict with "Calculator" sidebar button when using `getByRole("button", { name: "C" })` — always use `{ exact: true }` for single-character button names
 - **`waitForServer` must use `http` module**, not `fetch` — `fetch` may not be available in all Node.js versions used by Playwright. Use `http.get()` with polling loop instead
 - `state.ToBoolInput().Variant(BoolInputVariants.Checkbox)` renders as `<button role="checkbox">` (Radix UI), NOT a native `<input type="checkbox">` — `getByRole("checkbox", { name: /.../ })` and `getByLabel()` do NOT work for locating these; use `page.locator('[role="checkbox"]').nth(N)` by index order instead
 - `new Card(content, header: Text.H3("Title"))` — the card header text (e.g., "Monthly Revenue") will match `getByText()` along with any content containing the same substring (e.g., "Total Monthly Revenue:"), causing strict mode violations. Always use `getByRole("heading", { name: "Title" })` for card headers
 - `new Card(content).Title("X")` — Card `.Title()` does NOT render as an HTML heading element (`<h1>`-`<h6>`), so `getByRole("heading", { name: "X" })` will fail. Use `getByText("X", { exact: true }).first()` instead. Only explicit `Text.H2()`/`Text.H3()` passed as card header render as headings.
+- **NumberInput** (`state.ToNumberInput()`) renders as a regular text `<input>` in the DOM, NOT `<input type="number">`. `page.locator('input[type="number"]')` will find nothing. Use `page.locator('input[value="200"]')` to locate by current value, or find inputs relative to their label text.
+- **CodeInput copy buttons**: `.ShowCopyButton()` and code editors add `aria-label="Copy to clipboard"` icon buttons. Combined with explicit "Copy" `Button` widgets, `getByRole("button", { name: "Copy" })` may match multiple elements — always use `{ exact: true }` for the explicit Copy button.
+- **Webhooks require state parameter**: Ivy webhook URLs require an internal `state` query parameter. Server-side `HttpClient` calls to `webhook.BaseUrl` without this parameter return 400 "The 'state' query parameter is required." — Test Endpoint features using server-side HTTP calls to webhooks will fail.
 - `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
 - `.ToDetails()` on an anonymous object renders key-value pairs with PascalCase property names converted to spaced labels (e.g., `MonthlyNetBurn` → "Monthly Net Burn")
+
+## DataTable Gotchas
+
+- **DataTable uses virtualized grid rendering** — cells are `<td role="gridcell">` elements that Playwright considers "hidden" even when data is present. Use `page.locator('[role="gridcell"]').first()` with `.toBeAttached()` instead of `.toBeVisible()` to verify data loaded.
+- **`.Remove(e => e.Id)` crashes on positional records** — `RemoveFields` in `QueryableExtensions.cs` calls `Expression.New(type)` which requires a parameterless constructor. C# positional records (`record Foo(int X, string Y)`) don't have one. Workaround: don't use `.Remove()` on positional records, or convert to a class with default constructor.
+- **Decimal columns display as `0000000000000000`** — `decimal` values in DataTable grid render incorrectly (framework bug). Note as external issue.
+
+## Layout.Vertical with IEnumerable (Critical)
+
+- `Layout.Vertical(items.Select(...), otherWidget)` where the first arg is `IEnumerable<T>` causes Ivy's content builder to render it as a data table instead of expanding children
+- **Always** materialize enumerables before passing to Layout: `.Select<T, object?>(...).Append<object?>(otherWidget).ToArray()`
+- Alternative: build layout with `|` operator chaining instead of passing collections
+
+## Dialog and Sheet Locators (Critical)
+
+- Ivy dialogs (`.ToDialog()`) and confirmation dialogs (`.WithConfirm()`) render as `<div role="dialog">`, NOT HTML `<dialog>` elements
+- **NEVER** use `page.locator("dialog")` — it won't match. Always use `page.getByRole("dialog", { name: "Dialog Title" })` or `page.locator("[role='dialog']")`
+- Ivy sheets (`.ToSheet()`) also render with `role="dialog"` — same locator pattern applies
+- Form fields inside dialogs use labels like "Title *" (with asterisk for required) — `getByLabel("Title")` may not match. Use `dialog.getByRole("textbox").nth(N)` to target fields by position within the dialog
+- Edit sheets use "Save" button (not "Submit") for form submission
+- Create dialogs reuse the entity action name as the submit button text (e.g., "Create")
 
 ## WithConfirm Dialog
 
@@ -115,6 +143,8 @@
 ## Ivy Component Test Patterns
 
 - `AsQueryable().ToDataTable()` renders using glide-data-grid — a virtualized grid where cells have `role="gridcell"` but may not be "visible" (outside virtual viewport). Use `toBeAttached()` instead of `toBeVisible()` for these cells.
+- **glide-data-grid cell clicking**: gridcell elements are hidden behind the canvas overlay. `.click()` and `.click({ force: true })` both fail. Use `.dispatchEvent("click")` to bypass visibility — but note this does NOT trigger Ivy's `OnCellClick` handler (the canvas intercepts real mouse events). Sheet/detail panels triggered by `OnCellClick` cannot be reliably tested via automated clicks on glide-data-grid.
+- **`decimal` type in DataTable**: `decimal` columns in `AsQueryable().ToDataTable()` render as `00000000000000000` (zero-padded) instead of formatted numbers. This is a framework/glide-data-grid issue. Workaround: format values as strings in the `.Header()` call.
 - `state.ToNumberInput().Variant(NumberInputVariants.Slider)` renders similarly to `ToSliderInput()` — a Radix slider with `role="slider"`.
 - `state.ToSelectInput(options).Variant(SelectInputVariants.Toggle)` with string arrays renders radio buttons — use `getByRole("radio", { name: "OptionName" })`.
 - `state.ToSelectInput([new Option<T>("Label", Value), ...])` (without Toggle variant) renders as a dropdown with `role="combobox"` — click to open, then `getByRole("option", { name: "Label" }).click()` to select
@@ -138,7 +168,14 @@
 - `state.ToSelectInput(options)` WITHOUT `.Variant(SelectInputVariants.Toggle)` renders as a Radix dropdown (not native `<select>`) — click the trigger text to open, then `getByText("Option", { exact: true }).first().click()` to select.
 - `page.goto()` with `waitUntil: "networkidle"` hangs on Ivy apps because WebSocket connections keep the network active — use `waitUntil: "domcontentloaded"` instead.
 - `UseChrome().UseTabs(preventDuplicates: true)` with a single app auto-opens the tab — no sidebar click needed for navigation.
-- `state.ToBoolInput().Label("X")` WITHOUT explicit `.Variant()` renders as `role="checkbox"` (NOT `role="switch"`) — use `page.locator('[role="checkbox"]').first()` to click. Clicking the label text does NOT toggle the checkbox. Use dynamic detection: check `[role="checkbox"]` count first, then `[role="switch"]`, then fallback to `dispatchEvent("click")`.
+- `state.ToBoolInput().Label("X")` WITHOUT explicit `.Variant()` renders as `role="checkbox"` (NOT `role="switch"`) — clicking the label text does NOT toggle the checkbox. Use `page.getByRole("checkbox").nth(N)` to click by index order. Note: `getByRole("checkbox")` without `{ name }` DOES work; `getByRole("checkbox", { name: "X" })` does NOT (Playwright can't resolve the accessible name from the Ivy label association).
+
+## CodeBlock and UseEffect Timing
+
+- `new CodeBlock(state.Value, language)` where `state` is populated via `UseEffect` will render with EMPTY `<code>` element on initial page load — the UseEffect hasn't fired yet
+- The `<code>` element exists but has no text content; `page.locator("pre code").first().textContent()` returns `""`
+- To test CodeBlock content: trigger a state change first (e.g., type in an input, move a slider) to force UseEffect to fire, then wait 500-1000ms before asserting
+- Alternative: the app could initialize the state with the default value directly instead of relying on UseEffect
 
 ## Enum ToOptions() Display Text
 
@@ -146,7 +183,38 @@
 - This means `getByText("V1")` will NOT match — must use `getByText("V 1", { exact: true })` with the space
 - Same pattern applies to all enum values where PascalCase splitting inserts spaces between uppercase letters and digits
 
+## Layout.Grid Column Count Bug
+
+- `Layout.Grid(3).Gap(4)` renders the column count "3" as visible text content at the top of the grid container
+- The grid items appear stacked vertically (single column) instead of in a 3-column layout
+- This is a framework rendering bug — `Layout.Grid(N)` does not produce a proper CSS grid with N columns
+- Workaround: use `Layout.Horizontal()` with equal-width children, or `Layout.Grid().Columns(N)` (see ReversiForge.AI entry — `.Columns(8)` worked)
+
 ## Run History
+
+### 2026-03-13 — Test.CSSGradientTextGenerator
+- Gradient text generator with text input, color pickers, angle/font-size sliders, live preview, and CSS code output
+- `new CodeBlock(cssCode.Value)` where `cssCode` is set via `UseEffect` renders EMPTY on initial load — must trigger state change before asserting code content
+- `getByText("Preview")` matched both "Preview Text" label and "Preview" heading — use `getByRole("heading", { name: "Preview" })`
+- `getByText("Gradient Text")` matched both title "CSS Gradient Text Generator" and preview div — use `{ exact: true }`
+- Html inline styles (gradient background, font-size) not rendered in preview (confirmed known limitation)
+- 8 tests, 2 fix rounds (strict mode + CodeBlock timing), all passed, logs clean
+
+### 2026-03-13 — Test.LifeInWeeksVisualizer
+- 2-step flow: birth date input → life visualization with stats and weeks grid
+- `Layout.Grid(3)` renders "3" as text and produces single-column layout instead of 3-column grid
+- `new Html(gridHtml)` with CSS grid + inline styles is completely invisible — only `<span>` text content visible (confirmed known Html limitation)
+- `UseDefaultApp()` means no Chrome sidebar — navigate directly to `/<app-id>?chrome=false`
+- "Weeks lived" text appears in both stat label and Html grid legend — use `.first()` for strict mode
+- 7 tests, 1 fix round (strict mode violation), all passed, logs clean
+
+### 2026-03-13 — Test.SimpleCRM
+- CRM app with TabsLayout (Dashboard, Contacts, Deals, Activities) — tabs navigable via `getByText("TabName", { exact: true }).first().click()`
+- `decimal` column in DataTable renders as `00000000000000000` — framework bug, not fixable in project code without changing column to string
+- glide-data-grid cell `.dispatchEvent("click")` passes test but does NOT trigger Ivy `OnCellClick` — sheet panels cannot be validated
+- MetricView KPI cards render correctly with icons and formatted values
+- Bar/Pie charts render within Card components — chart titles via `.Title()` are spans, not headings
+- 9 tests, 3 fix rounds (gridcell click visibility issues), all passed
 
 ### 2026-03-10 — Tempus.AgeCalc
 - `state.ToDateInput()` renders as a `<button data-slot="calendar">` popover trigger, NOT a native date input
@@ -176,11 +244,12 @@
 - Solution: use top-level `test()` (outside `describe`) for tests that need to share the same server lifecycle
 
 ### 2026-03-09 20:46 — Parsely.Markflow
-- CodeMirror-based code inputs (from `state.ToCodeInput()`) use `.cm-content[contenteditable='true']` as the editable locator; type into them via `click()` then `page.keyboard.type()` rather than `.fill()`
+- CodeMirror-based code inputs (from `state.ToCodeInput()`) use `.cm-content[contenteditable='true']` as the editable locator
+- **IMPORTANT**: Do NOT use `keyboard.type()` or `keyboard.insertText()` for CodeMirror editors — `type()` triggers auto-brackets/auto-complete that corrupts structured input, and `insertText()` does not trigger CodeMirror's change events so Ivy state bindings never update (the server-side state stays stale). Instead, use clipboard paste: `page.evaluate(async (t) => { await navigator.clipboard.writeText(t); }, text)` then `page.keyboard.press("Control+V")`. Requires `permissions: ["clipboard-read", "clipboard-write"]` in playwright config.
 - For CodeMirror inputs, the second editor (read-only/disabled output) is accessed via `.cm-content` with `.nth(1)` index selector
 - Markdig's `ToHtml` with `UseAdvancedExtensions()` generates heading IDs like `id="hello-world"` — useful for asserting exact HTML output in tests
 - `Button.Disabled()` with a reactive condition correctly toggles the HTML `disabled` attribute, testable via `toBeDisabled()`/`toBeEnabled()`
-- Multi-line input in CodeMirror requires line-by-line `keyboard.type()` + `keyboard.press("Enter")` rather than pasting a single string with newlines
+- Multi-line input in CodeMirror: use clipboard paste (see above) — the paste approach handles newlines correctly without needing line-by-line entry
 - `Button.Variant(ButtonVariant.Ghost)` and `.Primary()` render as standard `role="button"` elements — no special locator strategy needed
 - After Clear button resets state, a `waitForTimeout(1000)` is needed before asserting the UI has updated
 
@@ -237,6 +306,7 @@
 - Badge `.OnClick()` works for removable items — clicking badge text triggers the click handler
 - `NumberInput<int>` renders as a standard text input with `placeholder` attribute — locatable via `input[placeholder="1-10"]`
 - `.ToNumberInput()` on state renders similarly with placeholder support
+- `.WithField().Label("X")` on NumberInput does NOT create an HTML `<label for="">` association — `getByLabel("X")` fails. Use `page.locator("input").first()` or index-based `page.locator("input").nth(N)` instead
 - App had no runtime errors — clean first run, only test locator fixes needed
 
 ### 2026-03-10 — Nexus.HumanCore
@@ -381,6 +451,13 @@
 - `ProductEditSheet` uses `.ToForm().Remove(e => e.Id, e => e.CreatedAt, e => e.UpdatedAt)` — correctly hides non-editable fields
 - Clean run: 12 tests passed after 1 test-only fix round, no project fixes, no runtime errors, logs clean
 
+### 2026-03-12 — Test.PomodoroTimer
+- `System.Timers.Timer` in `UseEffect` callback: timer `Elapsed` events can fire after `isRunning` state is set to false, because `UseEffect` disposal has a race condition with pending callbacks. Always add `if (!isRunning.Value) return;` guard inside `Elapsed` handler
+- `.WithField().Label("X")` on `NumberInput` does NOT create HTML `<label for="">` — `getByLabel("X")` and `getByRole("spinbutton")` both fail. Use `page.locator("input").first()` or `.nth(N)` by index
+- Pause/resume timing tests: after clicking Pause, wait 3+ seconds for timer disposal to settle before capturing "paused time" for comparison
+- `Expandable` renders as a clickable header with chevron — `page.getByText("Settings").click()` expands it
+- 6 tests passed after 1 project fix (timer guard in Elapsed callback), 4 test fix rounds, logs clean
+
 ### 2026-03-12 — Test.DataVisualization
 - `DataTableBuilder.Header(r => r.Values[colIndex], columns[i])` crashes with `ArgumentException: Invalid expression` — `GetNameFromMemberExpression` (Utils.cs:467) only handles simple member access, not indexer/array expressions
 - `DataTableBuilder` does NOT have a `.Remove()` method (unlike `FormBuilder` and `TableBuilder`) — `builder.Remove(expressions)` resolves to `CollectionExtensions.Remove<TKey,TValue>` and fails to compile
@@ -398,3 +475,50 @@
 - `.ToTable()` on `List<UuidEntry>` renders standard HTML table with copy icon buttons per row — `.Builder(u => u.Uuid, f => f.CopyToClipboard())` works correctly
 - `UseDownload()` for TXT/JSON/CSV export renders as `Button.Url()` links — visible and functional
 - Clean run: 13 tests passed after test-only fix rounds, no project fixes, no runtime errors, logs clean
+
+### 2026-03-12 — Test.PivotTableBuilder
+- **Multi-select Toggle variant** (`IState<string[]>` with `.Variant(SelectInputVariant.Toggle)`) renders as Radix toggle buttons with `aria-pressed` attribute, NOT `role="radio"` or `role="checkbox"`. Use `page.getByText("Option", { exact: true }).first().click()` to click them. The `clickToggleOption` helper pattern (try radio → checkbox → text fallback) works robustly
+- When Toggle row field options overlap with dropdown option names (e.g., "Quantity" appears in both row field toggles AND value field dropdown), `getByText("Quantity").first()` matches the TOGGLE button, not the dropdown option. Use `getByRole("option", { name: "Quantity", exact: true })` to select dropdown items when a popover/dropdown is open — this contradicts the UUIDGenerator2 finding that `getByRole("option")` doesn't work. It DOES work when the dropdown renders proper `role="option"` elements (varies by Ivy component)
+- `FileUpload<string>` with `MemoryStreamUploadHandler.Create(fileState)` and `.Accept(".csv")` — file content is available as `fileState.Value.Content` (string), not byte array
+- `.ToTable().Header(r => r.Prop, "Label").Totals(r => r.Prop)` renders a standard HTML table with a totals footer row — totals value may not be findable by exact number text (use regex pattern like `/7[,.]?850/`)
+- `UseDefaultApp(typeof(App))` with single app — no Chrome, access via `/<app-id>?chrome=false`
+- Clean run: 12 tests passed after 2 test-only fix rounds, no project fixes, no runtime errors, logs clean
+
+### 2026-03-12 — Test.WebhookTester
+- `UseWebhook` generates URLs at `/ivy/webhook/<guid>`, NOT `/api/webhook/<guid>` — don't assume API path prefix
+- `UseWebhook` only accepts GET and POST requests — PUT and DELETE return non-200 status codes. This is a Framework limitation
+- Webhook state (`UseState` with `ImmutableList`) persists server-side per session. Each `page.goto()` creates a new WebSocket session with fresh state (empty list), but also generates a new webhook URL (new GUID)
+- `page.request.get/post/put/delete()` from Playwright fires HTTP requests that hit the webhook endpoint. State updates propagate to the page via WebSocket — need 1500-3000ms wait for UI to reflect webhook-received data
+- When tests share a server and state accumulates across tests, either: (1) clear state at start of each test using UI buttons, or (2) use regex matchers like `/\d+ request\(s\) received/` instead of exact counts
+- Clean run: 11 tests passed after 2 test-only fix rounds, no project fixes, no runtime errors, logs clean
+
+### 2026-03-12 — Test.UTMParameterBuilder
+- **`Dictionary<TKey, TValue>.ToDetails()` crashes** with `TargetParameterCountException` — `DetailsBuilder.Item.GetValue()` calls `PropertyInfo.GetValue(obj)` on the dictionary's indexed `this[TKey key]` property which requires a parameter. Workaround: convert to anonymous object with explicit properties, then use `.ToDetails().RemoveEmpty()`
+- **Ivy `Layout.Tabs` renders BOTH tab panels in DOM** — inactive tab content is hidden but still exists. `getByText("X").first()` or `locator("input").first()` can match hidden elements from the inactive tab panel. For tab-specific interactions, use placeholder-based or role-based selectors to target elements in the active panel specifically (e.g., `input[placeholder*='unique_text']`)
+- `.WithField().Required()` adds `*` suffix to field labels — `getByText("Base URL", { exact: true })` fails; use `getByText("Base URL").first()` without exact match
+- Tab switching: `getByRole("tab", { name: "TabName" })` works reliably for clicking Ivy `Layout.Tabs` triggers
+- `ToDetails()` on anonymous objects with PascalCase property names renders labels with spaced text: `utm_source` → "Utm Source" (underscore treated as word boundary)
+- 13 tests passed after 1 project fix round (Dictionary.ToDetails crash), no runtime errors, logs clean
+
+### 2026-03-12 — Test.TimezoneWorldClock
+- **Card `.Title().Content()` renders invisible card body** — `new Card().Title(widget).Content(widget)`, `new Card(content).Title(widget)`, and `new Card(content)` all result in invisible card body content. The title/header text renders, but the body area is completely empty (white space) despite content being in the DOM. Workaround: use `Layout.Vertical()` with manual `.Padding()`, `.BorderThickness()`, `.BorderColor()` styling instead of Card
+- **IANA vs Windows timezone IDs on Windows**: `GetSystemTimeZones()` returns Windows-format IDs (e.g., "Eastern Standard Time") but `FindSystemTimeZoneById("America/New_York")` works via ICU conversion and returns `tz.Id = "America/New_York"` (preserving IANA format). To deduplicate, use `tz.StandardName` not `tz.Id` since both map to the same `StandardName`
+- **Searchable SelectInput dropdown**: `getByRole("combobox").first().click()` opens the dropdown, `keyboard.type("search")` filters, `getByRole("option").first().click()` selects — this pattern works reliably for `SelectInput.Searchable()`
+- `GetDisplayName(tz)` for Windows timezone IDs without `/` in `tz.Id` falls through to `tz.DisplayName` which returns verbose strings like "(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna"
+- 12 tests passed after 3 project fix rounds (cross-platform timezone IDs, Card content visibility, timezone deduplication), no runtime errors, logs clean
+
+### 2026-03-12 — Test.APIRequestBuilder
+- **`Layout.Vertical(IEnumerable<T>, otherItem)` renders enumerable as debug table**: When `Layout.Vertical()` receives an `IEnumerable<Layout>` from `.Select()` as one of multiple `params object?[]` arguments, the content builder serializes it as a data table (showing internal columns: Context, Id, Key, Call Site, Is Stateless) instead of expanding items as children. Fix: call `.Select<T, object?>().Append<object?>(otherItem).ToArray()` to materialize into a single array before passing to `Layout.Vertical()`
+- **Icon-only buttons (`.Destructive()` trash) have no accessible name**: `Button(icon: Icons.Trash).Destructive()` renders without accessible name, text, or `data-variant` attribute. Cannot use `getByRole("button", { name: "" })` (matches wrong elements) or `getByRole("button")` filters. Working approach: iterate all `page.locator("button")` elements, check `innerText().trim() === ""`, then `dispatchEvent("click")` on the match
+- `new TextInput(value, onChange).Placeholder("X")` renders with `placeholder="X"` attribute accessible via `getByRole("textbox", { name: "X" })` in Playwright
+- `ToSelectInput(["GET", "POST", "PUT", "DELETE"])` without Toggle renders as Radix dropdown with `role="option"` items — confirmed `getByRole("option", { name: "POST" })` works
+- `.Multiline().Rows(6)` on TextInput renders as `<textarea>` element
+- 13 tests passed after 1 project fix round (IEnumerable in Layout.Vertical), no runtime errors, logs clean
+
+### 2026-03-12 — Test.CountdownTimer
+- **`UseArgs<T>` does NOT work with external URL navigation**: `UseArgs` reads from the WebSocket `appArgs` query parameter, NOT from the browser page URL. Ivy's client-side JS does not extract `appArgs` from `window.location.search` and forward it to the WebSocket. This means shareable links using `appArgs` in the page URL won't work — it's a Framework limitation
+- **Shareable link URL format**: Apps that build shareable URLs must use `?appArgs={urlEncodedJson}` format (JSON-serialized args object, URL-encoded). The original pattern of individual query params (`?TargetTimestamp=X&EventName=Y`) does not work with Ivy's `UseArgs<T>()`
+- **`IHttpContextAccessor.HttpContext` is null in WebSocket context**: Ivy apps render via WebSocket/SignalR, not HTTP requests. `UseService<IHttpContextAccessor>()` returns an accessor where `.HttpContext` is null. Always use `?.` on the accessor itself: `httpContextAccessor?.HttpContext?.Request`
+- **`taskkill` in bash on Windows**: `spawn('taskkill', ['/pid', ...], { shell: true })` fails with "Invalid argument/option" because bash interprets `/f` as a path. Use `spawn('cmd', ['/c', 'taskkill', '/pid', pid, '/f', '/t'], { shell: false })` instead
+- **`beforeAll` timeout for recompilation**: When C# source is modified between test runs, `dotnet run` triggers a rebuild that can exceed the 30s default timeout. Always use `testInfo.setTimeout(120000)` in `beforeAll`
+- 7 tests passed after 3 fix rounds (2 project fixes: shareable URL format + null ref guard), logs clean

@@ -65,7 +65,7 @@ foreach ($traceFolder in $traceFolders) {
             $existingIsEvent = $existingObs.File.Name -match 'EVENT'
             # Keep EVENT over GENERATION
             if ($isEvent -and -not $existingIsEvent) {
-                $deduped = $deduped | Where-Object { $_.Path -ne $key }
+                $deduped = @($deduped | Where-Object { $_.Path -ne $key })
                 $deduped += $req
                 $seenPaths[$key] = $req
             }

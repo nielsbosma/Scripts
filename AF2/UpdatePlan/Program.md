@@ -38,6 +38,27 @@ Args contains the path to a plan file. Resolve it to an absolute path.
 - Write the updated plan to `D:\Repos\_Ivy\.plans\` with the new versioned filename
 - Delete the original (unversioned) file since the history copy serves as backup
 
+### IvyFramework Verification
+
+When updating a plan that targets **IvyFramework** (has `IvyFramework` in filename or queue) **and the change affects visual/UI behavior** (e.g., fixing a widget bug, changing layout, adding a new component), ensure the plan includes a `### Verification` section with instructions to run **IvyFeatureTester.ps1** after the commit. If this section is missing, add it.
+
+**Do NOT add verification for non-visual changes** such as documentation updates, FAQ entries, analyser error messages, refactoring rules, or code-only fixes that don't affect rendered output. If an existing plan has verification for a non-visual change, remove it.
+
+```markdown
+### Verification
+
+After committing the fix, use **IvyFeatureTester.ps1** to verify the changes visually:
+
+\```powershell
+cd D:\Repos\_Ivy
+D:\Repos\_Personal\Scripts\AF2\IvyFeatureTester.ps1 "Commit <COMMIT_ID>: <description of what to test>. Test with <specific test scenario>."
+\```
+
+Replace `<COMMIT_ID>` with the actual commit hash from the fix commit above.
+```
+
+The prompt should describe the expected behavior and suggest a concrete test scenario appropriate for the change.
+
 ### Rules
 
 - Preserve YAML frontmatter exactly as-is

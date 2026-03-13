@@ -3,11 +3,24 @@
 ## Ivy Framework Basics
 
 - Ivy apps are .NET web apps started with `dotnet run -- --port <port>`
+- The frontend client is in `src/frontend/` and built with `npm run build` into `src/frontend/dist/`. These assets are embedded into the Ivy.dll via `<EmbeddedResource>`. If testing a commit that changed frontend `.ts` files, you MUST rebuild the frontend (`cd src/frontend && npm run build`) before running the dotnet project, otherwise the old bundled JS is served.
 - The server prints `Ivy is running on http://localhost:<port>` when ready
 - Apps are decorated with `[App(icon: Icons.X, path: ["Apps"])]` and inherit `ViewBase`
 - The `Build()` method returns the UI tree
 - State is managed via `UseState<T>()` which returns reactive state objects
 - Services are injected via `UseService<T>()`
+
+## Standalone Test Project Setup
+
+- The server class is `Server` (NOT `IvyServer`). Entry point: `var server = new Server(); await server.RunAsync();`
+- Apps must be explicitly registered: `server.AddAppsFromAssembly(Assembly.GetExecutingAssembly());` — Ivy does NOT auto-discover apps
+- Use ProjectReference to local Ivy: `<ProjectReference Include="D:\Repos\_Ivy\Ivy-Framework\src\Ivy\Ivy.csproj" />`
+- The csproj needs `<Nullable>enable</Nullable>` to avoid CS8632 warnings
+- `ButtonVariant` values: Primary, Destructive, Outline, Secondary, Success, Warning, Info, Ghost, Link (NO `Default`)
+- `TextBuilder` does NOT support `.TestId()` — put TestId on cards/layouts/buttons instead
+- `Icons` enum: use PascalCase Lucide icon names. Not all names exist (e.g. `AlignCenter` doesn't exist, use `AlignCenterHorizontal`). Lucide renamed some icons: `AlertTriangle` → `TriangleAlert`
+- `AppContext` is ambiguous with `System.AppContext` — always use `Ivy.AppContext` in standalone test projects (e.g. `UseService<Ivy.AppContext>()`)
+- For `IDisposable` return in `UseEffect`, use `System.Reactive.Disposables.Disposable.Empty` (available via Ivy's dependency on System.Reactive)
 
 ## Ivy UI Components
 
@@ -81,7 +94,7 @@
 ## DataTable Gotchas
 
 - **DataTable uses virtualized grid rendering** — cells are `<td role="gridcell">` elements that Playwright considers "hidden" even when data is present. Use `page.locator('[role="gridcell"]').first()` with `.toBeAttached()` instead of `.toBeVisible()` to verify data loaded.
-- **`.Remove(e => e.Id)` crashes on positional records** — `RemoveFields` in `QueryableExtensions.cs` calls `Expression.New(type)` which requires a parameterless constructor. C# positional records (`record Foo(int X, string Y)`) don't have one. Workaround: don't use `.Remove()` on positional records, or convert to a class with default constructor.
+- **`.Remove()` on positional records: crash fixed but data alignment broken** — Commit `e08a55d6` fixes the crash (fills removed params with defaults in constructor). However, the DataTable serializes ALL property values (including defaults for removed fields) but maps them by index to only the visible column headers, causing a systematic data shift. The "Name" column shows `0` (default Id) instead of the actual name. This is a framework serialization bug.
 - **Decimal columns display as `0000000000000000`** — `decimal` values in DataTable grid render incorrectly (framework bug). Note as external issue.
 
 ## Layout.Vertical with IEnumerable (Critical)

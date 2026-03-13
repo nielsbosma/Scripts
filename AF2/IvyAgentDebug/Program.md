@@ -174,6 +174,27 @@ session: {SessionId}
 1. Commit
 ```
 
+### IvyFramework Verification
+
+When a plan targets **IvyFramework** (queue = `IvyFramework`) **and the change affects visual/UI behavior** (e.g., fixing a widget bug, changing layout, adding a new component), include a `### Verification` section after the commit instructions with instructions to run **IvyFeatureTester.ps1**.
+
+**Do NOT add verification for non-visual changes** such as documentation updates, FAQ entries, analyser error messages, refactoring rules, or code-only fixes that don't affect rendered output.
+
+```markdown
+### Verification
+
+After committing the fix, use **IvyFeatureTester.ps1** to verify the changes visually:
+
+\```powershell
+cd D:\Repos\_Ivy
+D:\Repos\_Personal\Scripts\AF2\IvyFeatureTester.ps1 "Commit <COMMIT_ID>: <description of what to test>. Test with <specific test scenario>."
+\```
+
+Replace `<COMMIT_ID>` with the actual commit hash from the fix commit above.
+```
+
+The prompt should describe the expected behavior and suggest a concrete test scenario appropriate for the change.
+
 ### Rules
 
 - **Everything must be expressed as plans** — hallucination fixes, FAQ edits, doc improvements, workflow fixes

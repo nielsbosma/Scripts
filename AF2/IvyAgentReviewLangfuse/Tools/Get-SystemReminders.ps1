@@ -52,17 +52,18 @@ foreach ($traceFolder in $traceFolders) {
 
         $time = Get-JsonString $json "startTime"
 
-        # Extract metadata
+        # Extract metadata — data may be in .metadata or .input depending on Langfuse serialization
         $analyser = "unknown"
         $message = ""
-        if ($null -ne $json.metadata) {
-            $analyser = Get-JsonString $json.metadata "analyser"
-            if (-not $analyser) { $analyser = "unknown" }
+        $metaAnalyser = if ($null -ne $json.metadata) { Get-JsonString $json.metadata "analyser" } else { $null }
+        $inputAnalyser = if ($null -ne $json.input) { Get-JsonString $json.input "analyser" } else { $null }
+
+        if ($metaAnalyser) {
+            $analyser = $metaAnalyser
             $message = Get-JsonString $json.metadata "message"
             if (-not $message) { $message = "" }
-        } elseif ($null -ne $json.input) {
-            $analyser = Get-JsonString $json.input "analyser"
-            if (-not $analyser) { $analyser = "unknown" }
+        } elseif ($inputAnalyser) {
+            $analyser = $inputAnalyser
             $message = Get-JsonString $json.input "message"
             if (-not $message) { $message = "" }
         }
