@@ -13,6 +13,8 @@ $promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $args; WorkDir = 
 
 Write-Host "Starting Agent..."
 Push-Location $programFolder
+# Allow nested invocation when called from another Claude session (e.g. BuildApproved)
+$env:CLAUDECODE = $null
 $output = claude --dangerously-skip-permissions -p -- (Get-Content $promptFile -Raw) 2>&1
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {
