@@ -85,6 +85,11 @@ if ($Feedback) {
     }
 }
 
+# --- Package FAQ feedback loop ---
+# If debugging reveals a NuGet package-related issue (e.g., wrong API usage, missing config),
+# add a FAQ entry to: D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent\PackageFaqs\<PackageId>.md
+# These are returned to the agent automatically when it adds the package via AddPackage tool.
+
 # --- Phase 1: Run ReviewBuild (must complete first) ---
 Write-Host "=== Phase 1: ReviewBuild ===" -ForegroundColor Cyan
 $buildReportExists = (-not $Force) -and (Test-Path (Join-Path $workDir ".ivy\review-build.md"))
