@@ -183,13 +183,22 @@ function activate(context) {
             const doc = await vscode.workspace.openTextDocument(tmpPath);
             const editor = await vscode.window.showTextDocument(doc);
 
-            // Set up a listener for when the document is closed
-            const closeHandler = vscode.workspace.onDidCloseTextDocument(async (closedDoc) => {
-                if (closedDoc.uri.toString() === doc.uri.toString()) {
-                    closeHandler.dispose();
+            // Trigger on save — onDidCloseTextDocument is unreliable (VS Code delays document disposal)
+            const saveHandler = vscode.workspace.onDidSaveTextDocument(async (savedDoc) => {
+                if (savedDoc.uri.toString() === doc.uri.toString()) {
+                    saveHandler.dispose();
 
-                    // Read the content from the document (even if not saved)
-                    const content = closedDoc.getText().trim();
+                    const content = savedDoc.getText().trim();
+
+                    // Close the editor tab
+                    for (const group of vscode.window.tabGroups.all) {
+                        for (const tab of group.tabs) {
+                            if (tab.input instanceof vscode.TabInputText &&
+                                tab.input.uri.toString() === doc.uri.toString()) {
+                                await vscode.window.tabGroups.close(tab);
+                            }
+                        }
+                    }
 
                     // Clean up temp file
                     try {

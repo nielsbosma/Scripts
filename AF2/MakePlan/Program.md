@@ -64,29 +64,58 @@ Commit!
 
 The `source:` frontmatter is optional — only include when the task references a specific source location. The `session:` frontmatter should always be included — it contains the SessionId from the header args, allowing the user to resume this Claude session with `claude --resume <session-id>`.
 
+### New Widget Checklist
+
+When a plan involves **creating a new widget** (queue = `IvyFramework`), the plan MUST include steps for ALL of the following:
+
+1. **Backend widget class** — `src/Ivy/Widgets/<WidgetName>.cs` with proper `[Prop]`/`[Event]` attributes, `[JsonIgnore]` on non-serializable delegates, and computed `Has*` booleans for the frontend
+2. **Frontend React component** — `src/frontend/src/widgets/<widgetName>/<WidgetName>Widget.tsx` following established patterns (see existing widgets like `StepperWidget.tsx`, `BadgeWidget.tsx` for reference)
+3. **Index export** — `src/frontend/src/widgets/<widgetName>/index.ts`
+4. **Widget map registration** — Add import and `'Ivy.<WidgetName>': <WidgetName>Widget` entry in `src/frontend/src/widgets/widgetMap.ts`
+5. **Sample app** — `src/Ivy.Samples.Shared/Apps/Widgets/<WidgetName>App.cs` demonstrating key features (basic usage, configuration options, event handling)
+6. **Documentation page** — `src/Ivy.Docs.Shared/Docs/02_Widgets/<category>/<WidgetName>.md` with ingress, usage examples (`demo-below`/`demo-tabs`), configuration options, and `WidgetDocs` footer
+
+If the backend widget already exists (e.g., adding a missing frontend), the plan should still verify/reference all six elements and note which already exist vs. which need to be created.
+
 ### IvyFramework Verification
 
-When a plan targets **IvyFramework** (queue = `IvyFramework`) **and the change affects visual/UI behavior** (e.g., fixing a widget bug, changing layout, adding a new component), add a `### Verification` section after the commit instructions. This section should instruct the executing agent to run **IvyFeatureTester.ps1** to visually verify the change.
+When a plan targets **IvyFramework** (queue = `IvyFramework`) **and the change affects visual/UI behavior** (e.g., fixing a widget bug, changing layout, adding a new component), add verification instructions to the **Tests** section as the final test step. This ensures verification is treated as a mandatory step rather than optional post-work.
 
 **Do NOT add verification for non-visual changes** such as documentation updates, FAQ entries, analyser error messages, refactoring rules, or code-only fixes that don't affect rendered output.
 
-```markdown
-### Verification
+Add this as the final step in the Tests section:
 
-After committing the fix, use **IvyFeatureTester.ps1** to verify the changes visually:
+```markdown
+## Tests
+
+1. Build the Ivy Framework project to ensure compilation succeeds
+2. Run manual tests as needed (e.g., navigate to sample app, verify behavior)
+3. Verify documentation renders correctly (if applicable)
+
+### Visual Verification (REQUIRED)
+
+**You MUST run IvyFeatureTester.ps1 to verify this change visually before committing.**
+
+Execute the following command and wait for completion:
 
 \```powershell
 cd D:\Repos\_Ivy
 D:\Repos\_Personal\Scripts\AF2\IvyFeatureTester.ps1 "Commit <COMMIT_ID>: <description of what to test>. Test with <specific test scenario>."
 \```
 
-Replace `<COMMIT_ID>` with the actual commit hash from the fix commit above.
+Replace `<COMMIT_ID>` with the actual commit hash. The script will:
+- Create a worktree at D:\Temp\IvyFeatureTester
+- Set up the testing environment
+- Launch the Ivy samples app for manual verification
+
+Wait for the visual verification to complete and confirm the test passed before proceeding to commit.
 ```
 
 The prompt should describe the expected behavior and suggest a concrete test scenario appropriate for the change.
 
 ### Rules
 
+- **!CRITICAL: Every MakePlan execution MUST produce at least one plan file. Even if the task is an analysis, review, or investigation — always create a plan with actionable steps. Never just analyze and report back without a plan.**
 - The plan must include all paths and information for an LLM coding agent to execute end-to-end without human intervention
 - Keep the plan short and concise
 - **!IMPORTANT: ONE issue per plan file — if multiple issues, create multiple plan files with separate IDs**
