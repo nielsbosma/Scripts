@@ -39,6 +39,7 @@ Read about important paths and files in ../.shared/Paths.md
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="D:\Repos\_Ivy\Ivy-Framework\src\Ivy\Ivy.csproj" />
+    <ProjectReference Include="D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Analyser\Ivy.Analyser.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
 ```
@@ -83,7 +84,7 @@ Create `.ivy/tests/` directory with:
 
 **package.json** — minimal, with `@playwright/test` dependency
 
-**playwright.config.ts** — Chromium only, single worker, no retries, viewport `{ width: 1920, height: 1080 }`, uses `process.env.APP_PORT`
+**playwright.config.ts** — Chromium only, single worker, no retries, viewport `{ width: 1920, height: 1920 }` (square format, must be set in both `use` and `projects[0].use` to override device presets), uses `process.env.APP_PORT`
 
 **One `.spec.ts` per app:**
 - `beforeAll`: find free port, spawn `dotnet run -- --port <port>`, wait for HTTP 200
@@ -120,14 +121,15 @@ npx playwright install chromium  # if needed
 npx playwright test
 ```
 
-### 8. Fix Loop (up to 5 rounds)
+### 8. Fix Loop #1 (up to 10 rounds)
 
 If tests fail, logs have errors, or screenshots show issues:
 
 1. Analyze failures — categorize as:
    - **Test code issue** → fix `.spec.ts`
    - **Demo app issue** → fix `.cs` files in temp project
-   - **Framework bug** → note for reporting, don't fix
+   - **Bug in the tester framework feature** → Fix 
+   - **General framework bug** → Fix by reporting to D:\Repos\_Ivy\.plans\ (see instructions below)
 2. Apply fixes and re-run
 3. Track each fix round
 
@@ -177,6 +179,14 @@ Write `.ivy/review-feature.md`:
 [Any suggestions for improvement]
 ```
 
+### 8. Fix Loop #2 UX/Functionality (up to 3 rounds)
+
+Baed on review-feature.md and review-ux.md, try to fix and rerun the entire process until perfect.
+
+1. Analyze
+2. Apply fixes and re-run
+3. Track each fix round
+
 ### 11. Summary
 
 Present:
@@ -195,3 +205,7 @@ Present:
 - Keep demo apps focused — each tests a specific aspect
 - If a feature has too many props, split into multiple apps
 - Screenshots are evidence — take many, with descriptive names
+
+### Plans
+
+For larger issue that might need human decision make a proposed plan in D:\Repos\_Ivy\.plans\. Trigger D:\Repos\_Personal\Scripts\AF2\MakePlan.ps1 with a propt to do this. 

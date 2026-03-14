@@ -10,7 +10,7 @@ Write-Host "Log file: $logFile"
 
 $sessionId = [guid]::NewGuid().ToString()
 
-$promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $args; WorkDir = (Get-Location).Path; ClaudeSessionId = $sessionId }
+$promptFile = PrepareFirmware $PSScriptRoot $logFile $programFolder @{ Args = $args; WorkDir = (Get-Location).Path; ClaudeSessionId = $sessionId }
 
 Write-Host "Starting Agent..."
 Push-Location $programFolder

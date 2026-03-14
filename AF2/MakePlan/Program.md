@@ -113,6 +113,21 @@ Wait for the visual verification to complete and confirm the test passed before 
 
 The prompt should describe the expected behavior and suggest a concrete test scenario appropriate for the change.
 
+### If Tests Find Issues
+
+If the IvyFeatureTester discovers problems during verification, it should **automatically create a new implementation plan** to fix the discovered issues:
+
+1. Create a new plan file in D:\Repos\_Ivy\.plans\ with a descriptive name (e.g., 417-IvyFramework-RadialBarChart-FollowUpFix.md)
+2. The plan should include:
+   - Clear problem description from test results
+   - Root cause analysis if identifiable
+   - Proposed solution steps
+   - Test verification steps
+   - Reference back to this original plan (417)
+3. Queue the new plan for execution by adding it to the appropriate queue file
+
+This ensures any issues discovered during testing have a tracked resolution path.
+
 ### Rules
 
 - **!CRITICAL: Every MakePlan execution MUST produce at least one plan file. Even if the task is an analysis, review, or investigation — always create a plan with actionable steps. Never just analyze and report back without a plan.**

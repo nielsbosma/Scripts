@@ -243,6 +243,14 @@
 - Multiple `test.describe` blocks in one file each trigger their own `beforeAll` — caused server re-spawn failure due to DLL locks from first server instance
 - Solution: use top-level `test()` (outside `describe`) for tests that need to share the same server lifecycle
 
+### 2026-03-13 — Test.LovableLanguageLearner (Arabi Lingo)
+- Language learning app with TabsLayout (Lessons, Flashcards, Quiz, Progress)
+- **IMPORTANT**: `getByText("Flashcard")` matched both tab "Flashcards" and card title "Flashcard" — always use `{ exact: true }` when text appears in both tabs and content
+- **IMPORTANT**: `getByRole('button', { name: 'Correct' })` matched both "Incorrect" and "Correct" buttons — add `exact: true` to button role queries when button labels share substrings
+- QuizView buttons without onClick handlers generated backend warnings: `Event 'OnClick' for Widget 'xxx' not found` — adding empty `onClick: _ => { }` handlers silenced the warnings
+- Zombie dotnet processes from failed test runs lock build files (`.exe` and `.dll`) — use `powershell -Command "Get-Process 'Test.ProjectName*' | Stop-Process -Force"` to kill them reliably (more effective than `taskkill` on Windows)
+- 8 tests, 2 fix rounds (selector exact matching + QuizView onClick handlers), all passed, logs clean
+
 ### 2026-03-09 20:46 — Parsely.Markflow
 - CodeMirror-based code inputs (from `state.ToCodeInput()`) use `.cm-content[contenteditable='true']` as the editable locator
 - **IMPORTANT**: Do NOT use `keyboard.type()` or `keyboard.insertText()` for CodeMirror editors — `type()` triggers auto-brackets/auto-complete that corrupts structured input, and `insertText()` does not trigger CodeMirror's change events so Ivy state bindings never update (the server-side state stays stale). Instead, use clipboard paste: `page.evaluate(async (t) => { await navigator.clipboard.writeText(t); }, text)` then `page.keyboard.press("Control+V")`. Requires `permissions: ["clipboard-read", "clipboard-write"]` in playwright config.

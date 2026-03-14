@@ -27,7 +27,7 @@ $logFile = GetNextLogFile $programFolder
 $updatingPath | Set-Content $logFile
 Write-Host "Log file: $logFile"
 
-$promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $updatingPath; WorkDir = (Get-Location).Path }
+$promptFile = PrepareFirmware $PSScriptRoot $logFile $programFolder @{ Args = $updatingPath; WorkDir = (Get-Location).Path }
 
 Write-Host "Starting Agent..."
 Push-Location $programFolder
