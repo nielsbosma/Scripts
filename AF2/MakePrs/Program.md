@@ -76,35 +76,36 @@ After grouping commits, for each group:
 
 ### 4. Present Plan to User
 
-Display the suggested PR plan with:
-- Number of groups
-- Each group showing:
-  - Proposed PR title
-  - Repository
-  - List of commits (short hash + subject)
-  - Estimated base branch (usually origin/main or origin/master)
-  - Related issues found (if any):
-    ```
-    Related Issues Found:
-      - #42 Add RadialBarChart widget support
-      - #38 Missing chart types in widget library
+**Enter plan mode** (using the EnterPlanMode tool) and present the PR groups as a plan. Each group should show:
+- Proposed PR title
+- Repository
+- List of commits (short hash + subject)
+- Estimated base branch (usually origin/main or origin/master)
+- Linked issues (if any were found in the GitHub issue search or referenced in commit messages). Omit the `Links:` line if no relevant issues exist.
 
-    Link issues? [42,38/none/custom]:
-    ```
-  - User can select which issues to link (comma-separated numbers), type "none", or enter custom issue numbers
-  - Issues referenced directly in commit messages (e.g., `#123`) are pre-selected automatically
+Example plan format:
+```
+PR 1: [Ivy-Framework] Add RadialBarChart widget
+  Base: origin/main
+  Commits:
+    - abc1234 Add RadialBarChart backend widget class
+    - def5678 Add RadialBarChart frontend component
+  Links: #42 Add RadialBarChart widget support, #38 Missing chart types
 
-Ask user for approval:
+PR 2: [Ivy-Agent] Refactor session management
+  Base: origin/main
+  Commits:
+    - jkl3456 Refactor session management
+    - mno7890 Add timeout configuration
 ```
-Options:
-  a) Approve all and create PRs
-  1-N) Review/modify group N
-  c) Cancel
-```
+
+Not every PR group will have related issues — that's fine. Group commits logically by functionality regardless of whether matching issues exist.
+
+The user can review, modify, or remove groups before approving. Once the user approves the plan, exit plan mode and only execute on the PR groups that remain in the approved plan.
 
 ### 5. Create Pull Requests
 
-For each approved group:
+For each approved group that remains in the plan:
 
 #### A. Get PR Details from User
 - **PR Title** (suggest from commits, allow editing)
