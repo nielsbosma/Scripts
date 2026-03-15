@@ -23,7 +23,18 @@ Read about important paths and files in ../.shared/Paths.md
 - Read existing samples for similar features: `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Samples.Shared\Apps\`
 - Understand the API surface: constructors, methods, properties, events
 
-### 3. Create Temp Project
+### 3. Verify Completeness (Widgets Only)
+
+If the feature being tested is a **widget**, check that required companion artifacts exist:
+
+1. **Sample App**: Search `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Samples.Shared\Apps\` for files containing the widget name
+2. **Documentation Page**: Search `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\02_Widgets\` subdirectories for a matching `.md` file
+
+Record the results — they will be included in the Feature Verification Report (Step 11). If either artifact is missing, it will be flagged as a warning.
+
+Skip this step for non-widget features (utilities, services, non-visual APIs).
+
+### 4. Create Temp Project
 
 - Create folder: `D:\Temp\IvyFeatureTester\<FeatureName>\`
 - Create a new Ivy project:
@@ -54,7 +65,7 @@ server.AddAppsFromAssembly(Assembly.GetExecutingAssembly());
 await server.RunAsync();
 ```
 
-### 4. Create Demo Apps
+### 5. Create Demo Apps
 
 Create multiple `.cs` app files that exercise the feature comprehensively:
 
@@ -71,14 +82,14 @@ Each app must:
 - Display state changes visibly so Playwright can verify them
 - Follow patterns from `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Samples.Shared\Apps\`
 
-### 5. Build and Verify
+### 6. Build and Verify
 
 - Run `dotnet build` in the temp project folder
 - Fix any compilation errors
 - Run `dotnet run --describe` to verify all apps are registered
 - Iterate until build succeeds
 
-### 6. Create Playwright Tests
+### 7. Create Playwright Tests
 
 Create `.ivy/tests/` directory with:
 
@@ -112,7 +123,7 @@ Create `.ivy/tests/` directory with:
 - Resolve project root: `process.cwd().replace(/[/\\]\.ivy[/\\]tests$/, "")`
 - Wait for server ready by polling HTTP, not just stdout
 
-### 7. Install & Run Tests
+### 8. Install & Run Tests
 
 ```bash
 cd .ivy/tests
@@ -121,7 +132,7 @@ npx playwright install chromium  # if needed
 npx playwright test
 ```
 
-### 8. Fix Loop #1 (up to 10 rounds)
+### 9. Fix Loop #1 (up to 10 rounds)
 
 If tests fail, logs have errors, or screenshots show issues:
 
@@ -133,7 +144,7 @@ If tests fail, logs have errors, or screenshots show issues:
 2. Apply fixes and re-run
 3. Track each fix round
 
-### 9. Visual Quality Review
+### 10. Visual Quality Review
 
 Review all screenshots and verify:
 - Does the feature look consistent with other Ivy features?
@@ -143,7 +154,7 @@ Review all screenshots and verify:
 
 Write `.ivy/review-ux.md` with findings.
 
-### 10. Feature Verification Report
+### 11. Feature Verification Report
 
 Write `.ivy/review-feature.md`:
 
@@ -152,6 +163,12 @@ Write `.ivy/review-feature.md`:
 
 ## Result
 [✅ Feature works as intended / ⚠️ Partial / ❌ Failed]
+
+## Completeness (Widgets Only)
+| Artifact | Status | Path |
+|----------|--------|------|
+| Sample App | Found/Missing | path or N/A |
+| Documentation | Found/Missing | path or N/A |
 
 ## Props Tested
 | Prop | Status | Notes |
@@ -179,15 +196,17 @@ Write `.ivy/review-feature.md`:
 [Any suggestions for improvement]
 ```
 
-### 8. Fix Loop #2 UX/Functionality (up to 3 rounds)
+If the feature is a widget, include the Completeness section with results from Step 3. Any missing artifact should also be added to the Issues Found table with severity "Medium".
 
-Baed on review-feature.md and review-ux.md, try to fix and rerun the entire process until perfect.
+### 12. Fix Loop #2 UX/Functionality (up to 3 rounds)
+
+Based on review-feature.md and review-ux.md, try to fix and rerun the entire process until perfect.
 
 1. Analyze
 2. Apply fixes and re-run
 3. Track each fix round
 
-### 11. Summary
+### 13. Summary
 
 Present:
 - Feature name
