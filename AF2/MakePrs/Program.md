@@ -78,7 +78,8 @@ After grouping commits, for each group:
 
 **Enter plan mode** (using the EnterPlanMode tool) and present the PR groups as a plan. Each group should show:
 - Proposed PR title
-- Repository
+- Full repo path on disk
+- Current branch name (to restore after cherry-pick)
 - List of commits (short hash + subject)
 - Estimated base branch (usually origin/main or origin/master)
 - Linked issues (if any were found in the GitHub issue search or referenced in commit messages). Omit the `Links:` line if no relevant issues exist.
@@ -86,7 +87,9 @@ After grouping commits, for each group:
 Example plan format:
 ```
 PR 1: [Ivy-Framework] Add RadialBarChart widget
+  Repo: D:\Repos\_Ivy\Ivy-Framework
   Base: origin/main
+  Branch: main
   Commits:
     - abc1234 Add RadialBarChart backend widget class
     - def5678 Add RadialBarChart frontend component
@@ -95,7 +98,9 @@ PR 1: [Ivy-Framework] Add RadialBarChart widget
     - https://github.com/Ivy-Interactive/Ivy-Framework/issues/38 Missing chart types
 
 PR 2: [Ivy-Agent] Refactor session management
+  Repo: D:\Repos\_Ivy\Ivy-Agent
   Base: origin/main
+  Branch: main
   Commits:
     - jkl3456 Refactor session management
     - mno7890 Add timeout configuration
@@ -103,11 +108,39 @@ PR 2: [Ivy-Agent] Refactor session management
 
 Not every PR group will have related issues — that's fine. Group commits logically by functionality regardless of whether matching issues exist.
 
+After all PR groups, append the following **Execution Instructions** section to the plan:
+
+```
+## Execution Instructions
+
+For each PR group above, execute these steps:
+
+1. `cd <Repo>`
+2. `git branch pr/<first-commit-short-hash>-<sanitized-title> <Base>`
+3. `git checkout pr/<first-commit-short-hash>-<sanitized-title>`
+4. `git cherry-pick <commit1> <commit2> ...` (all commits listed in the group, in order)
+5. `git push -u origin pr/<first-commit-short-hash>-<sanitized-title>`
+6. `gh pr create --head pr/<first-commit-short-hash>-<sanitized-title> --base main --title "<PR title>" --body "<Summary from commits, with Closes #N for linked issues>"`
+7. `git checkout <Branch>` (restore original branch)
+8. Open the PR URL in the browser
+9. Drop the cherry-picked commits from `<Branch>`: `git checkout <Branch>` then `git rebase --onto <commit-before-first-cherry-picked> <last-cherry-picked> <Branch>` (or use `git rebase -i` equivalent). This always happens — the commits are "lifted out" of the original branch into the PR branch.
+10. Verify you are back on the original `<Branch>`
+
+Notes:
+- Sanitize title for branch name: lowercase, replace spaces with hyphens, remove special chars, truncate to ~50 chars
+- If cherry-pick fails, abort (`git cherry-pick --abort`), clean up the branch, and skip this PR
+- If issues were linked, append `Closes #N` lines to the PR body
+```
+
+> **Important**: The plan must be fully self-contained because exiting plan mode clears context. The PR groups plus the Execution Instructions section must include everything needed to create the PRs from scratch — the agent executing these steps will have NO other context beyond this plan text.
+
 The user can review, modify, or remove groups before approving. Once the user approves the plan, exit plan mode and only execute on the PR groups that remain in the approved plan.
 
-### 5. Create Pull Requests
+### 5. Execute Approved Plan
 
-For each approved group that remains in the plan:
+Execute the PR groups from the approved plan using the Execution Instructions at the bottom of the plan. The plan is self-contained — do not rely on any context from prior steps.
+
+For each PR group that remains in the approved plan:
 
 #### A. Get PR Details from User
 - **PR Title** (suggest from commits, allow editing)
