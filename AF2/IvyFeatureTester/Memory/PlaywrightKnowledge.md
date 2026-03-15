@@ -4,6 +4,7 @@
 
 - Ivy apps are .NET web apps started with `dotnet run -- --port <port>`
 - The frontend client is in `src/frontend/` and built with `npm run build` into `src/frontend/dist/`. These assets are embedded into the Ivy.dll via `<EmbeddedResource>`. If testing a commit that changed frontend `.ts` files, you MUST rebuild the frontend (`cd src/frontend && npm run build`) before running the dotnet project, otherwise the old bundled JS is served.
+- If `npm run build` fails due to pre-existing TS errors in unrelated files, run vite directly: `node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build` — this skips tsc and still produces a working bundle.
 - The server prints `Ivy is running on http://localhost:<port>` when ready
 - Apps are decorated with `[App(icon: Icons.X, path: ["Apps"])]` and inherit `ViewBase`
 - The `Build()` method returns the UI tree
@@ -30,7 +31,9 @@
 - `Switch` — toggle input, configured with `.Label()`
 - `Button` — click handler, configured with `.Icon()`, `.Variant()`, `.Disabled()`
 - `Badge` — status label with variant (Destructive, Warning, Success, Info, Secondary)
-- `Card` — container card component
+- `Card` — container card component. Note: Card supports pipe `|` for children but Text elements (H3, P) added directly as Card children may not render; use `Layout.Vertical()` inside Card for mixed content
+- `Json` — displays formatted JSON with syntax highlighting and collapsible tree. Constructors: `Json(JsonNode)`, `Json(object)` (auto-serializes), `Json(string)`. Props: `Expanded` (null=collapsed, N=depth, -1=fully expanded). Default is collapsed — use `{ Expanded = -1 }` for testing to make content visible
+- `Xml` — displays formatted XML with syntax highlighting and collapsible tree. Constructors: `Xml(XObject)`, `Xml(string)`. Props: `Expanded` (null=collapsed, 0=collapsed, N=depth, -1=fully expanded). Same behavior as Json widget. `.TestId()` does NOT render `data-testid` in the DOM — use text-based or heading-relative locators instead
 - `Toast` — notification via `IClientProvider.Toast(message, type)`
 - State bindings: `state.ToSliderInput()`, `state.ToSwitchInput()`
 
@@ -137,9 +140,20 @@
 
 ## Ivy App Construction
 
+- `ViewBase.Build()` is `public override`, NOT `protected override` — using `protected` causes CS0507
 - Ivy apps MUST have a parameterless constructor — `AppDescriptor.CreateApp()` uses `Activator.CreateInstance` without DI
 - Do NOT use primary constructor injection like `MyApp(IClientProvider client) : ViewBase` — causes `MissingMethodException` at runtime
 - Instead, use `var client = UseService<IClientProvider>()` inside the `Build()` method
+
+## SelectInput Slider Variant
+
+- `state.ToSelectInput(options).Slider()` renders a discrete range slider using Radix UI `<Slider>` with `role="slider"`
+- Use `page.getByRole('slider')` to locate; keyboard interaction with ArrowRight/ArrowLeft (step), Home/End (min/max)
+- The slider fires `OnChange` on value commit (not during drag), providing the selected option value
+- End labels (first/last option) and current value label are rendered below the track
+- The slider shows a numeric index above the thumb (Radix built-in) — this is cosmetic, not the option label
+- Does NOT support `selectMany` — logs a warning and falls back to single-select
+- Works with string options (`.ToOptions()`), enum options (auto-generated), and supports Disabled/Density
 
 ## Card Component
 
@@ -162,6 +176,14 @@
 - `state.ToSelectInput(options).Variant(SelectInputVariants.Toggle)` with string arrays renders radio buttons — use `getByRole("radio", { name: "OptionName" })`.
 - `state.ToSelectInput([new Option<T>("Label", Value), ...])` (without Toggle variant) renders as a dropdown with `role="combobox"` — click to open, then `getByRole("option", { name: "Label" }).click()` to select
 - `.ToTable()` on anonymous object collections renders as a standard HTML `<table>` — buttons in table cells are locatable via `page.locator("table button")`
+
+## DateRangeInput (ToDateRangeInput) Calendar Popover
+
+- `state.ToDateRangeInput()` renders as a `<button data-slot="calendar">` trigger with a two-month calendar popover and preset shortcuts (Today, Yesterday, Last 7 Days, Last 30 Days, etc.)
+- The `data-testid` attribute (from `.TestId()`) is placed directly on the trigger button itself, NOT on a wrapper div. So `page.locator('[data-testid="my-id"]')` IS the button — do NOT look for a child `button` inside it.
+- **Date selection in range mode**: After clicking the start date, react-day-picker disables dates before the start. For reliable testing, use the sidebar presets (e.g., `page.getByText('Last 7 Days', { exact: true }).click()`) instead of clicking individual calendar days.
+- **Placeholders**: Supports `Placeholder`, `StartPlaceholder`, `EndPlaceholder`. When `StartPlaceholder`/`EndPlaceholder` are set, shows `"{start} - {end}"` format. Falls back to default `"Pick a date range"` for missing sides.
+- **Card constructors**: `Card.Default(content)` does NOT exist. Use `new Card().Content(widget)` or `new Card().Header("title").Content(widget)` pattern instead.
 
 ## DateInput (ToDateInput) Calendar Popover
 
@@ -203,7 +225,31 @@
 - This is a framework rendering bug — `Layout.Grid(N)` does not produce a proper CSS grid with N columns
 - Workaround: use `Layout.Horizontal()` with equal-width children, or `Layout.Grid().Columns(N)` (see ReversiForge.AI entry — `.Columns(8)` worked)
 
+## Camera/Media Testing
+
+- Chromium's `--use-fake-device-for-media-stream` and `--use-fake-ui-for-media-stream` flags produce video streams with `videoWidth=0` and `videoHeight=0` in headless mode
+- This means `canvas.toBlob()` after drawing from a 0x0 video produces no valid blob, preventing actual file uploads
+- `canvas.captureStream()` in `addInitScript` as a getUserMedia mock also doesn't produce valid dimensions
+- The CameraInput widget's state machine (idle -> active -> captured) CAN be tested: clicking the placeholder starts the camera, clicking Capture shows the Retake button
+- Upload-dependent assertions (e.g., file upload status changes on the backend) cannot be verified with fake cameras — test the UI state transitions instead
+- Set Playwright config: `permissions: ['camera']` and `launchOptions.args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']`
+
+## Ivy Upload/FileUpload Patterns
+
+- `UseUpload(MemoryStreamUploadHandler.Create(photoState), defaultContentType: "image/png")` creates an upload context
+- `FileUpload<byte[]>` has: FileName, Length, Content, Status (Pending/Loading/Aborted/Failed/Finished)
+- `FileUploadStatus` values: Pending, Aborted, Loading, Failed, Finished (NO `InProgress`)
+- `Callout.Success("message")` is the correct static factory — `new Callout("msg", CalloutVariant.Success)` uses named params: `new Callout(description: "msg", variant: CalloutVariant.Success)`
+
 ## Run History
+
+### 2026-03-13 — CameraInput Widget
+- Camera input widget with idle/active/captured states, upload via MemoryStreamUploadHandler
+- MUST rebuild frontend (`cd src/frontend && npm run build`) when testing commits with new frontend widgets — otherwise shows "Unknown component type: Ivy.CameraInput"
+- `TextBuilder` does NOT support `.TestId()` — use `Badge` or `Card` wrapper for testable text
+- `Icons.AlertTriangle` renamed to `Icons.TriangleAlert` in Lucide
+- Fake camera in headless Chromium produces 0x0 video — upload tests must verify UI state machine instead of backend state
+- 21 tests, 5 fix rounds (frontend rebuild, API fixes, fake camera workarounds), all passed
 
 ### 2026-03-13 — Test.CSSGradientTextGenerator
 - Gradient text generator with text input, color pickers, angle/font-size sliders, live preview, and CSS code output
@@ -535,3 +581,19 @@
 - **`taskkill` in bash on Windows**: `spawn('taskkill', ['/pid', ...], { shell: true })` fails with "Invalid argument/option" because bash interprets `/f` as a path. Use `spawn('cmd', ['/c', 'taskkill', '/pid', pid, '/f', '/t'], { shell: false })` instead
 - **`beforeAll` timeout for recompilation**: When C# source is modified between test runs, `dotnet run` triggers a rebuild that can exceed the 30s default timeout. Always use `testInfo.setTimeout(120000)` in `beforeAll`
 - 7 tests passed after 3 fix rounds (2 project fixes: shareable URL format + null ref guard), logs clean
+
+### 2026-03-13 — AspectRatio (WidgetBase property)
+- **`data-testid` on Box/Card widgets is NOT reliably found by `[data-testid="..."]` selectors** in Playwright. Use text-based locators (`getByText`, `getByRole`) and `page.evaluate()` with DOM tree walking to inspect computed CSS properties instead
+- **`baseURL` in `playwright.config.ts` is evaluated at import time**, before `beforeAll` runs. When using dynamic ports, use full URLs in `page.goto()` calls: `page.goto(\`http://localhost:${port}/app?chrome=false\`)` instead of relative paths
+- **Verifying CSS properties via `page.evaluate()`**: Walk the DOM tree from text content upward to find elements with specific computed styles (e.g., `window.getComputedStyle(el).aspectRatio`). This is more reliable than data-testid selectors for layout/style verification
+- **Flex stretch overrides `aspect-ratio`**: In `Layout.Horizontal()`, flex `align-items: stretch` causes all children to share the tallest height, partially overriding the visual aspect ratio. This is standard CSS behavior. In non-flex contexts, aspect-ratio works perfectly
+- 6 tests passed after 2 fix rounds (test fixes only: URL pattern + frontend rebuild), no project fixes needed
+
+### 2026-03-13 — FirstDayOfWeek (DateTimeInput & DateRangeInput)
+- **CRITICAL: C# `DayOfWeek` enum serialized as string over WebSocket**: `DayOfWeek.Monday` becomes `"firstDayOfWeek":"Monday"` in WebSocket messages, but react-day-picker's `weekStartsOn` expects numeric `0|1|2|3|4|5|6`. The string value causes `RangeError: Invalid time value` crash. This is a backend serialization bug — needs `[JsonConverter]` for integer serialization or using `int` instead of `DayOfWeek`
+- **TypeScript type mismatch**: `firstDayOfWeek?: number` in DateTimeInputWidget/types.ts and DateRangeInputWidget.tsx doesn't match react-day-picker's `weekStartsOn` union type `0|1|2|3|4|5|6` — causes `tsc -b` build failure
+- **`UseState<(DateOnly, DateOnly)?>()` incompatible with `.ToDateRangeInput()`**: Nullable tuple throws "DateRangeInput can only be used with a tuple of two elements" at runtime. Use non-nullable tuple `UseState<(DateOnly, DateOnly)>()` instead
+- **Calendar crash with pre-selected DateOnly values after frontend rebuild**: Calendars with non-null `DateOnly` state crash with `RangeError: Invalid time value` — separate issue from FirstDayOfWeek, likely date serialization format incompatibility with date-fns v4 / react-day-picker v9.11.1
+- **WebSocket message interception for debugging**: `page.on("websocket", ws => ws.on("framereceived", ...))` captures all WS messages — useful for verifying backend→frontend prop serialization when UI crashes prevent visual inspection
+- **Calendar weekday header selectors**: `table thead th` inside `div[data-slot="calendar"]` contains weekday abbreviations (Su, Mo, Tu, etc.) — useful for verifying first-day-of-week rendering
+- FAILED — feature completely broken due to enum serialization bug. 5 fix rounds (locators, frontend rebuild, TS types, nullable dates, WS interception). No project fixes possible (root cause is in Ivy Framework serialization layer)
