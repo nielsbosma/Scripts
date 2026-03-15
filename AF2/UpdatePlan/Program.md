@@ -24,15 +24,27 @@ Args contains the path to a plan file. Resolve it to an absolute path.
 - Look for lines prefixed with `>>` — these are user comments/instructions
 - If no `>>` lines exist, report "No comments found" and stop
 
-### 4. Apply Comments
+### 4. Extract and Answer Questions
 
-- Incorporate the intent of each `>>` comment into the plan
-- Remove all `>>` lines after applying them
+- Check each `>>` line to determine if it's a **question** (contains `?`, or starts with question words like "How", "Why", "What", "Is", "Can", "Should", "Does", "Will", "Are", "Where", "When", "Which")
+- For each question:
+  1. Research the answer by reading relevant source files, documentation, and existing patterns in the codebase
+  2. Format as a bullet with the question, followed by a nested `**Answer:**` paragraph
+- Collect all answered questions into a `## Questions` section
+- Place the `## Questions` section directly after the YAML frontmatter, before `## Problem` (or the first existing heading)
+- If a `## Questions` section already exists, merge new questions into it (avoid duplicates)
+- If a question truly cannot be answered from available sources, mark it with `**Answer:** Unknown — requires user input.` so it's clear which questions remain open
+- Questions are NOT incorporated into the plan body — they stay in `## Questions` as a reference section
+
+### 5. Apply Comments
+
+- Incorporate the intent of each non-question `>>` comment into the plan
+- Remove all `>>` lines after applying them (both questions and non-questions)
 - Read relevant source files if needed to improve accuracy
 - Preserve the plan's markdown structure, frontmatter, and detail level
 - The updated plan must be at least as comprehensive as the original
 
-### 5. Save Updated Plan
+### 6. Save Updated Plan
 
 - Version the filename: append `-v2`, or increment existing version (`-v2` → `-v3`, etc.)
 - Write the updated plan to `D:\Repos\_Ivy\.plans\` with the new versioned filename
