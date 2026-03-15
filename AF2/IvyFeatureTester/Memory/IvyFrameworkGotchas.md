@@ -266,6 +266,58 @@ data.map(d => ({ value: record[valKey] ?? d.measure, name: record[nameKey] ?? d.
 
 📝 **Another instance of the DataKey camelCase mismatch pattern.** Always use case-insensitive lookups when mapping C#-serialized data to frontend chart properties.
 
+## Enum Display Names (PascalCase Split)
+
+### Enum values are auto-split for display labels
+Ivy's `EnumHelper.GetDescription()` (used by `typeof(MyEnum).ToOptions()`) calls `StringHelper.SplitPascalCase()` on enum member names.
+
+- `SciFi` → "Sci Fi"
+- `ExtraLarge` → "Extra Large"
+- `OnlyChoice` → "Only Choice"
+
+❌ **In Playwright tests, don't match enum member name directly**: `getByText('SciFi')` won't find the label
+✅ **Match the split display name**: `getByText('Sci Fi')` or `locator('label').filter({ hasText: 'Sci Fi' })`
+
+📝 **Note**: `enum.ToString()` still returns the raw member name (e.g., `SciFi`), so state feedback text like `$"Selected: {state.Value}"` will show `SciFi`, not `Sci Fi`.
+
+### SelectInput State Binding
+❌ **`new SelectInput<T>(options).Value(x).OnChange(handler)`** — `Value()` and `OnChange()` are not available as extension methods on `SelectInputBase`
+✅ **Use state binding**: `state.ToSelectInput(options).Radio()` — state changes are automatic
+✅ **For side effects on change**: Use `UseEffect(() => { ... }, state)` to react to state changes
+
+## DayOfWeek Enum Serialization (FIXED)
+
+### FirstDayOfWeek Prop — String vs Number Mismatch
+**Problem**: C# `DayOfWeek` enum serializes as string ("Monday", "Sunday", etc.) via `JsonEnumConverter`, but the frontend `react-day-picker` `weekStartsOn` prop expects a number (0-6).
+
+❌ **Before fix**: Setting `.FirstDayOfWeek(DayOfWeek.Monday)` crashed the calendar with `RangeError: Invalid time value`
+✅ **After fix**: Added `resolveDayOfWeek()` in `DateTimeInputWidget.tsx` and `DateRangeInputWidget.tsx` to convert string enum names to numeric values
+
+📝 **Pattern**: Any C# enum prop that the frontend expects as a number needs a string-to-number conversion on the frontend side, because Ivy's `JsonEnumConverter` always serializes enums as their string name (e.g., `"Monday"` not `1`).
+
+## react-day-picker DOM Structure
+
+### Calendar uses flex layout, NOT `<table>`
+❌ **`page.locator("table thead th")`** — react-day-picker v9 does NOT use HTML tables
+✅ **`page.locator(".rdp-weekdays .rdp-weekday")`** — use RDP CSS classes to find weekday headers
+✅ **`page.locator(".rdp-day button")`** — use for clicking day buttons
+
+## Badge TestId Not Rendered in DOM
+
+### TestId on Badge does NOT produce data-testid attribute
+❌ **`new Badge("text").TestId("my-id")`** — compiles but does NOT render `data-testid` in the DOM
+✅ **Use `getByText()` for text content verification** — more reliable than TestId on badges
+✅ **Buttons DO render data-testid** — `getByTestId()` works for buttons
+
+📝 **Why**: Badge may not extend WidgetBase in a way that enables data-testid rendering in the frontend widget. Buttons use `<button>` elements that receive the attribute.
+
+## Float Formatting Locale Issues
+
+### C# float formatting uses system locale
+❌ **`$"{volume.Value:F2}"`** — on European locales produces `"0,50"` instead of `"0.50"`
+✅ **`volume.Value.ToString("F2", CultureInfo.InvariantCulture)`** — always produces dot separator
+📝 **Why**: The Ivy server runs with the system's locale. On Windows with European regional settings, `float.ToString("F2")` uses comma as decimal separator. Always use `CultureInfo.InvariantCulture` when the formatted text needs to be matched in Playwright tests.
+
 ## Future Gotchas to Document
 
 As we encounter more issues during feature testing, add them here with:

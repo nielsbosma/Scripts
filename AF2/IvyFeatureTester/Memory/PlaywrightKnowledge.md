@@ -69,6 +69,8 @@
 4. **Output validation** — check generated/computed values appear correctly
 
 ### Gotchas & Tips
+- **Xml/Json widget toggle buttons use `role="button"`** — the expandable tree nodes in Xml and Json widgets render as `<div role="button">` elements. This means `getByRole("button", { name: "0" })` can match both actual `<button>` elements AND XML toggle nodes whose tag text contains "0". Always use `{ exact: true }` when targeting real buttons on pages that also contain Xml/Json widgets.
+- **Ivy layout doesn't render widgets as direct DOM siblings of headings** — `h2.nextElementSibling` won't contain the widget that follows the heading in the Ivy tree. Use full-page `body` text assertions or specific locators instead of DOM sibling traversal.
 - Ivy apps may take a few seconds to start; 30s timeout is safe
 - Use `shell: true` in spawn options on Windows
 - Password/random generation tests: compare two outputs rather than asserting exact values
@@ -629,14 +631,12 @@ This is different from `[ExternalWidget]` "Unknown component type" errors which 
 - **Flex stretch overrides `aspect-ratio`**: In `Layout.Horizontal()`, flex `align-items: stretch` causes all children to share the tallest height, partially overriding the visual aspect ratio. This is standard CSS behavior. In non-flex contexts, aspect-ratio works perfectly
 - 6 tests passed after 2 fix rounds (test fixes only: URL pattern + frontend rebuild), no project fixes needed
 
-### 2026-03-13 — FirstDayOfWeek (DateTimeInput & DateRangeInput)
-- **CRITICAL: C# `DayOfWeek` enum serialized as string over WebSocket**: `DayOfWeek.Monday` becomes `"firstDayOfWeek":"Monday"` in WebSocket messages, but react-day-picker's `weekStartsOn` expects numeric `0|1|2|3|4|5|6`. The string value causes `RangeError: Invalid time value` crash. This is a backend serialization bug — needs `[JsonConverter]` for integer serialization or using `int` instead of `DayOfWeek`
-- **TypeScript type mismatch**: `firstDayOfWeek?: number` in DateTimeInputWidget/types.ts and DateRangeInputWidget.tsx doesn't match react-day-picker's `weekStartsOn` union type `0|1|2|3|4|5|6` — causes `tsc -b` build failure
-- **`UseState<(DateOnly, DateOnly)?>()` incompatible with `.ToDateRangeInput()`**: Nullable tuple throws "DateRangeInput can only be used with a tuple of two elements" at runtime. Use non-nullable tuple `UseState<(DateOnly, DateOnly)>()` instead
-- **Calendar crash with pre-selected DateOnly values after frontend rebuild**: Calendars with non-null `DateOnly` state crash with `RangeError: Invalid time value` — separate issue from FirstDayOfWeek, likely date serialization format incompatibility with date-fns v4 / react-day-picker v9.11.1
-- **WebSocket message interception for debugging**: `page.on("websocket", ws => ws.on("framereceived", ...))` captures all WS messages — useful for verifying backend→frontend prop serialization when UI crashes prevent visual inspection
-- **Calendar weekday header selectors**: `table thead th` inside `div[data-slot="calendar"]` contains weekday abbreviations (Su, Mo, Tu, etc.) — useful for verifying first-day-of-week rendering
-- FAILED — feature completely broken due to enum serialization bug. 5 fix rounds (locators, frontend rebuild, TS types, nullable dates, WS interception). No project fixes possible (root cause is in Ivy Framework serialization layer)
+### 2026-03-13/15 — FirstDayOfWeek (DateTimeInput & DateRangeInput) — FIXED
+- **DayOfWeek enum string-to-number conversion (FIXED)**: C# `DayOfWeek.Monday` serializes as `"Monday"` (string) but react-day-picker `weekStartsOn` expects numeric `0-6`. Fix: Added `resolveDayOfWeek()` in `DateTimeInputWidget.tsx` and `DateRangeInputWidget.tsx` to map string names to numbers
+- **Calendar weekday header selectors**: react-day-picker v9 uses flex layout, NOT `<table>` elements. Use `.rdp-weekdays .rdp-weekday` for weekday headers, `.rdp-day button` for day buttons
+- **`UseState<(DateOnly, DateOnly)?>()` incompatible with `.ToDateRangeInput()`**: Nullable tuple throws error. Use non-nullable `UseState<(DateOnly, DateOnly)>()` instead
+- **Badge TestId may not be found by `[data-testid]` locators**: Use `getByText()` for more reliable Badge content verification
+- PASSED after bug fix — 8/8 tests, 3 fix rounds (selectors, serialization fix, text-based locators)
 
 ### 2026-03-13 — Test.ScatterChart
 - **Frontend TypeScript errors block widget rendering**: ScatterChart widget compiles in C# but displays "Unknown component type: Ivy.ScatterChart" due to TypeScript compilation errors in ScatterChartWidget.tsx (4 errors: unused variables, type mismatch on XAxisProps[])
