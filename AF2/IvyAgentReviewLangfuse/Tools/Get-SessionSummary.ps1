@@ -89,24 +89,31 @@ foreach ($traceFolder in $traceFolders) {
                 }
             }
 
-            # Message events
+            # Message events - check both input.message (old) and metadata.message (new)
+            $message = $null
             if ($input.message -and $input.message.'$type') {
-                switch ($input.message.'$type') {
+                $message = $input.message
+            } elseif ($json.metadata -and $json.metadata.message -and $json.metadata.message.'$type') {
+                $message = $json.metadata.message
+            }
+
+            if ($message) {
+                switch ($message.'$type') {
                     'BuildProjectResultMessage' {
                         $stats.BuildAttempts++
-                        if ($input.message.success -ne $true) { $stats.BuildFailures++ }
+                        if ($message.success -ne $true) { $stats.BuildFailures++ }
                     }
                     'WriteFileMessage' {
                         $stats.WriteFileCount++
-                        if ($input.message.filePath) { $stats.UniqueFilesWritten.Add($input.message.filePath) | Out-Null }
+                        if ($message.filePath) { $stats.UniqueFilesWritten.Add($message.filePath) | Out-Null }
                     }
                     'ReadFileMessage' { $stats.ReadFileCount++ }
                     'BashMessage' { $stats.BashCount++ }
-                    'BashResultMessage' { if ($input.message.success -ne $true) { $stats.BashFailures++ } }
+                    'BashResultMessage' { if ($message.success -ne $true) { $stats.BashFailures++ } }
                     'GrepMessage' { $stats.GrepCount++ }
                     'GlobMessage' { $stats.GlobCount++ }
                     'LspMessage' { $stats.LspCount++ }
-                    'WorkflowStartMessage' { if ($input.message.workflowName) { $stats.WorkflowNames.Add($input.message.workflowName) | Out-Null } }
+                    'WorkflowStartMessage' { if ($message.workflowName) { $stats.WorkflowNames.Add($message.workflowName) | Out-Null } }
                     'ToolFeedback' { $stats.ToolFeedbackCount++ }
                 }
             }

@@ -25,24 +25,32 @@ foreach ($traceFolder in $traceFolders) {
     foreach ($file in $obsFiles) {
         try {
             $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
-            $input = $json.input
-            if (-not $input -or -not $input.message -or -not $input.message.'$type') { continue }
 
-            $msgType = $input.message.'$type'
+            # Check both input.message (old format) and metadata.message (new format)
+            $message = $null
+            if ($json.input -and $json.input.message) {
+                $message = $json.input.message
+            } elseif ($json.metadata -and $json.metadata.message) {
+                $message = $json.metadata.message
+            }
+
+            if (-not $message -or -not $message.'$type') { continue }
+
+            $msgType = $message.'$type'
 
             if ($msgType -eq 'WriteFileMessage') {
                 $pendingWrites += [PSCustomObject]@{
                     ObservationFile = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
-                    FilePath = $input.message.filePath
+                    FilePath = $message.filePath
                 }
             }
             elseif ($msgType -eq 'BuildProjectResultMessage') {
                 $globalBuildNum++
-                $success = $input.message.success -eq $true
+                $success = $message.success -eq $true
                 $errors = @()
 
-                if (-not $success -and $input.message.buildResults) {
-                    foreach ($br in $input.message.buildResults) {
+                if (-not $success -and $message.buildResults) {
+                    foreach ($br in $message.buildResults) {
                         $relPath = $br.relativePath
                         if ($br.buildErrors) {
                             foreach ($err in $br.buildErrors) {

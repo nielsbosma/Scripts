@@ -41,7 +41,7 @@ $args | Set-Content $logFile
 Write-Host "Log file: $logFile"
 
 $workDir = (Get-Location).Path
-$promptFile = PrepareFirmware $PSScriptRoot $logFile @{
+$promptFile = PrepareFirmware $PSScriptRoot $logFile $programFolder @{
     Args = $args
     WorkDir = $workDir
     SessionId = $sessionId

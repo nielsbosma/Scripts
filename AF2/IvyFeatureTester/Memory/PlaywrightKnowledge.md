@@ -18,7 +18,7 @@
 - Use ProjectReference to local Ivy: `<ProjectReference Include="D:\Repos\_Ivy\Ivy-Framework\src\Ivy\Ivy.csproj" />`
 - The csproj needs `<Nullable>enable</Nullable>` to avoid CS8632 warnings
 - `ButtonVariant` values: Primary, Destructive, Outline, Secondary, Success, Warning, Info, Ghost, Link (NO `Default`)
-- `TextBuilder` does NOT support `.TestId()` — put TestId on cards/layouts/buttons instead
+- `Card` has no `.Default()` method — use `new Card(content)` or `Layout.Vertical()` containers instead
 - `Icons` enum: use PascalCase Lucide icon names. Not all names exist (e.g. `AlignCenter` doesn't exist, use `AlignCenterHorizontal`). Lucide renamed some icons: `AlertTriangle` → `TriangleAlert`
 - `AppContext` is ambiguous with `System.AppContext` — always use `Ivy.AppContext` in standalone test projects (e.g. `UseService<Ivy.AppContext>()`)
 - For `IDisposable` return in `UseEffect`, use `System.Reactive.Disposables.Disposable.Empty` (available via Ivy's dependency on System.Reactive)
@@ -44,6 +44,7 @@
 - Use `package.json` with `@playwright/test` dependency
 - `playwright.config.ts` targets Chromium only, single worker, no retries
 - Config uses `process.env.APP_PORT` for base URL
+- **Viewport configuration**: Use `{ width: 1920, height: 1920 }` for square screenshots that capture sufficient page content without being excessively tall. Must be set in BOTH `use` and `projects[0].use` to override device preset defaults (e.g., `...devices['Desktop Chrome']` sets 1280x720 which is too short)
 
 ### App Lifecycle in Tests
 - `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
@@ -58,6 +59,8 @@
 - Use `page.locator("code")` for inline code elements
 - Use `.first()` when multiple matches are possible
 - Use `waitFor({ state: "visible", timeout: 5000 })` for async content
+- **Flexible text matching**: When matching formatted values (currency, percentages), use flexible regex patterns like `/Value:.*50.*200/` instead of strict patterns like `/Value: \$50\.00 - \$200\.00/` to handle formatting variations
+- **Heading role conflicts**: `getByRole('heading', { name: 'Text' })` can match multiple headings if names overlap (e.g., "Percent Format" matches both "Currency & Percent Formatting" H1 and "Percent Format" H3). Always use `{ exact: true }` when heading names are substrings of other headings
 
 ### Common Test Categories
 1. **Visibility tests** — verify UI elements render correctly
@@ -89,6 +92,7 @@
 - `new Card(content, header: Text.H3("Title"))` — the card header text (e.g., "Monthly Revenue") will match `getByText()` along with any content containing the same substring (e.g., "Total Monthly Revenue:"), causing strict mode violations. Always use `getByRole("heading", { name: "Title" })` for card headers
 - `new Card(content).Title("X")` — Card `.Title()` does NOT render as an HTML heading element (`<h1>`-`<h6>`), so `getByRole("heading", { name: "X" })` will fail. Use `getByText("X", { exact: true }).first()` instead. Only explicit `Text.H2()`/`Text.H3()` passed as card header render as headings.
 - **NumberInput** (`state.ToNumberInput()`) renders as a regular text `<input>` in the DOM, NOT `<input type="number">`. `page.locator('input[type="number"]')` will find nothing. Use `page.locator('input[value="200"]')` to locate by current value, or find inputs relative to their label text.
+- **NumberRangeInput** (`state.ToNumberRangeInput()`) renders as a dual-handle slider with `role="slider"` attributes (2 sliders per range input for lower/upper bounds). Supports currency formatting (`.ToMoneyRangeInput()`), percent formatting, prefix/suffix (text and icons), and keyboard navigation. Range constraints (lower ≤ upper) are enforced automatically.
 - **CodeInput copy buttons**: `.ShowCopyButton()` and code editors add `aria-label="Copy to clipboard"` icon buttons. Combined with explicit "Copy" `Button` widgets, `getByRole("button", { name: "Copy" })` may match multiple elements — always use `{ exact: true }` for the explicit Copy button.
 - **Webhooks require state parameter**: Ivy webhook URLs require an internal `state` query parameter. Server-side `HttpClient` calls to `webhook.BaseUrl` without this parameter return 400 "The 'state' query parameter is required." — Test Endpoint features using server-side HTTP calls to webhooks will fail.
 - `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
@@ -154,6 +158,24 @@
 - The slider shows a numeric index above the thumb (Radix built-in) — this is cosmetic, not the option label
 - Does NOT support `selectMany` — logs a warning and falls back to single-select
 - Works with string options (`.ToOptions()`), enum options (auto-generated), and supports Disabled/Density
+
+## Ivy Hooks Rules (Enforced by Ivy.Analyser)
+
+- **IVYHOOK005**: ALL Ivy hooks (`UseState`, `UseEffect`, `UseService`, etc.) MUST be called at the very top of the `Build()` method, before any other statements or logic
+- Hooks cannot be called conditionally or after value extraction — they must be the first lines in `Build()`
+- Correct pattern:
+  ```csharp
+  public override object? Build() {
+      // All hooks first
+      var state1 = UseState<int>(() => 0);
+      var state2 = UseState<string>(() => "");
+      var service = UseService<IClientProvider>();
+
+      // Then other logic
+      var value = state1.Value * 2;
+      return Layout.Vertical() | ...;
+  }
+  ```
 
 ## Card Component
 
@@ -240,6 +262,24 @@
 - `FileUpload<byte[]>` has: FileName, Length, Content, Status (Pending/Loading/Aborted/Failed/Finished)
 - `FileUploadStatus` values: Pending, Aborted, Loading, Failed, Finished (NO `InProgress`)
 - `Callout.Success("message")` is the correct static factory — `new Callout("msg", CalloutVariant.Success)` uses named params: `new Callout(description: "msg", variant: CalloutVariant.Success)`
+
+## Frontend Build Issues
+
+### Unknown Component Type Errors
+
+When an Ivy app displays "Unknown component type: Ivy.WidgetName" instead of rendering a widget:
+
+1. **Check frontend build status**: The widget may have TypeScript compilation errors preventing the frontend bundle from building
+2. **Rebuild frontend**: Run `cd D:\Repos\_Ivy\Ivy-Framework\src\frontend && npm run build` to see compilation errors
+3. **Common causes**:
+   - Unused variables in the TypeScript widget implementation
+   - Type mismatches (e.g., XAxisProps[] not compatible with expected interface)
+   - Missing imports or exports in the frontend code
+   - Widget not registered in the frontend widget registry
+4. **Verification**: A successful frontend build is required before testing any new or modified widgets
+5. **Note**: The C# backend can compile successfully while the TypeScript frontend fails, causing this error
+
+This is different from `[ExternalWidget]` "Unknown component type" errors which are Framework bundle serving issues.
 
 ## Run History
 
@@ -597,3 +637,23 @@
 - **WebSocket message interception for debugging**: `page.on("websocket", ws => ws.on("framereceived", ...))` captures all WS messages — useful for verifying backend→frontend prop serialization when UI crashes prevent visual inspection
 - **Calendar weekday header selectors**: `table thead th` inside `div[data-slot="calendar"]` contains weekday abbreviations (Su, Mo, Tu, etc.) — useful for verifying first-day-of-week rendering
 - FAILED — feature completely broken due to enum serialization bug. 5 fix rounds (locators, frontend rebuild, TS types, nullable dates, WS interception). No project fixes possible (root cause is in Ivy Framework serialization layer)
+
+### 2026-03-13 — Test.ScatterChart
+- **Frontend TypeScript errors block widget rendering**: ScatterChart widget compiles in C# but displays "Unknown component type: Ivy.ScatterChart" due to TypeScript compilation errors in ScatterChartWidget.tsx (4 errors: unused variables, type mismatch on XAxisProps[])
+- **Frontend build verification is critical**: Always verify `cd src/frontend && npm run build` succeeds before testing widgets, especially newly added ones
+- **"Unknown component type" diagnostic approach**: When seeing this error, check frontend compilation first before investigating test code or backend API
+- **BadgeVariant has no Default value**: Use `BadgeVariant.Primary` instead (values: Primary, Destructive, Outline, Secondary, Success, Warning, Info)
+- **Card has no Variant prop**: Card only has `HoverVariant` of type `CardHoverVariant`, not a general `Variant` property
+- **Expandable constructor requires both parameters**: `new Expandable(header, content)` not `.Content(content)` method
+- 0 tests executed (blocked by frontend issues), 5 comprehensive test apps and test suites created and ready, backend compiles successfully
+
+### 2026-03-15 — ExpressionNameHelper RadarChart Fix
+- **ECharts indicator labels are rendered on canvas, NOT in DOM text**: `page.innerText('body')` and `getByText()` cannot find chart axis/indicator labels. They are part of the ECharts canvas rendering
+- **Accessing ECharts option data via React fiber**: The echarts-for-react component stores the `option` prop (including `radar[].indicator[]`) in React fiber's `memoizedProps`. Access pattern:
+  1. Find a `<canvas>` element
+  2. Walk up to parent elements looking for `__reactFiber$` prefixed keys
+  3. Walk the fiber tree (`fiber.return`) until finding `memoizedProps.option.radar`
+  4. Extract `indicator[].name` from the radar config
+- **`__ec_instance__` and `_ec_` are NOT reliable**: These properties may not be set on the container div in echarts-for-react — the global `echarts.getInstanceByDom()` and `div[_echarts_instance_]` attribute selector both returned empty results
+- **Radar option.radar can be object or array**: When accessed via fiber, `radar` may be a single object rather than an array. Always normalize: `Array.isArray(data) ? data : [data]`
+- 5 tests passed, 4 test fix rounds (all ECharts detection), no project fixes, logs clean

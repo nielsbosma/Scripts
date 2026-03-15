@@ -231,7 +231,7 @@ $logFile = GetNextLogFile $programFolder
 $args | Set-Content $logFile
 Write-Host "Log file: $logFile"
 
-$promptFile = PrepareFirmware $PSScriptRoot $logFile @{ Args = $args; WorkDir = $workDir; SessionId = $sessionId }
+$promptFile = PrepareFirmware $PSScriptRoot $logFile $programFolder @{ Args = $args; WorkDir = $workDir; SessionId = $sessionId }
 
 Write-Host "Starting Agent..."
 Push-Location $programFolder

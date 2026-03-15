@@ -38,16 +38,26 @@ foreach ($traceFolder in $traceFolders) {
     $requests = @() # array of @{Index; Search; SearchType; MaxResults; Source; Matched}
     for ($i = 0; $i -lt $observations.Count; $i++) {
         $obs = $observations[$i]
-        # EVENT GetTypeInfoMessage with input.message.search or input.search
+        # EVENT GetTypeInfoMessage - check both input.message (old) and metadata.message (new)
         if ($obs.File.Name -match 'GetTypeInfo' -and -not ($obs.File.Name -match 'Result')) {
-            $search = $obs.Json.input.message.search
-            if (-not $search) { $search = $obs.Json.input.search }
+            $message = $null
+            if ($obs.Json.input -and $obs.Json.input.message) {
+                $message = $obs.Json.input.message
+            } elseif ($obs.Json.metadata -and $obs.Json.metadata.message) {
+                $message = $obs.Json.metadata.message
+            }
+
+            $search = $null
+            if ($message -and $message.search) {
+                $search = $message.search
+            } elseif ($obs.Json.input -and $obs.Json.input.search) {
+                $search = $obs.Json.input.search
+            }
+
             if ($search) {
-                $searchType = $obs.Json.input.message.searchType
-                if (-not $searchType) { $searchType = $obs.Json.input.searchType }
-                $maxResults = $obs.Json.input.message.maxResults
-                if (-not $maxResults) { $maxResults = $obs.Json.input.maxResults }
-                $messageId = $obs.Json.input.message.messageId
+                $searchType = if ($message) { $message.searchType } else { $obs.Json.input.searchType }
+                $maxResults = if ($message) { $message.maxResults } else { $obs.Json.input.maxResults }
+                $messageId = if ($message) { $message.messageId } else { $null }
                 $requests += [PSCustomObject]@{
                     Index      = $i
                     Search     = $search
@@ -111,12 +121,20 @@ foreach ($traceFolder in $traceFolders) {
         $obs = $observations[$i]
         $input = $obs.Json.input
         if (-not $input) { continue }
-        # Match both old format (input.toolName/input.response) and new format (input.message.$type=GetTypeInfoResultMessage)
+        # Match old format (input.toolName/input.response) and new format (input.message.$type or metadata.message.$type)
         $isOldFormat = ($input.toolName -eq 'GetTypeInfo' -and $input.response)
-        $isNewFormat = ($input.message -and $input.message.'$type' -eq 'GetTypeInfoResultMessage')
-        if (-not $isOldFormat -and -not $isNewFormat) { continue }
-        # Normalize: for new format, use input.message as the response data
-        $responseData = if ($isNewFormat) { $input.message } else { $input.response }
+        $isInputMsgFormat = ($input.message -and $input.message.'$type' -eq 'GetTypeInfoResultMessage')
+        $isMetadataMsgFormat = ($obs.Json.metadata -and $obs.Json.metadata.message -and $obs.Json.metadata.message.'$type' -eq 'GetTypeInfoResultMessage')
+        if (-not $isOldFormat -and -not $isInputMsgFormat -and -not $isMetadataMsgFormat) { continue }
+        # Normalize: extract response data
+        $responseData = $null
+        if ($isOldFormat) {
+            $responseData = $input.response
+        } elseif ($isInputMsgFormat) {
+            $responseData = $input.message
+        } elseif ($isMetadataMsgFormat) {
+            $responseData = $obs.Json.metadata.message
+        }
 
         $fileName = [System.IO.Path]::GetFileNameWithoutExtension($obs.File.Name)
 

@@ -25,13 +25,21 @@ foreach ($traceFolder in $traceFolders) {
     foreach ($file in $obsFiles) {
         try {
             $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
-            $input = $json.input
-            if (-not $input -or -not $input.message -or -not $input.message.'$type') { continue }
+
+            # Check both input.message (old format) and metadata.message (new format)
+            $message = $null
+            if ($json.input -and $json.input.message) {
+                $message = $json.input.message
+            } elseif ($json.metadata -and $json.metadata.message) {
+                $message = $json.metadata.message
+            }
+
+            if (-not $message -or -not $message.'$type') { continue }
 
             $time = Format-Time $json.startTime
             $obsName = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
-            $msgType = $input.message.'$type'
-            $msg = $input.message
+            $msgType = $message.'$type'
+            $msg = $message
 
             switch ($msgType) {
                 'WorkflowStartMessage' {

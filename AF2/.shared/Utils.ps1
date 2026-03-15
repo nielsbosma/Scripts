@@ -39,14 +39,18 @@ function PrepareFirmware {
     param(
         [string]$ScriptRoot,
         [string]$LogFile,
+        [string]$ProgramFolder,
         [hashtable]$Values = @{}
     )
 
     $header = ($Values.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Key): $($_.Value)" }) -join "`n"
 
-    $firmware = Get-Content "$ScriptRoot\.shared\Firmware.md" -Raw
+    $sharedFolder = Join-Path $ScriptRoot ".shared"
+    $firmware = Get-Content "$sharedFolder\Firmware.md" -Raw
     $firmware = $firmware.Replace("[HEADER]", $header)
     $firmware = $firmware.Replace("[LOGFILE]", $LogFile)
+    $firmware = $firmware.Replace("[PROGRAMFOLDER]", $ProgramFolder)
+    $firmware = $firmware.Replace("[SHAREDFOLDER]", $sharedFolder)
 
     $promptFile = [System.IO.Path]::GetTempFileName()
     Set-Content -Path $promptFile -Value $firmware -NoNewline
@@ -70,6 +74,54 @@ function GetLatestSessionId {
     }
 
     return ($lastLine | ConvertFrom-Json).sessionId
+}
+
+function InvokeOrOutputPrompt {
+    param(
+        [string]$ProgramFolder,
+        [string]$PromptFile,
+        [string]$Prompt,
+        [string]$LogFile,
+        [switch]$GetPrompt,
+        [switch]$GetTaskPrompt,
+        [string[]]$ExtraClaudeArgs = @()
+    )
+
+    if ($GetPrompt) {
+        Get-Content $PromptFile -Raw
+        Remove-Item $PromptFile
+        return
+    }
+
+    if ($GetTaskPrompt) {
+        $programMd = Join-Path $ProgramFolder "Program.md"
+        $content = if (Test-Path $programMd) { Get-Content $programMd -Raw } else { "(No Program.md found)" }
+        Remove-Item $PromptFile
+        Write-Output @"
+## Task: $([System.IO.Path]::GetFileName($ProgramFolder))
+
+**Working Directory:** $ProgramFolder
+**Log File:** $LogFile
+**Args:** $Prompt
+
+$content
+"@
+        return
+    }
+
+    Write-Host "Log file: $LogFile"
+    Write-Host "Starting Agent..."
+    Push-Location $ProgramFolder
+
+    $firmware = Get-Content $PromptFile -Raw
+    Remove-Item $PromptFile
+
+    $env:CLAUDECODE = $null
+    $env:CLAUDE_CODE_ENTRYPOINT = $null
+    claude --dangerously-skip-permissions @ExtraClaudeArgs -- $firmware
+
+    Pop-Location
+    return $false
 }
 
 function CollectArgs {

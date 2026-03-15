@@ -85,9 +85,16 @@ foreach ($traceFolder in $traceFolders) {
                 continue
             }
 
-            # Message-based events
-            if (-not $input.message -or -not $input.message.'$type') { continue }
-            $msgType = $input.message.'$type'
+            # Message-based events - check both input.message (old) and metadata.message (new)
+            $message = $null
+            if ($input.message -and $input.message.'$type') {
+                $message = $input.message
+            } elseif ($json.metadata -and $json.metadata.message -and $json.metadata.message.'$type') {
+                $message = $json.metadata.message
+            }
+
+            if (-not $message) { continue }
+            $msgType = $message.'$type'
 
             switch ($msgType) {
                 'WriteFileMessage' {
@@ -96,30 +103,30 @@ foreach ($traceFolder in $traceFolders) {
                         ObservationFile = $obsName
                         Time = $time
                         EventType = "WriteFile"
-                        Detail = $input.message.filePath
+                        Detail = $message.filePath
                         IsError = $false
                     }
                 }
                 'WriteFileResultMessage' {
-                    $success = $input.message.success -eq $true
+                    $success = $message.success -eq $true
                     if (-not $success) {
                         $results += [PSCustomObject]@{
                             TraceName = $traceFolder.Name
                             ObservationFile = $obsName
                             Time = $time
                             EventType = "WriteFile"
-                            Detail = "[FAIL] $($input.message.filePath)"
+                            Detail = "[FAIL] $($message.filePath)"
                             IsError = $true
                         }
                     }
                 }
                 'BuildProjectResultMessage' {
-                    $success = $input.message.success -eq $true
+                    $success = $message.success -eq $true
                     $detail = if ($success) { "OK" } else { "FAILED" }
 
-                    if (-not $success -and $input.message.buildResults) {
+                    if (-not $success -and $message.buildResults) {
                         $errorMsgs = @()
-                        foreach ($br in $input.message.buildResults) {
+                        foreach ($br in $message.buildResults) {
                             if ($br.buildErrors) {
                                 foreach ($err in $br.buildErrors) {
                                     $errorMsgs += "$($err.errorCode): $(Truncate $err.message 60)"
@@ -142,8 +149,8 @@ foreach ($traceFolder in $traceFolders) {
                     }
                 }
                 'ToolFeedback' {
-                    $fbTool = $input.message.toolName
-                    $fb = $input.message.feedback
+                    $fbTool = $message.toolName
+                    $fb = $message.feedback
                     $results += [PSCustomObject]@{
                         TraceName = $traceFolder.Name
                         ObservationFile = $obsName
