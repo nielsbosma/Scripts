@@ -585,3 +585,14 @@ This is different from `[ExternalWidget]` "Unknown component type" errors which 
 - **Card has no Variant prop**: Card only has `HoverVariant` of type `CardHoverVariant`, not a general `Variant` property
 - **Expandable constructor requires both parameters**: `new Expandable(header, content)` not `.Content(content)` method
 - 0 tests executed (blocked by frontend issues), 5 comprehensive test apps and test suites created and ready, backend compiles successfully
+
+### 2026-03-15 — ExpressionNameHelper RadarChart Fix
+- **ECharts indicator labels are rendered on canvas, NOT in DOM text**: `page.innerText('body')` and `getByText()` cannot find chart axis/indicator labels. They are part of the ECharts canvas rendering
+- **Accessing ECharts option data via React fiber**: The echarts-for-react component stores the `option` prop (including `radar[].indicator[]`) in React fiber's `memoizedProps`. Access pattern:
+  1. Find a `<canvas>` element
+  2. Walk up to parent elements looking for `__reactFiber$` prefixed keys
+  3. Walk the fiber tree (`fiber.return`) until finding `memoizedProps.option.radar`
+  4. Extract `indicator[].name` from the radar config
+- **`__ec_instance__` and `_ec_` are NOT reliable**: These properties may not be set on the container div in echarts-for-react — the global `echarts.getInstanceByDom()` and `div[_echarts_instance_]` attribute selector both returned empty results
+- **Radar option.radar can be object or array**: When accessed via fiber, `radar` may be a single object rather than an array. Always normalize: `Array.isArray(data) ? data : [data]`
+- 5 tests passed, 4 test fix rounds (all ECharts detection), no project fixes, logs clean

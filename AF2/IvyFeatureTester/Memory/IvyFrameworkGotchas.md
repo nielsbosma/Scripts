@@ -9,9 +9,10 @@ Common mistakes and issues encountered when working with the Ivy Framework durin
 - ✅ **Use**: `new Card(content)` or `Layout.Vertical()` containers
 
 ### TestId Support
-- ❌ **Not universal**: `.TestId()` only works on `WidgetBase` types
-- ❌ **Doesn't work on**: `TextBuilder`, `LayoutView`, and other non-widget types
-- ✅ **Workaround**: Put TestIds on actual widgets (inputs, buttons, cards), not on layouts or text
+- ✅ **Works on**: `WidgetBase` types AND `TextBuilder` (recently added)
+- ❌ **Doesn't work on**: `LayoutView` and other non-widget types
+- ✅ **Workaround**: Put TestIds on actual widgets (inputs, buttons, cards, text), not on layouts
+- 📝 **Testing tip**: `getByText()` is often more robust than `getByTestId()` for verifying visible text content
 
 ### Icons Enum
 - ❌ **Not all Lucide icons available**: Some expected names don't exist (e.g., `Icons.AlignCenter`)
@@ -123,6 +124,18 @@ await server.RunAsync();
 ❌ **Don't use `AppBase`** for test apps
 ✅ **Use `ViewBase`** - it's the correct base class for Ivy views
 
+### Badge.Color() Doesn't Exist
+❌ **`new Badge("text").Color(Colors.X)`** — `Color()` extension is for `CalendarEvent`, not `Badge`
+✅ **Use**: `new Badge("text")` with variant methods if available, or no color modifier
+
+### MemoryStreamUploadHandler.Create() Requires State
+❌ **`MemoryStreamUploadHandler.Create()`** — no zero-arg overload
+✅ **Use**: `MemoryStreamUploadHandler.Create(state)` where `state` is `IState<FileUpload<byte[]>?>`
+
+### Namespace Conflicts with External Widget Types
+❌ **Using namespace matching widget type name** (e.g., `namespace ScreenshotFeedback` when using `Ivy.Widgets.ScreenshotFeedback.ScreenshotFeedback`)
+✅ **Use different namespace**: e.g., `namespace ScreenshotFeedbackTest` to avoid `CS0118: 'X' is a namespace but is used like a type`
+
 ## Ivy.Analyser Integration
 
 ### Local Analyser Reference
@@ -213,6 +226,45 @@ To pass structured children to a widget on the frontend:
 
 ### WidgetRenderer.tsx File Casing Issue
 Git tracks this file as `widgetRenderer.tsx` (lowercase) but the file on disk is `WidgetRenderer.tsx` (PascalCase). Existing imports use lowercase (`@/widgets/widgetRenderer`). This pre-existing mismatch causes TS1261 errors when the file is modified. Use `npx vite build` directly to bypass the `tsc -b` check if needed.
+
+### Slot Content vs Title in Child Widgets (Calendar/Kanban)
+When a child widget (e.g. CalendarEvent) has no custom content children, `slots?.default?.[index]` still contains a rendered widget component (empty React Fragment). This is truthy, so any `event.content ? ... : event.title` check incorrectly takes the content branch and renders an empty div instead of the title.
+
+- Check `widgetNode.children && widgetNode.children.length > 0` before using slot content
+- `content: hasChildren ? (slots?.default?.[index] || null) : null`
+
+This pattern applies to any widget that uses the children/slots pattern and has a fallback text display.
+
+## FunnelChart DataKey CamelCase Mismatch
+
+### FunnelChartWidget.tsx Hardcoded Property Names
+**Problem**: `FunnelChartWidget.tsx` line 71 hardcoded `d.measure`/`d.dimension` for data mapping, which only works with `PieChartData` format. When `FunnelChartData` (with `Stage`/`Value` properties) is used via `ToFunnelChart()`, the serialized data has camelCase keys `stage`/`value` but the frontend looks for `measure`/`dimension`.
+
+❌ **Original code (broken for FunnelChartData):**
+```typescript
+data.map(d => ({ value: d.measure, name: d.dimension as string }))
+```
+
+✅ **Fixed code:**
+```typescript
+// Derive keys from funnel config's dataKey/nameKey with camelCase conversion
+const valKey = firstFunnel?.dataKey ? camelCase(firstFunnel.dataKey) : 'measure';
+const nameKey = firstFunnel?.nameKey ? camelCase(firstFunnel.nameKey) : 'dimension';
+data.map(d => ({ value: record[valKey] ?? d.measure, name: record[nameKey] ?? d.dimension }))
+```
+
+📝 **This is another instance of the DataKey camelCase mismatch pattern** documented in the Serialization section above. Any chart widget that hardcodes property names instead of using config-provided keys will break when data uses non-standard property names.
+
+## RadarChart Explicit Radar Config CamelCase Bug (FIXED)
+
+### Case-sensitive property lookup in RadarChartWidget.tsx
+**Problem**: When using explicit `.Radar("values")` config, `RadarChartWidget.tsx` line 122 used `item[ind.name]` (case-sensitive) to look up indicator values. Since C# serializes properties to camelCase (`sales`, `marketing`) but indicator names are PascalCase (`Sales`, `Marketing`), all values resolved to 0 — rendering an empty radar polygon.
+
+**Note**: The default path (no explicit Radar config, line 112) correctly used `getPropertyValue(item, ind.name)` (case-insensitive).
+
+✅ **Fix applied**: Changed line 122 from `item[ind.name]` to `getPropertyValue(item, ind.name)`.
+
+📝 **Another instance of the DataKey camelCase mismatch pattern.** Always use case-insensitive lookups when mapping C#-serialized data to frontend chart properties.
 
 ## Future Gotchas to Document
 

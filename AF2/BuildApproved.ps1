@@ -121,6 +121,9 @@ function Show-Status {
     $failColor = if ($totalFailed -gt 0) { "`e[31m" } else { "`e[90m" }
     $null = $buf.AppendLine("  `e[32mDone: $totalDone$rst  |  ${failColor}Failed: $totalFailed$rst  |  `e[33mRunning: $totalRunning$rst  |  `e[34mPending: $totalPending$rst")
 
+    # Set terminal tab title via ANSI OSC
+    Write-Host "`e]0;BA $totalRunning/$totalPending/$totalDone`a" -NoNewline
+
     # Atomic screen update: clear then write buffer
     Clear-Host
     Write-Host $buf.ToString()
