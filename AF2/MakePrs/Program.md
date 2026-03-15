@@ -90,7 +90,9 @@ PR 1: [Ivy-Framework] Add RadialBarChart widget
   Commits:
     - abc1234 Add RadialBarChart backend widget class
     - def5678 Add RadialBarChart frontend component
-  Links: #42 Add RadialBarChart widget support, #38 Missing chart types
+  Links:
+    - https://github.com/Ivy-Interactive/Ivy-Framework/issues/42 Add RadialBarChart widget support
+    - https://github.com/Ivy-Interactive/Ivy-Framework/issues/38 Missing chart types
 
 PR 2: [Ivy-Agent] Refactor session management
   Base: origin/main
