@@ -61,6 +61,19 @@ PR Group 2: [Ivy-Agent] Fix session timeout handling
   - mno7890 Add timeout configuration
 ```
 
+#### Search for Related GitHub Issues
+
+After grouping commits, for each group:
+1. Determine the repo's GitHub `owner/repo` from the git remote URL (`git remote get-url origin`)
+2. Extract keywords from the proposed PR title (strip common prefixes like "Add", "Fix", "Update", "Refactor")
+3. Search for open issues in that repo:
+   ```bash
+   gh search issues "<keywords>" --repo <owner/repo> --state open --json title,url,number,body --limit 10
+   ```
+4. Also search using keywords extracted from commit messages
+5. Parse commit messages for existing issue references (e.g., `#123`) and include those automatically
+6. Deduplicate results and store the matched issues per group
+
 ### 4. Present Plan to User
 
 Display the suggested PR plan with:
@@ -70,6 +83,16 @@ Display the suggested PR plan with:
   - Repository
   - List of commits (short hash + subject)
   - Estimated base branch (usually origin/main or origin/master)
+  - Related issues found (if any):
+    ```
+    Related Issues Found:
+      - #42 Add RadialBarChart widget support
+      - #38 Missing chart types in widget library
+
+    Link issues? [42,38/none/custom]:
+    ```
+  - User can select which issues to link (comma-separated numbers), type "none", or enter custom issue numbers
+  - Issues referenced directly in commit messages (e.g., `#123`) are pre-selected automatically
 
 Ask user for approval:
 ```
@@ -86,6 +109,8 @@ For each approved group:
 #### A. Get PR Details from User
 - **PR Title** (suggest from commits, allow editing)
 - **PR Body** (generate summary from commits, allow editing)
+  - If issues were linked in Step 4, append `Closes #N` lines to the body (one per linked issue)
+  - For cross-repo issues, use full URL syntax: `Closes Ivy-Interactive/Ivy-Framework#42`
 - **Base Branch** (suggest origin/main, allow changing)
 - **Assignee** (optional):
   - None (leave unassigned)
@@ -107,13 +132,21 @@ Follow the pattern from ReviewCommits.ps1:
 
 #### C. Push and Create PR
 1. Push branch to origin: `git push -u origin [branch-name]`
-2. Create PR using gh CLI:
-   ```powershell
-   gh pr create --repo [repo-url] --head [branch-name] --base [base-branch] --title "[title]" --body "[body]"
+2. Build the PR body with summary and issue references:
+   ```markdown
+   ## Summary
+   <generated summary from commits>
+
+   Closes #42
+   Closes #38
    ```
-3. If assignee specified, assign PR: `gh pr edit [pr-url] --add-assignee [assignee]`
-4. **IMPORTANT**: Open PR URL in browser using `Start-Process [pr-url]` (PowerShell) or appropriate browser launch command
-5. **Ask user**: "Drop these commits from [original-branch]? (y/n)"
+3. Create PR using gh CLI:
+   ```powershell
+   gh pr create --repo [repo-url] --head [branch-name] --base [base-branch] --title "[title]" --body "[body-with-closes-refs]"
+   ```
+4. If assignee specified, assign PR: `gh pr edit [pr-url] --add-assignee [assignee]`
+5. **IMPORTANT**: Open PR URL in browser using `Start-Process [pr-url]` (PowerShell) or appropriate browser launch command
+6. **Ask user**: "Drop these commits from [original-branch]? (y/n)"
    - If yes, drop commits using rebase: `git rebase --onto [first-hash]^ [last-hash] [original-branch]`
    - If rebase fails, warn user and abort rebase
 
@@ -138,7 +171,7 @@ Display final summary:
 ## Args Flags
 
 Parse Args for optional flags:
-- `-AutoApprove`: Skip approval prompt and create all suggested PRs automatically
+- `-AutoApprove`: Skip approval prompt and create all suggested PRs automatically. For issue linking, automatically link all issues whose title has high similarity (>70%) to the PR title
 - `-AutoAssign [user]`: Automatically assign all PRs to the specified user
 - `-SkipUncommitted`: Skip the uncommitted changes check and only work with committed changes
 - `-Repo [name]`: Only process the specified repository (e.g., `-Repo Ivy-Framework`)
@@ -150,6 +183,8 @@ Parse Args for optional flags:
 - If cherry-pick conflicts occur, abort and skip that PR
 - If gh CLI not available, error and exit (gh is required)
 - If repo not found, skip it with a warning
+- If `gh search issues` fails or returns no results, skip issue linking silently for that group
+- If issue search returns results but none are relevant, skip the linking prompt
 
 ## Tools
 
