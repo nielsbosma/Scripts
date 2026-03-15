@@ -13,6 +13,10 @@ Read about important paths and files in ../.shared/Paths.md
 - Args contains the feature description/spec
 - Extract: feature name, widget/API names, expected props, events, and behaviors
 - Identify which Ivy Framework source files are relevant
+- **Set terminal title** to the extracted feature name for easy tab identification:
+  ```bash
+  echo -ne "\033]0;IFT: <FeatureName>\007"
+  ```
 
 ### 2. Research the Feature
 
@@ -62,6 +66,7 @@ using System.Reflection;
 
 var server = new Server();
 server.AddAppsFromAssembly(Assembly.GetExecutingAssembly());
+server.UseChrome();
 await server.RunAsync();
 ```
 
