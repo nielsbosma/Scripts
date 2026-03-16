@@ -5,7 +5,7 @@
 .DESCRIPTION
     Adds right-click context menu options:
     - "Run with IvyFeatureTester..." for folders
-    - "Execute with Claude Code..." for .md files (plan execution)
+    - "Test with IvyFeatureTester..." for .md files
     Requires Administrator privileges.
 
 .PARAMETER Uninstall
@@ -40,10 +40,10 @@ $ContextMenus = @(
         CommandTemplate = "powershell.exe -NoExit -ExecutionPolicy Bypass -Command `"& '{0}' '%V'`""
     }
     @{
-        Label        = "Execute with Claude Code..."
-        ScriptPath   = "D:\Repos\_Personal\Scripts\AF2\ExecutePlan.ps1"
+        Label        = "Test with IvyFeatureTester..."
+        ScriptPath   = "D:\Repos\_Personal\Scripts\AF2\IvyFeatureTester.ps1"
         RegistryPaths = @(
-            "Registry::HKEY_CLASSES_ROOT\SystemFileAssociations\.md\shell\ExecutePlan"
+            "Registry::HKEY_CLASSES_ROOT\SystemFileAssociations\.md\shell\IvyFeatureTester"
         )
         # %1 = the full file path
         CommandTemplate = "powershell.exe -NoExit -ExecutionPolicy Bypass -Command `"& '{0}' '%1'`""
@@ -106,4 +106,4 @@ foreach ($menu in $ContextMenus) {
 
 Write-Host "`nAll context menus installed successfully." -ForegroundColor Green
 Write-Host "- Right-click on or inside a folder for 'Run with IvyFeatureTester...'" -ForegroundColor Cyan
-Write-Host "- Right-click on a .md file for 'Execute with Claude Code...'" -ForegroundColor Cyan
+Write-Host "- Right-click on a .md file for 'Test with IvyFeatureTester...'" -ForegroundColor Cyan
