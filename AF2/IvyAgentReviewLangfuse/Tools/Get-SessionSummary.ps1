@@ -67,21 +67,31 @@ foreach ($traceFolder in $traceFolders) {
             }
 
             $input = $json.input
-            if (-not $input) { continue }
 
-            # Tool events
-            $toolName = $input.toolName
+            # Tool events - check both input (old) and metadata (new)
+            $toolName = $null
+            $toolResponse = $null
+            $toolFeedback = $null
+            if ($input -and $input.toolName) {
+                $toolName = $input.toolName
+                $toolResponse = $input.response
+                $toolFeedback = $input.feedback
+            } elseif ($json.metadata -and $json.metadata.toolName) {
+                $toolName = $json.metadata.toolName
+                $toolResponse = $json.metadata.response
+                $toolFeedback = $json.metadata.feedback
+            }
             if ($toolName) {
-                if ($input.feedback) { $stats.ToolFeedbackCount++ }
-                if ($input.response) {
+                if ($toolFeedback) { $stats.ToolFeedbackCount++ }
+                if ($toolResponse) {
                     switch ($toolName) {
                         'IvyQuestion' {
                             $stats.IvyQuestionCount++
-                            if ($input.response.success -eq $false) { $stats.IvyQuestionFailCount++ }
+                            if ($toolResponse.success -eq $false) { $stats.IvyQuestionFailCount++ }
                         }
                         'IvyDocs' {
                             $stats.IvyDocsCount++
-                            if ($input.response.success -eq $false) { $stats.IvyDocsFailCount++ }
+                            if ($toolResponse.success -eq $false) { $stats.IvyDocsFailCount++ }
                         }
                         'WebFetch' { $stats.WebFetchCount++ }
                         'WebSearch' { $stats.WebSearchCount++ }
@@ -91,7 +101,7 @@ foreach ($traceFolder in $traceFolders) {
 
             # Message events - check both input.message (old) and metadata.message (new)
             $message = $null
-            if ($input.message -and $input.message.'$type') {
+            if ($input -and $input.message -and $input.message.'$type') {
                 $message = $input.message
             } elseif ($json.metadata -and $json.metadata.message -and $json.metadata.message.'$type') {
                 $message = $json.metadata.message

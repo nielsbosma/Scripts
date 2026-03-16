@@ -14,7 +14,7 @@
 ## Known Issues
 
 - **VBCSCompiler file locks**: `dotnet build` frequently fails on first attempt due to VBCSCompiler holding locks on DLLs. Retry usually succeeds. Consider killing VBCSCompiler processes before building.
-- **Process file locks**: Running Ivy.Agent.Server or other dotnet processes can lock DLLs preventing builds. Kill them before building.
+- **Process file locks**: Running Ivy.Agent.Server, Ivy.Docs, or other dotnet processes can lock DLLs preventing builds. Kill them before building. Ivy.Docs can spawn many instances (14+).
 - **Microsoft Defender locks**: Defender can temporarily lock DLLs during builds. Retry usually succeeds.
 
 ## Build Strategy

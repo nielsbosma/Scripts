@@ -37,9 +37,17 @@ foreach ($traceFolder in $traceFolders) {
     $requests = @() # array of @{Index; Path; Matched}
     for ($i = 0; $i -lt $observations.Count; $i++) {
         $obs = $observations[$i]
-        # EVENT__local__IvyDocs with input.path
-        if ($obs.File.Name -match 'IvyDocs' -and $obs.Json.input.path) {
-            $requests += [PSCustomObject]@{ Index = $i; Path = $obs.Json.input.path; Matched = $false }
+        # EVENT__local__IvyDocs - check input.path (old) and metadata.path (new)
+        if ($obs.File.Name -match 'IvyDocs' -and -not ($obs.File.Name -match 'LocalResponse')) {
+            $path = $null
+            if ($obs.Json.input -and $obs.Json.input.path) {
+                $path = $obs.Json.input.path
+            } elseif ($obs.Json.metadata -and $obs.Json.metadata.path) {
+                $path = $obs.Json.metadata.path
+            }
+            if ($path) {
+                $requests += [PSCustomObject]@{ Index = $i; Path = $path; Matched = $false }
+            }
         }
         # GENERATION output with IvyDocs tool call
         if ($obs.File.Name -match 'GENERATION' -and $obs.Json.output -is [array]) {
@@ -84,9 +92,17 @@ foreach ($traceFolder in $traceFolders) {
     # For each response, match to nearest preceding unmatched request
     for ($i = 0; $i -lt $observations.Count; $i++) {
         $obs = $observations[$i]
-        $input = $obs.Json.input
-        if (-not $input) { continue }
-        if ($input.toolName -ne 'IvyDocs' -or -not $input.response) { continue }
+        # Check both input (old) and metadata (new) for LocalResponse with IvyDocs
+        $toolName = $null
+        $response = $null
+        if ($obs.Json.input -and $obs.Json.input.toolName) {
+            $toolName = $obs.Json.input.toolName
+            $response = $obs.Json.input.response
+        } elseif ($obs.Json.metadata -and $obs.Json.metadata.toolName) {
+            $toolName = $obs.Json.metadata.toolName
+            $response = $obs.Json.metadata.response
+        }
+        if ($toolName -ne 'IvyDocs' -or -not $response) { continue }
 
         # Find nearest preceding unmatched request
         $matchedReq = $null
@@ -107,9 +123,9 @@ foreach ($traceFolder in $traceFolders) {
         $results += [PSCustomObject]@{
             TraceName     = $traceFolder.Name
             Path          = $path
-            Success       = $input.response.success -eq $true
-            ContentLength = $input.response.contentLength
-            Error         = $input.response.error
+            Success       = $response.success -eq $true
+            ContentLength = $response.contentLength
+            Error         = $response.error
         }
     }
 }

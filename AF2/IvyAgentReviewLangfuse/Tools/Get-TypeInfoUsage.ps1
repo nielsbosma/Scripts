@@ -120,16 +120,18 @@ foreach ($traceFolder in $traceFolders) {
     for ($i = 0; $i -lt $observations.Count; $i++) {
         $obs = $observations[$i]
         $input = $obs.Json.input
-        if (-not $input) { continue }
-        # Match old format (input.toolName/input.response) and new format (input.message.$type or metadata.message.$type)
-        $isOldFormat = ($input.toolName -eq 'GetTypeInfo' -and $input.response)
-        $isInputMsgFormat = ($input.message -and $input.message.'$type' -eq 'GetTypeInfoResultMessage')
+        # Match old format (input.toolName/input.response), new metadata format (metadata.toolName), and message format (metadata.message.$type)
+        $isOldFormat = ($input -and $input.toolName -eq 'GetTypeInfo' -and $input.response)
+        $isMetadataToolFormat = ($obs.Json.metadata -and $obs.Json.metadata.toolName -eq 'GetTypeInfo' -and $obs.Json.metadata.response)
+        $isInputMsgFormat = ($input -and $input.message -and $input.message.'$type' -eq 'GetTypeInfoResultMessage')
         $isMetadataMsgFormat = ($obs.Json.metadata -and $obs.Json.metadata.message -and $obs.Json.metadata.message.'$type' -eq 'GetTypeInfoResultMessage')
-        if (-not $isOldFormat -and -not $isInputMsgFormat -and -not $isMetadataMsgFormat) { continue }
+        if (-not $isOldFormat -and -not $isMetadataToolFormat -and -not $isInputMsgFormat -and -not $isMetadataMsgFormat) { continue }
         # Normalize: extract response data
         $responseData = $null
         if ($isOldFormat) {
             $responseData = $input.response
+        } elseif ($isMetadataToolFormat) {
+            $responseData = $obs.Json.metadata.response
         } elseif ($isInputMsgFormat) {
             $responseData = $input.message
         } elseif ($isMetadataMsgFormat) {
