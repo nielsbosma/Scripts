@@ -22,6 +22,13 @@ Read about important paths and files in ../.shared/Paths.md
 
 - Read `Memory/PlaywrightKnowledge.md` for accumulated Ivy testing knowledge (correct APIs, gotchas, patterns)
 - Read the Ivy Framework AGENTS.md for general Ivy knowledge: `D:\Repos\_Ivy\Ivy-Framework\AGENTS.md`
+- **Search plan context for recent related work:**
+  - Use Glob to list files in `D:\Repos\_Ivy\.plans\completed\`, `D:\Repos\_Ivy\.plans\review\`, and `D:\Repos\_Ivy\.plans\logs\`
+  - Use Grep to search for the feature name or related widget names across those directories
+  - Read the most relevant 3-5 plan files (prioritize review > completed for currency)
+  - If a specific commit is referenced in Args, search for plans that mention that commit ID
+  - Extract key insights: known issues, workarounds, design decisions, implementation patterns
+  - Use this context to inform test app creation and edge case selection
 - Read relevant source code for the feature from `D:\Repos\_Ivy\Ivy-Framework\src\`
 - Read docs if available: `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs`
 - Read existing samples for similar features: `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Samples.Shared\Apps\`

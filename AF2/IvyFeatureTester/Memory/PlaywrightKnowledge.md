@@ -11,6 +11,15 @@
 - State is managed via `UseState<T>()` which returns reactive state objects
 - Services are injected via `UseService<T>()`
 
+## DataTable Testing Patterns
+
+- DataTable uses Glide Data Grid which renders as `<canvas>` elements, NOT HTML `<table>`
+- Canvas locator: `page.locator('[data-testid="data-grid-canvas"]')` or `page.locator('canvas').first()`
+- **Click target**: Use `page.locator('.dvn-scroller').first().click({ position: { x, y } })` — the `dvn-scroller` overlay div intercepts pointer events over the canvas
+- Wait for table: `await page.waitForSelector('canvas', { timeout: 15000 })`; then wait 1s for render
+- Stale process cleanup: Always kill previous `DataTableAutoWidth.exe` processes before running tests — they lock DLLs and cause build failures
+- Use `--no-build` in test spawn after pre-building: `spawn('dotnet', ['run', '--no-build', '--', '--port', port])`
+
 ## Standalone Test Project Setup
 
 - The server class is `Server` (NOT `IvyServer`). Entry point: `var server = new Server(); await server.RunAsync();`
@@ -150,6 +159,16 @@
 - Ivy apps MUST have a parameterless constructor — `AppDescriptor.CreateApp()` uses `Activator.CreateInstance` without DI
 - Do NOT use primary constructor injection like `MyApp(IClientProvider client) : ViewBase` — causes `MissingMethodException` at runtime
 - Instead, use `var client = UseService<IClientProvider>()` inside the `Build()` method
+
+## SelectInput Multi-Select vs Single-Select Locators
+
+- **Single-select** (Select variant): Uses Radix Select — trigger is `button[role="combobox"]`, options are `[role="option"]`
+- **Multi-select** (Select variant): Uses CMDK (Command Menu) in a Popover — trigger is a div with input, options are `[cmdk-item]`
+- To open multi-select: `page.getByPlaceholder('placeholder text').click()`
+- To select option in multi-select: `page.locator('[cmdk-item]').filter({ hasText: 'Option' }).click()`
+- Multi-select popover stays open after selecting — close with `page.keyboard.press('Escape')`
+- Visual group separators appear between option groups in the dropdown (Select variant only)
+- Group separator count = number of groups - 1
 
 ## SelectInput Slider Variant
 
@@ -657,3 +676,11 @@ This is different from `[ExternalWidget]` "Unknown component type" errors which 
 - **`__ec_instance__` and `_ec_` are NOT reliable**: These properties may not be set on the container div in echarts-for-react — the global `echarts.getInstanceByDom()` and `div[_echarts_instance_]` attribute selector both returned empty results
 - **Radar option.radar can be object or array**: When accessed via fiber, `radar` may be a single object rather than an array. Always normalize: `Array.isArray(data) ? data : [data]`
 - 5 tests passed, 4 test fix rounds (all ECharts detection), no project fixes, logs clean
+
+### 2026-03-16 — FeedbackInputMax
+- **Star rating SVG locator**: Use `page.locator('button svg')` instead of `page.locator('svg')` to target only star rating icons. The page has an extra SVG from the Ivy branding icon (green circle, bottom-right) which throws off index-based locators
+- **AllowHalf creates extra SVG elements**: When `AllowHalf()` is enabled, star ratings may render additional overlay SVGs for half-star detection. Don't assert exact `button svg` counts on pages with AllowHalf inputs
+- **Star indices per page**: Stars render in DOM order matching visual order. On a page with multiple feedback inputs, indices accumulate: first group (0 to max-1), second group (max to max+max2-1), etc. Navigate fresh for each click test to avoid stale index issues after re-renders
+- **Decimal formatting locale**: Use `CultureInfo.InvariantCulture` in C# when formatting decimal/double values that will be matched by Playwright `getByText()` — European locales use `,` instead of `.`
+- **Invalid prop visual**: FeedbackInput `.Invalid("message")` renders as a small circle-exclamation icon next to the stars, not as visible text. Don't assert `getByText("message")` for invalid state — just verify the state label
+- 20 tests passed, 4 fix rounds (icon name, locale, SVG locator, framework stash), logs clean
