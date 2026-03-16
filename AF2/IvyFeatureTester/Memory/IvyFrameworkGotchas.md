@@ -318,6 +318,21 @@ Ivy's `EnumHelper.GetDescription()` (used by `typeof(MyEnum).ToOptions()`) calls
 ✅ **`volume.Value.ToString("F2", CultureInfo.InvariantCulture)`** — always produces dot separator
 📝 **Why**: The Ivy server runs with the system's locale. On Windows with European regional settings, `float.ToString("F2")` uses comma as decimal separator. Always use `CultureInfo.InvariantCulture` when the formatted text needs to be matched in Playwright tests.
 
+## PathToAppIdMiddleware Intercepts Custom File Extensions
+
+### Missing file extensions in routing-constants.json
+**Problem**: `PathToAppIdMiddleware` rewrites ALL URL paths to `/?appId=...` unless the path has an extension listed in `staticFileExtensions` (in `src/frontend/src/routing-constants.json`). Custom middleware registered via `UseWebApplication()` runs AFTER this rewrite, so it sees `path="/"` instead of the original URL.
+
+- If you add new middleware that serves files with a custom extension (e.g., `.md`), you MUST add that extension to `staticFileExtensions`
+- Without this, the middleware pipeline is: `UseRouting -> UsePathToAppId (rewrites path) -> UseRouting -> user middleware (sees "/" not original path) -> UseFrontend`
+
+## Chrome Parameter and Sidebar Visibility
+
+### `?chrome=false` Hides the Sidebar
+- `?chrome=false` disables the Ivy "chrome" (sidebar navigation, tab bar, settings)
+- When testing **sidebar labels, navigation items, or app names in the sidebar**, do NOT use `?chrome=false`
+- Only use `?chrome=false` when testing app content in isolation without sidebar interference
+
 ## Future Gotchas to Document
 
 As we encounter more issues during feature testing, add them here with:
