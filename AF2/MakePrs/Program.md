@@ -29,7 +29,7 @@ For each repository in Repos.md:
     - Run `git log --oneline -5` to see recent commit style
     - Analyze changes and create a logical commit message
     - Stage appropriate files (avoid .env, credentials, large binaries)
-    - Create commit with: `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>`
+    - Create commit (no co-authored-by line)
   - If no, warn that this repo will be skipped for PR creation
 
 ### 2. Gather Unpushed Commits
@@ -233,8 +233,15 @@ For each PR group above, execute these steps:
 
 Notes:
 - Sanitize title for branch name: lowercase, replace spaces with hyphens, remove special chars, truncate to ~50 chars
-- If cherry-pick fails, abort (`git cherry-pick --abort`), clean up the branch, and skip this PR
+- If cherry-pick conflicts, attempt resolution (see Error Handling). Only abort and skip if irreconcilable.
 - For issue-based PRs (explicit reference or smart match), append `Closes #N` to the PR body; omit for feature-based PRs
+
+## Post-PR Cleanup
+
+After all PRs are created:
+1. Delete all local `pr/*` branches (they're pushed to origin, no longer needed locally)
+2. For repos on `main`: `git reset --hard origin/main` to drop cherry-picked commits
+3. Verify each repo is clean: no unpushed commits, no uncommitted changes
 ```
 
 > **Important**: The plan must be fully self-contained because exiting plan mode clears context. The PR groups plus the Execution Instructions section must include everything needed to create the PRs from scratch — the agent executing these steps will have NO other context beyond this plan text.
@@ -269,7 +276,11 @@ Follow the pattern from ReviewCommits.ps1:
 5. Create new branch off default branch: `git branch [branch-name] origin/[default-branch]`
 6. Checkout new branch: `git checkout [branch-name]`
 7. Cherry-pick commits in order: `git cherry-pick [hash1] [hash2] ...`
-   - If cherry-pick fails, show error, abort, cleanup, and skip this PR
+   - If cherry-pick conflicts, attempt resolution:
+     - Check if the conflict is due to code being moved/renamed on main (e.g., file split into multiple files)
+     - Apply the commit's intent to the current file structure
+     - For many conflicted files, use an Agent to resolve in parallel
+     - Only abort and skip if truly irreconcilable
 8. Return to original branch: `git checkout [original-branch]`
 
 #### C. Push and Create PR
@@ -297,7 +308,14 @@ Follow the pattern from ReviewCommits.ps1:
 - For failures, show clear error messages
 - Don't clean up failed branches automatically (user may want to investigate)
 
-### 6. Summary
+### 6. Post-PR Cleanup
+
+After all PRs are created:
+1. Delete all local `pr/*` branches across all repos (they're pushed to origin)
+2. For each repo that had commits cherry-picked: `git reset --hard origin/main` to drop them from the local branch
+3. Verify each repo is clean: no unpushed commits, no uncommitted changes, on `main`
+
+### 7. Summary
 
 Display final summary:
 ```
@@ -323,7 +341,12 @@ Parse Args for optional flags:
 
 - If no unpushed commits found, inform user and exit gracefully
 - If git commands fail, show error and continue with other repos
-- If cherry-pick conflicts occur, abort and skip that PR
+- If cherry-pick conflicts occur, attempt to resolve them:
+  1. Read each conflicted file and understand both sides
+  2. If the conflict is due to code refactoring on main (e.g., file was split into multiple files, imports renamed), apply the commit's intent to the new file structure
+  3. If resolution is straightforward (e.g., both sides added content, import renames), resolve and continue
+  4. For complex conflicts across many files, use an Agent to resolve in parallel
+  5. Only abort and skip if the conflict is fundamentally irreconcilable (e.g., the feature no longer makes sense on main)
 - If gh CLI not available, error and exit (gh is required)
 - If repo not found, skip it with a warning
 - If `gh issue view` fails for a referenced issue, warn but continue with PR creation
