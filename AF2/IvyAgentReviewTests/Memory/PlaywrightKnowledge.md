@@ -150,9 +150,10 @@
 - `state.ToSelectInput([new Option<T>("Label", Value), ...])` (without Toggle variant) renders as a dropdown with `role="combobox"` — click to open, then `getByRole("option", { name: "Label" }).click()` to select
 - `.ToTable()` on anonymous object collections renders as a standard HTML `<table>` — buttons in table cells are locatable via `page.locator("table button")`
 
-## DateInput (ToDateInput) Calendar Popover
+## DateInput (ToDateInput / ToDateTimeInput) Calendar Popover
 
-- `state.ToDateInput()` renders as a `<button data-slot="calendar">` trigger that opens a Radix Popover with a react-day-picker Calendar
+- `state.ToDateInput()` and `state.ToDateTimeInput()` both render as a `<button data-slot="calendar">` trigger that opens a Radix Popover with a react-day-picker Calendar
+- `ToDateTimeInput()` additionally shows a time input (`input[type="time"]`) at the bottom of the popover — same calendar interaction, just with a time field added
 - It is NOT a native `<input type="date">` — do NOT use `input[type="date"]` selectors
 - The trigger button shows the formatted date or placeholder text, with a CalendarIcon
 - **Calendar navigation**: The calendar caption has a `MonthYearInput` component with two `<input>` fields:
@@ -191,6 +192,12 @@
 - Workaround: use `Layout.Horizontal()` with equal-width children, or `Layout.Grid().Columns(N)` (see ReversiForge.AI entry — `.Columns(8)` worked)
 
 ## Run History
+
+### 2026-03-17 — Test.AgeCalculator
+- Age calculator with date picker and age display (years, months, days, hours)
+- `ToDateTimeInput()` renders identically to `ToDateInput()` (same `button[data-slot="calendar"]` pattern) plus a time input — existing DateInput knowledge applies
+- Initial attempt used `input[type="date"]` selector which failed — switched to calendar popover interaction
+- 6 tests, 1 fix round (wrong date input selector), all passed, logs clean
 
 ### 2026-03-13 — Test.CSSGradientTextGenerator
 - Gradient text generator with text input, color pickers, angle/font-size sliders, live preview, and CSS code output
