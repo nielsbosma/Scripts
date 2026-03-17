@@ -6,6 +6,8 @@
     Watches D:\Repos\_Ivy\.plans\approved for .md files.
     Groups by queue name (second filename segment) and runs items within each
     queue sequentially while running separate queues in parallel.
+    Also watches D:\Repos\_Ivy\.plans\plan for task descriptions and sends them
+    to MakePlan.ps1 for plan generation.
 .EXAMPLE
     .\BuildApproved.ps1
     .\BuildApproved.ps1 -PollInterval 5
@@ -17,6 +19,7 @@ param(
     [string]$FailPath     = "D:\Repos\_Ivy\.plans\failed",
     [string]$LogPath      = "D:\Repos\_Ivy\.plans\logs",
     [string]$ReviewPath   = "D:\Repos\_Ivy\.plans\review",
+    [string]$PlanWatchPath = "D:\Repos\_Ivy\.plans\plan",
     [int]   $PollInterval = 3
 )
 
@@ -30,7 +33,7 @@ $QueueDirs = @{
 $DefaultDir = "D:\Repos\_Ivy"
 
 # ── Ensure directories exist ────────────────────────────────────────────────
-foreach ($dir in @($WatchPath, $DonePath, $FailPath, $LogPath, $ReviewPath)) {
+foreach ($dir in @($WatchPath, $DonePath, $FailPath, $LogPath, $ReviewPath, $PlanWatchPath)) {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 }
 
@@ -39,6 +42,11 @@ $seen    = [System.Collections.Generic.HashSet[string]]::new()
 $queues  = @{}   # QueueName → List<string> of file paths
 $active  = @{}   # QueueName → @{ Job; File; Start }
 $history = [System.Collections.Generic.List[pscustomobject]]::new()
+
+# Plan queue state
+$seenPlan  = [System.Collections.Generic.HashSet[string]]::new()
+$planQueue = [System.Collections.Generic.List[string]]::new()
+$activePlan = $null  # @{ Job; File; Start } or $null
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 function Get-QueueName([string]$FileName) {
@@ -67,7 +75,7 @@ function Show-Status {
     $null = $buf.AppendLine("")
     $null = $buf.AppendLine("  `e[1;36mBuildApproved$rst")
     $null = $buf.AppendLine("  `e[90m$([string]::new([char]0x2500, 60))$rst")
-    $null = $buf.AppendLine("  `e[37mWatching: `e[97m$WatchPath$rst")
+    $null = $buf.AppendLine("  `e[37mWatching: `e[97m$WatchPath `e[90m| `e[97m$PlanWatchPath$rst")
     $null = $buf.AppendLine("")
 
     # Active
@@ -79,6 +87,17 @@ function Show-Status {
             $name    = [IO.Path]::GetFileName($info.File)
             $null = $buf.AppendLine("    > `e[33m$($q.PadRight(18))`e[97m$($name.PadRight(46))`e[33m$elapsed$rst")
         }
+        if ($activePlan) {
+            $elapsed = Format-Duration ((Get-Date) - $activePlan.Start)
+            $name    = [IO.Path]::GetFileName($activePlan.File)
+            $null = $buf.AppendLine("    > `e[35mMakePlan          `e[97m$($name.PadRight(46))`e[35m$elapsed$rst")
+        }
+        $null = $buf.AppendLine("")
+    } elseif ($activePlan) {
+        $null = $buf.AppendLine("  `e[1;33mRUNNING$rst")
+        $elapsed = Format-Duration ((Get-Date) - $activePlan.Start)
+        $name    = [IO.Path]::GetFileName($activePlan.File)
+        $null = $buf.AppendLine("    > `e[35mMakePlan          `e[97m$($name.PadRight(46))`e[35m$elapsed$rst")
         $null = $buf.AppendLine("")
     }
 
@@ -91,6 +110,19 @@ function Show-Status {
                 $name = [IO.Path]::GetFileName($f)
                 $null = $buf.AppendLine("    `e[34m- $($q.PadRight(18))$name$rst")
             }
+        }
+        if ($planQueue.Count -gt 0) {
+            foreach ($f in $planQueue) {
+                $name = [IO.Path]::GetFileName($f)
+                $null = $buf.AppendLine("    `e[35m- MakePlan          $name$rst")
+            }
+        }
+        $null = $buf.AppendLine("")
+    } elseif ($planQueue.Count -gt 0) {
+        $null = $buf.AppendLine("  `e[1;34mPENDING$rst")
+        foreach ($f in $planQueue) {
+            $name = [IO.Path]::GetFileName($f)
+            $null = $buf.AppendLine("    `e[35m- MakePlan          $name$rst")
         }
         $null = $buf.AppendLine("")
     }
@@ -116,8 +148,8 @@ function Show-Status {
     # Summary
     $totalDone    = @($history | Where-Object Status -eq "Done").Count
     $totalFailed  = @($history | Where-Object Status -eq "Failed").Count
-    $totalRunning = $active.Count
-    $totalPending = ($queues.Values | ForEach-Object { $_.Count } | Measure-Object -Sum).Sum
+    $totalRunning = $active.Count + $(if ($activePlan) { 1 } else { 0 })
+    $totalPending = ($queues.Values | ForEach-Object { $_.Count } | Measure-Object -Sum).Sum + $planQueue.Count
     $failColor = if ($totalFailed -gt 0) { "`e[31m" } else { "`e[90m" }
     $null = $buf.AppendLine("  `e[32mDone: $totalDone$rst  |  ${failColor}Failed: $totalFailed$rst  |  `e[33mRunning: $totalRunning$rst  |  `e[34mPending: $totalPending$rst")
 
@@ -154,6 +186,15 @@ try {
                     $queues[$q] = [System.Collections.Generic.List[string]]::new()
                 }
                 $queues[$q].Add($f.FullName)
+            }
+        }
+
+        # 1b. Scan for plan request files
+        $planFiles = Get-ChildItem $PlanWatchPath -Filter "*.md" -File -ErrorAction SilentlyContinue |
+                     Sort-Object Name
+        foreach ($f in $planFiles) {
+            if ($seenPlan.Add($f.Name)) {
+                $planQueue.Add($f.FullName)
             }
         }
 
@@ -209,6 +250,50 @@ try {
 
                 $active.Remove($q)
             }
+        }
+
+        # 2b. Check completed plan job
+        if ($activePlan -and $activePlan.Job.State -in @('Completed', 'Failed', 'Stopped')) {
+            $output   = Receive-Job $activePlan.Job 2>&1
+            $success  = $activePlan.Job.State -eq 'Completed'
+            $duration = (Get-Date) - $activePlan.Start
+            Remove-Job $activePlan.Job -Force
+
+            # Write log
+            $stem    = [IO.Path]::GetFileNameWithoutExtension($activePlan.File)
+            $logFile = Join-Path $LogPath "plan-$stem.log"
+            ($output | Out-String) | Set-Content $logFile -Encoding utf8
+
+            # Extract failure reason
+            $reason = $null
+            if (-not $success) {
+                $lines = ($output | Out-String) -split "`n" |
+                         ForEach-Object { $_.Trim() } |
+                         Where-Object { $_ -ne '' }
+                if ($lines.Count -gt 0) {
+                    $reason = ($lines | Select-Object -Last 3) -join ' | '
+                    if ($reason.Length -gt 120) { $reason = $reason.Substring(0, 117) + '...' }
+                }
+            }
+
+            # Move or delete the plan request file
+            $destDir = if ($success) { $DonePath } else { $FailPath }
+            $fileName = [IO.Path]::GetFileName($activePlan.File)
+            if (Test-Path $activePlan.File) {
+                Move-Item $activePlan.File (Join-Path $destDir "plan-$fileName") -Force
+            }
+
+            $status = if ($success) { "Done" } else { "Failed" }
+            $history.Add([pscustomobject]@{
+                File     = $activePlan.File
+                Queue    = "MakePlan"
+                Status   = $status
+                Duration = $duration
+                Reason   = $reason
+                LogFile  = $logFile
+            })
+
+            $activePlan = $null
         }
 
         # 3. Start next item for each idle queue
@@ -285,6 +370,26 @@ We don't need to review faq updates, doc fixes, or simple code changes that are 
             }
         }
 
+        # 3b. Start next plan job
+        if (-not $activePlan -and $planQueue.Count -gt 0) {
+            $file = $planQueue[0]
+            $planQueue.RemoveAt(0)
+
+            $job = Start-Job -ScriptBlock {
+                param($PlanFile, $MakePlanScript)
+                $content = Get-Content $PlanFile -Raw
+                $env:CLAUDECODE = $null
+                & pwsh -File $MakePlanScript $content 2>&1
+                if ($LASTEXITCODE -ne 0) { throw "MakePlan exited with code $LASTEXITCODE" }
+            } -ArgumentList $file, "D:\Repos\_Personal\Scripts\AF2\MakePlan.ps1"
+
+            $activePlan = @{
+                Job   = $job
+                File  = $file
+                Start = Get-Date
+            }
+        }
+
         # 4. Display
         Show-Status
         Start-Sleep -Seconds $PollInterval
@@ -296,5 +401,10 @@ finally {
         Stop-Job  $active[$q].Job -ErrorAction SilentlyContinue
         Remove-Job $active[$q].Job -Force -ErrorAction SilentlyContinue
     }
-    Write-Host "`nStopped. Cleaned up $($active.Count) active job(s)." -ForegroundColor Yellow
+    if ($activePlan) {
+        Stop-Job  $activePlan.Job -ErrorAction SilentlyContinue
+        Remove-Job $activePlan.Job -Force -ErrorAction SilentlyContinue
+    }
+    $cleanedUp = $active.Count + $(if ($activePlan) { 1 } else { 0 })
+    Write-Host "`nStopped. Cleaned up $cleanedUp active job(s)." -ForegroundColor Yellow
 }
