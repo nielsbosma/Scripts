@@ -56,7 +56,7 @@
         },
         {
           "command": "ivy.followUpPlan",
-          "when": "resourceExtname == .md && resourceFilename =~ /^\\d+[-_]/",
+          "when": "resourceExtname == .md",
           "group": "2_workspace@8"
         }
       ]
