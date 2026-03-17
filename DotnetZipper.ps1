@@ -28,11 +28,11 @@ try {
     Get-ChildItem -Path $TargetFolder -Recurse -File | Where-Object {
         $relativePath = $_.FullName.Substring($TargetFolder.Length)
 
-        # Exclude patterns
-        $exclude = $relativePath -match '[\\/]\.git[\\/]' -or
-                   $relativePath -match '[\\/]bin[\\/]' -or
-                   $relativePath -match '[\\/]obj[\\/]' -or
-                   $relativePath -match '[\\/]node_modules[\\/]' -or
+        # Exclude patterns (match at path separator OR start of string)
+        $exclude = $relativePath -match '(^|[\x5c/])\.git([\x5c/]|$)' -or
+                   $relativePath -match '(^|[\x5c/])bin([\x5c/]|$)' -or
+                   $relativePath -match '(^|[\x5c/])obj([\x5c/]|$)' -or
+                   $relativePath -match '(^|[\x5c/])node_modules([\x5c/]|$)' -or
                    $_.Name -eq $zipFileName
 
         -not $exclude
