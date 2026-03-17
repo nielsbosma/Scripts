@@ -9,9 +9,9 @@ Common mistakes and issues encountered when working with the Ivy Framework durin
 - ✅ **Use**: `new Card(content)` or `Layout.Vertical()` containers
 
 ### TestId Support
-- ✅ **Works on**: `WidgetBase` types AND `TextBuilder` (recently added)
-- ❌ **Doesn't work on**: `LayoutView` and other non-widget types
-- ✅ **Workaround**: Put TestIds on actual widgets (inputs, buttons, cards, text), not on layouts
+- ✅ **Works on**: `WidgetBase` types (inputs, buttons, cards)
+- ❌ **Doesn't work on**: `TextBuilder`, `LayoutView`, and other non-widget types — `TextBuilder` does NOT extend `WidgetBase<TextBuilder>`, so `.TestId()` causes CS0311 compile error
+- ✅ **Workaround**: Use `getByText()` for text content verification instead of TestId
 - 📝 **Testing tip**: `getByText()` is often more robust than `getByTestId()` for verifying visible text content
 
 ### Icons Enum
@@ -295,6 +295,25 @@ Ivy's `EnumHelper.GetDescription()` (used by `typeof(MyEnum).ToOptions()`) calls
 
 📝 **Pattern**: Any C# enum prop that the frontend expects as a number needs a string-to-number conversion on the frontend side, because Ivy's `JsonEnumConverter` always serializes enums as their string name (e.g., `"Monday"` not `1`).
 
+## react-day-picker v9 Date Restriction API
+
+### fromDate/toDate are v8 props — use disabled + startMonth/endMonth in v9
+❌ **`<Calendar fromDate={minDate} toDate={maxDate} />`** — `fromDate`/`toDate` are react-day-picker v8 props, silently ignored in v9
+✅ **Use `disabled` with matchers + `startMonth`/`endMonth` for navigation restriction:**
+```tsx
+const disabledMatcher: Matcher[] = [];
+if (minDate) disabledMatcher.push({ before: minDate });
+if (maxDate) disabledMatcher.push({ after: maxDate });
+
+<Calendar
+  disabled={disabledMatcher.length > 0 ? disabledMatcher : undefined}
+  startMonth={minDate}
+  endMonth={maxDate}
+/>
+```
+
+📝 **Why**: react-day-picker v9 removed `fromDate`/`toDate` props. Date disabling uses the `disabled` prop with `DateBefore`/`DateAfter` matchers. Navigation restriction uses `startMonth`/`endMonth`.
+
 ## react-day-picker DOM Structure
 
 ### Calendar uses flex layout, NOT `<table>`
@@ -317,6 +336,165 @@ Ivy's `EnumHelper.GetDescription()` (used by `typeof(MyEnum).ToOptions()`) calls
 ❌ **`$"{volume.Value:F2}"`** — on European locales produces `"0,50"` instead of `"0.50"`
 ✅ **`volume.Value.ToString("F2", CultureInfo.InvariantCulture)`** — always produces dot separator
 📝 **Why**: The Ivy server runs with the system's locale. On Windows with European regional settings, `float.ToString("F2")` uses comma as decimal separator. Always use `CultureInfo.InvariantCulture` when the formatted text needs to be matched in Playwright tests.
+
+<<<<<<< HEAD
+## DateTimeInput Popover Click Target
+
+### DateInput is NOT a `<button>` — it's a Popover trigger div
+❌ **`page.getByTestId('my-date').locator('button').first().click()`** — times out because the clickable area is not a `<button>` element
+✅ **`page.getByTestId('my-date').click()`** — click the testid element directly to open the calendar popover
+
+📝 **Why**: DateVariant, MonthVariant, YearVariant, and WeekVariant use Radix `<PopoverTrigger asChild>` wrapping a styled div, not a button. The `<button>` locator finds nothing. TimeVariant uses `<input type="time">` directly.
+
+### Disabled DateInput has no `<button>` to check
+❌ **`page.getByTestId('disabled-date').locator('button').first()` → `toBeDisabled()`** — element not found
+✅ **Just verify visibility**: `await expect(page.getByTestId('disabled-date')).toBeVisible()` — the disabled state renders as reduced opacity/non-interactive div
+
+## Navigation in chrome=false Mode
+
+### NavigateSignal requires Chrome wrapper
+❌ **`navigator.Navigate(beacon, entity)` in chrome=false mode** — does NOT redirect to the target app page
+✅ **Navigation only works with Chrome wrapper** — the `NavigateSignal` is `[Signal(BroadcastType.Chrome)]`, meaning it's consumed by the Chrome sidebar component
+📝 **Why**: In `chrome=false` mode, there is no Chrome component to receive and act on the navigation signal. The signal fires but nothing handles it.
+
+**Testing implications:**
+- ❌ Don't test actual page navigation (URL change, new page content) in `chrome=false` mode
+- ✅ Test state feedback before navigation (click counters, action logs)
+- ✅ Test beacon discovery and availability (UseNavigationBeacon returns non-null)
+- ✅ Test target apps by navigating directly via URL: `page.goto(\`http://localhost:\${port}/app-id?chrome=false\`)`
+- ✅ Test button enabled/disabled state based on beacon availability
+
+### Beacon AppId Must Match Full Registered ID
+❌ **`AppId: "customer-details"`** — won't match if the app's registered ID includes a namespace prefix
+✅ **`AppId: "my-namespace/customer-details"`** — use `dotnet run -- --describe` to find the exact registered app ID
+📝 **Why**: Ivy auto-generates app IDs from the namespace + class name in kebab-case. The beacon's AppId must match exactly.
+
+## DataTable Canvas Locator & Click Target
+
+### DataTable uses Glide Data Grid canvas, NOT HTML table
+❌ **`page.locator('[data-testid="gdg-canvas"]')`** — this testid does NOT exist
+✅ **`page.locator('canvas').first()`** or **`page.locator('[data-testid="data-grid-canvas"]')`** — correct locators for the DataTable grid
+📝 **Note**: The actual `data-testid` on the canvas element is `"data-grid-canvas"`, not `"gdg-canvas"`
+
+### Canvas click intercepted by scroller overlay
+❌ **`page.locator('canvas').first().click()`** — blocked by `<div class="dvn-scroller">` which intercepts pointer events
+✅ **`page.locator('.dvn-scroller').first().click({ position: { x, y } })`** — click the overlay div instead
+📝 **Why**: Glide Data Grid uses a `dvn-scroller` overlay div for scroll handling that intercepts all pointer events above the canvas.
+
+## WidgetSerializer Strips Default Enum Values (FIXED)
+
+### Number columns have `type` omitted from JSON
+**Problem**: `WidgetSerializer.AddDefaultValueComparison` compares each property against a default instance. `DataTableColumn.ColType` defaults to `ColType.Number` (enum value 0), so Number columns have `type` stripped from the serialized JSON.
+
+**Impact**: Frontend receives `undefined` for `column.type` on all Number-type columns. Any code doing `column.type.toLowerCase()` crashes.
+
+**Fix applied**: Added null guards in `calculateAutoWidth.ts` (`(column.type ?? 'text')`) and `columnHelpers.ts` (`(col.type ?? 'text')`).
+
+📝 **Pattern**: Any `DataTableColumn` property whose value matches the parameterless constructor default will be stripped from JSON. Watch for similar issues with `Align` (defaults to `Left`), `Sortable` (defaults to `true`), etc.
+
+## DataTable Custom Header Icons — Three Bugs (FIXED)
+
+### Bug 1: mapColumnIcon() discards custom icon names
+❌ **`mapColumnIcon()` default case returned `GridColumnIcon.HeaderString`** — custom icon names like "CustomTag" were replaced with a built-in enum value
+✅ **Fix**: Changed default case to `return col.icon` to preserve custom names for SpriteMap lookup
+📝 **File**: `src/frontend/src/widgets/dataTables/utils/columnHelpers.ts`
+
+### Bug 2: showColumnTypeIcons gate blocks explicit icons
+❌ **`icon: showColumnTypeIcons ? mapColumnIcon(col) : undefined`** — columns with explicit `.Icon()` get no icon when `showColumnTypeIcons=false`
+✅ **Fix**: Always show icon when `col.icon` is set; only use `showColumnTypeIcons` toggle for auto-detected type icons
+📝 **File**: `src/frontend/src/widgets/dataTables/utils/columnHelpers.ts`
+
+### Bug 3: CamelCase mismatch between dictionary keys and Icon values
+❌ **`config.CustomHeaderIcons["CustomTag"]` → serialized key `"customTag"` but `column.Icon` stays `"CustomTag"`** — SpriteMap key doesn't match column icon name
+✅ **Fix**: In `generateHeaderIcons()`, store custom icons under both camelCased key and PascalCase variant
+📝 **File**: `src/frontend/src/widgets/dataTables/utils/headerIcons.ts`
+📝 **Root cause**: Ivy's `WidgetSerializer` uses `DictionaryKeyPolicy = JsonNamingPolicy.CamelCase` which camelCases dictionary keys, but string VALUES (like column.Icon) are sent as-is. This is the same class of bug as the DataKey camelCase mismatch documented above.
+
+## VideoPlayer Widget — Id/TestId Not Rendered as HTML Attributes
+
+### `.TestId()` and `.Id()` don't produce predictable HTML IDs
+❌ **`new VideoPlayer(url).TestId("my-video")`** — `data-testid` attribute is NOT rendered in the DOM
+❌ **`new VideoPlayer(url).Id("my-video")`** — the `id` HTML attribute is set to an Ivy-generated short hash (e.g., `fueuz635nb`), NOT the value passed to `.Id()`
+✅ **Use positional locators**: `page.locator('video').nth(0)` for HTML5 videos, `page.locator('iframe').nth(0)` for YouTube embeds
+✅ **Use text-based navigation**: Find surrounding headings with `getByText()` then locate the nearby `video` element
+📝 **Why**: Ivy's widget system wraps components in `<ivy-widget>` custom elements and generates its own short-hash IDs. The `.Id()` extension sets the widget-level ID which gets transformed by the framework before rendering. VideoPlayerWidget.tsx receives `id` from props but it's the framework-generated ID.
+
+## Video PlaybackRate — Browser Resets During Media Load (FIXED)
+
+### useEffect alone is insufficient for setting playbackRate
+❌ **Setting only `videoElement.playbackRate` in useEffect** — the browser's media load algorithm resets `playbackRate` to `defaultPlaybackRate` (1.0) during source loading, overwriting the useEffect
+✅ **Set both `defaultPlaybackRate` AND `playbackRate`** — `defaultPlaybackRate` persists across media loads
+✅ **Also re-apply in `onLoadedData` handler** — safety net for race conditions
+📝 **Why**: The HTML spec's media load algorithm (triggered when `src` is set) includes: "Set playbackRate to defaultPlaybackRate". Since `defaultPlaybackRate` defaults to 1.0, any `playbackRate` set before load completes gets overwritten. This pattern applies to ANY video/audio property set via useEffect that the browser resets during load.
+
+## SelectInput Multi-Select Uses CMDK, Not Radix Select
+
+### Multi-select Select variant has different DOM structure
+❌ **`page.locator('button[role="combobox"]')`** — multi-select Select variant does NOT use Radix Select's native combobox button
+✅ **`page.getByPlaceholder('placeholder text')`** — click the input area by placeholder to open the dropdown
+✅ **`page.locator('[cmdk-item]').filter({ hasText: 'Option' })`** — select options using CMDK item attribute
+📝 **Why**: Multi-select Select variant uses CMDK (Command Menu) with a Popover, not the Radix Select primitive. The trigger is a div with an input, not a `<button role="combobox">`. Single-select DOES use `button[role="combobox"]`.
+
+**Key differences:**
+- Single-select: `button[role="combobox"]` trigger, `[role="option"]` items
+- Multi-select: `getByPlaceholder()` trigger, `[cmdk-item]` items
+- Multi-select popover stays open after selecting (allowing multiple picks), close with `Escape`
+
+## SignatureInput OnChange Not Wired (FIXED)
+
+### State-bound constructor must wire OnChange
+❌ **`OnChange => null`** — property-body returning null means OnChange is never set, so `InvokeEventAsync` returns false
+✅ **`OnChange { get; }`** with constructor wiring: `OnChange = new(e => { typedState.Set(e.Value); return ValueTask.CompletedTask; });`
+📝 **Why**: Unlike auto-properties `{ get; }` which have backing fields, expression-body `=> null` is a computed getter. The `InvokeEventAsync` reflection finds the property but `GetValue()` returns null, so the event is silently ignored. All state-bound input constructors MUST set OnChange.
+📝 **Pattern check**: `FileInput` has the same `=> null` — but FileInput uses upload handlers instead of OnChange, so it's OK there.
+
+### Base64 data URL vs raw base64 for byte[] serialization
+❌ **`eventHandler('OnChange', id, [canvas.toDataURL('image/png')])`** — sends `data:image/png;base64,...` prefix which breaks C# `System.Text.Json` byte[] deserialization
+✅ **Strip prefix**: `const base64 = dataUrl.split(',')[1]; eventHandler('OnChange', id, [base64]);`
+❌ **`img.src = value`** when value is raw base64 from C# — img.src needs data URL prefix
+✅ **Add prefix**: `img.src = value.startsWith('data:') ? value : \`data:image/png;base64,\${value}\``
+📝 **Why**: C# `System.Text.Json` serializes byte[] as raw base64 strings (no prefix). Frontend `canvas.toDataURL()` returns a data URL with prefix. These two formats are incompatible and must be converted at the boundary.
+
+## SVG xmlns Required for Data URI / SpriteMap Usage
+
+### SVG strings used as image sources MUST include xmlns
+❌ **`<svg width="24" height="24" viewBox="0 0 24 24" ...>`** — missing xmlns causes "source image cannot be decoded" when used as data URI in `<img>` or SpriteMap
+✅ **`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" ...>`** — always include xmlns
+📝 **Why**: When SVG is inline in HTML, the namespace is inherited from the document context. But when SVG is used as an image source (data URI, Blob URL, or glide-data-grid SpriteMap), the browser parses it as a standalone document. Without `xmlns`, the parser doesn't know it's SVG and the image fails silently.
+
+## WidgetSerializer Strips Default Enum Values — Ongoing Pattern
+
+### column.type null guard needed in ALL DataTable utility files
+The WidgetSerializer strips properties that match the parameterless constructor default. `DataTableColumn.ColType` defaults to `ColType.Number` (enum value 0), so Number columns have `type: undefined` in the frontend.
+
+**Files that need `(col.type ?? 'text')` null guard:**
+- `columnHelpers.ts` — `mapColumnIcon()`
+- `calculateAutoWidth.ts` — `calculateAutoWidth()`
+- `cellContent.ts` — already has `column.type?.toLowerCase() || 'text'`
+- `DataTableFilterOption.tsx` — already has `(col.type ?? ColType.Text)`
+
+📝 **Warning**: When rewriting any of these files (e.g., during plan implementation), always preserve null guards. They've been lost before during file rewrites.
+
+## Extension Hooks on IViewContext (UseLoading, UseAlert, etc.)
+
+### Must use `this.Context.UseXxx()` from ViewBase
+❌ **`UseLoading()`** — direct call from ViewBase fails with CS0103 "does not exist in current context"
+✅ **`this.Context.UseLoading()`** — extension methods on `IViewContext` must be called via `this.Context`
+📝 **Why**: `ViewBase` wraps hooks like `UseState`, `UseEffect` as protected methods delegating to `this.Context`. But extension methods defined on `IViewContext` (like `UseLoading`, `UseAlert`) aren't wrapped, so you must call them through `this.Context` explicitly.
+
+## Clicking Buttons Behind Modal Dialog Overlays (Playwright)
+
+### Dialog overlay intercepts all pointer events
+❌ **`page.getByTestId('btn').click()`** — times out, overlay div intercepts pointer events
+❌ **`page.getByTestId('btn').click({ force: true })`** — fires click event but Ivy's event handler doesn't process it
+✅ **Use `page.evaluate` with `dispatchEvent`:**
+```typescript
+await page.evaluate((id) => {
+  const btn = document.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+  if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+}, 'my-button-testid');
+```
+📝 **Why**: Ivy's dialog uses a fixed overlay div (`class="fixed inset-0 z-50 bg-black/30"`) that intercepts all pointer events. Playwright's `force: true` dispatches pointer events but they don't propagate through Ivy's websocket-based event system correctly. `dispatchEvent` on the actual DOM element triggers the native click handler which Ivy does process.
 
 ## PathToAppIdMiddleware Intercepts Custom File Extensions
 
