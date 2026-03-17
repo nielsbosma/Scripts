@@ -178,6 +178,7 @@ Rules:
 "@
         }
 
+        Write-Host "Generating workspace namespace (attempt $($i + 1)/$maxAttempts)..."
         $result = LlmComplete -Prompt $llmPrompt
         if (-not $result) {
             Write-Warning "LlmComplete returned null, retrying..."
@@ -208,8 +209,9 @@ Rules:
         Write-Warning "Namespace '$namespace' already exists (all suffixes taken), retrying..."
     }
 
-    Write-Error "Failed to generate a unique namespace after $maxAttempts attempts"
-    return $null
+    $fallback = "Workspace." + [System.IO.Path]::GetRandomFileName().Replace(".", "").Substring(0, 6)
+    Write-Warning "LLM namespace generation failed after $maxAttempts attempts. Using fallback namespace: $fallback"
+    return $fallback
 }
 
 # Function to complete text using OpenAI API
@@ -252,6 +254,7 @@ function LlmComplete {
             -Headers $headers `
             -Body $bodyBytes `
             -ContentType "application/json; charset=utf-8" `
+            -TimeoutSec 15 `
             -ErrorAction Stop
         
         return $response.choices[0].message.content
