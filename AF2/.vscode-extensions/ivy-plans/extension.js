@@ -165,6 +165,79 @@ function activate(context) {
         })
     );
 
+    // Test Plan - runs IvyFeatureTester.ps1 on the selected .md file
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ivy.testPlan', async (uri) => {
+            if (!uri && vscode.window.activeTextEditor) {
+                uri = vscode.window.activeTextEditor.document.uri;
+            }
+            if (!uri) return;
+            await saveAndClose(uri);
+            const terminal = vscode.window.createTerminal({ name: 'Ivy Test', shellPath: 'pwsh' });
+            terminal.show();
+            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\IvyFeatureTester.ps1" "${uri.fsPath}"`);
+        })
+    );
+
+    // Follow-Up Plan - like Make Plan but prepends [number] from the source file
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ivy.followUpPlan', async (uri) => {
+            if (!uri && vscode.window.activeTextEditor) {
+                uri = vscode.window.activeTextEditor.document.uri;
+            }
+            if (!uri) return;
+
+            const fileName = path.basename(uri.fsPath);
+            const match = fileName.match(/^(\d+)[-_]/);
+            if (!match) {
+                vscode.window.showWarningMessage('File does not start with a plan number');
+                return;
+            }
+            const planNumber = match[1]; // preserves leading zeros
+
+            const os = require('os');
+            const crypto = require('crypto');
+
+            const tmpDir = os.tmpdir();
+            const tmpFileName = `makeplan-${crypto.randomUUID()}.md`;
+            const tmpPath = path.join(tmpDir, tmpFileName);
+
+            fs.writeFileSync(tmpPath, '', 'utf8');
+
+            const doc = await vscode.workspace.openTextDocument(tmpPath);
+            const editor = await vscode.window.showTextDocument(doc);
+
+            const saveHandler = vscode.workspace.onDidSaveTextDocument(async (savedDoc) => {
+                if (savedDoc.uri.toString() === doc.uri.toString()) {
+                    saveHandler.dispose();
+
+                    const content = savedDoc.getText().trim();
+
+                    for (const group of vscode.window.tabGroups.all) {
+                        for (const tab of group.tabs) {
+                            if (tab.input instanceof vscode.TabInputText &&
+                                tab.input.uri.toString() === doc.uri.toString()) {
+                                await vscode.window.tabGroups.close(tab);
+                            }
+                        }
+                    }
+
+                    try { fs.unlinkSync(tmpPath); } catch (err) {}
+
+                    if (content) {
+                        const fullContent = `[${planNumber}] ${content}`;
+                        const terminal = vscode.window.createTerminal({ name: 'Follow-Up Plan', shellPath: 'pwsh' });
+                        terminal.show();
+                        const escapedContent = fullContent.replace(/"/g, '`"');
+                        terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\MakePlan.ps1" "${escapedContent}"`);
+                    } else {
+                        vscode.window.showInformationMessage('Follow-Up Plan cancelled - no content provided');
+                    }
+                }
+            });
+        })
+    );
+
     // Make Plan - opens temp .md file in VSCode, then passes content to MakePlan.ps1
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.makePlan', async () => {
