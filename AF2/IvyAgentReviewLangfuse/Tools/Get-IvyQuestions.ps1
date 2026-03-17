@@ -27,13 +27,19 @@ foreach ($traceFolder in $traceFolders) {
         try {
             $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
             $input = $json.input
-            if (-not $input) { continue }
-
-            $toolName = $input.toolName
             $fileName = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
 
+            # Check both input (old) and metadata (new) for toolName
+            $toolName = $null
+            if ($input -and $input.toolName) {
+                $toolName = $input.toolName
+            } elseif ($json.metadata -and $json.metadata.toolName) {
+                $toolName = $json.metadata.toolName
+            }
+
             # --- AnswerAgent SPAN: WebFetch questions answered by AnswerAgent ---
-            if ($json.type -eq 'SPAN' -and $json.name -eq 'AnswerAgent' -and $input.question) {
+            $question = if ($input) { $input.question } elseif ($json.metadata) { $json.metadata.question } else { $null }
+            if ($json.type -eq 'SPAN' -and $json.name -eq 'AnswerAgent' -and $question) {
                 $answer = $null
                 $answerLen = $null
                 $success = $false

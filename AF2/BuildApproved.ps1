@@ -228,6 +228,34 @@ try {
                     $content = $content -replace '(?s)\A---\r?\n.*?\r?\n---\r?\n', ''
                     $stem = [IO.Path]::GetFileNameWithoutExtension($PlanFile)
 
+                    $preCommitInstructions = @"
+
+## Pre-Commit (REQUIRED)
+
+Before creating any git commit, you MUST run the appropriate formatting/linting commands based on what files you changed.
+
+**If you modified any frontend files** (files under ``src/frontend/`` — .ts, .tsx, .js, .jsx, .css files):
+
+``````bash
+cd src/frontend
+npm run format
+npm run lint:fix
+cd ../..
+``````
+
+**If you modified any .cs (C#) files**:
+
+``````bash
+cd src
+dotnet format
+cd ..
+``````
+
+After running these commands, check the output for any remaining errors. If there are errors that were not auto-fixed (e.g., lint errors, type errors, or build failures), you MUST fix them in your code before proceeding. Re-run the commands after fixing to confirm they pass cleanly.
+
+Once everything passes, stage any files that were reformatted or fixed (``git add`` the changed files), then proceed with the commit.
+"@
+
                     $reviewInstructions = @"
 
 ## Review (optional)
@@ -245,7 +273,7 @@ If the change is purely mechanical (e.g., renaming, formatting, trivial config) 
 We don't need to review faq updates, doc fixes, or simple code changes that are low-risk. 
 "@
 
-                    & claude -p ($content + $reviewInstructions) --dangerously-skip-permissions 2>&1
+                    & claude -p ($content + $preCommitInstructions + $reviewInstructions) --dangerously-skip-permissions 2>&1
                     if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
                 } -ArgumentList $file, $workDir, $ReviewPath
 

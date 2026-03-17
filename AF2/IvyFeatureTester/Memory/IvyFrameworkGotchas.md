@@ -337,6 +337,7 @@ if (maxDate) disabledMatcher.push({ after: maxDate });
 ✅ **`volume.Value.ToString("F2", CultureInfo.InvariantCulture)`** — always produces dot separator
 📝 **Why**: The Ivy server runs with the system's locale. On Windows with European regional settings, `float.ToString("F2")` uses comma as decimal separator. Always use `CultureInfo.InvariantCulture` when the formatted text needs to be matched in Playwright tests.
 
+<<<<<<< HEAD
 ## DateTimeInput Popover Click Target
 
 ### DateInput is NOT a `<button>` — it's a Popover trigger div
@@ -494,6 +495,21 @@ await page.evaluate((id) => {
 }, 'my-button-testid');
 ```
 📝 **Why**: Ivy's dialog uses a fixed overlay div (`class="fixed inset-0 z-50 bg-black/30"`) that intercepts all pointer events. Playwright's `force: true` dispatches pointer events but they don't propagate through Ivy's websocket-based event system correctly. `dispatchEvent` on the actual DOM element triggers the native click handler which Ivy does process.
+
+## PathToAppIdMiddleware Intercepts Custom File Extensions
+
+### Missing file extensions in routing-constants.json
+**Problem**: `PathToAppIdMiddleware` rewrites ALL URL paths to `/?appId=...` unless the path has an extension listed in `staticFileExtensions` (in `src/frontend/src/routing-constants.json`). Custom middleware registered via `UseWebApplication()` runs AFTER this rewrite, so it sees `path="/"` instead of the original URL.
+
+- If you add new middleware that serves files with a custom extension (e.g., `.md`), you MUST add that extension to `staticFileExtensions`
+- Without this, the middleware pipeline is: `UseRouting -> UsePathToAppId (rewrites path) -> UseRouting -> user middleware (sees "/" not original path) -> UseFrontend`
+
+## Chrome Parameter and Sidebar Visibility
+
+### `?chrome=false` Hides the Sidebar
+- `?chrome=false` disables the Ivy "chrome" (sidebar navigation, tab bar, settings)
+- When testing **sidebar labels, navigation items, or app names in the sidebar**, do NOT use `?chrome=false`
+- Only use `?chrome=false` when testing app content in isolation without sidebar interference
 
 ## Future Gotchas to Document
 

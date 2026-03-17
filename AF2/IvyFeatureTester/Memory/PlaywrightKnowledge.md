@@ -684,3 +684,11 @@ This is different from `[ExternalWidget]` "Unknown component type" errors which 
 - **Decimal formatting locale**: Use `CultureInfo.InvariantCulture` in C# when formatting decimal/double values that will be matched by Playwright `getByText()` — European locales use `,` instead of `.`
 - **Invalid prop visual**: FeedbackInput `.Invalid("message")` renders as a small circle-exclamation icon next to the stars, not as visible text. Don't assert `getByText("message")` for invalid state — just verify the state label
 - 20 tests passed, 4 fix rounds (icon name, locale, SVG locator, framework stash), logs clean
+
+### 2026-03-16 — Copy Page (Ivy Docs)
+- **Testing Ivy Docs features**: The Ivy.Docs project at `src/Ivy.Docs/` runs the docs server. Use it directly rather than creating a standalone test project. The Ivy.Docs.Shared library contains the Article widget, MarkdownMiddleware, and generated docs.
+- **Docs page URL structure**: Pages are at paths like `/onboarding/getting-started/introduction` (derived from app namespace). NOT `/onboarding` (that's not a valid app path).
+- **PathToAppIdMiddleware rewrites ALL non-static paths**: Any URL path that doesn't match `staticFileExtensions` in `routing-constants.json` gets rewritten from `/path` to `/?appId=path`. Custom middleware (UseWebApplication) runs AFTER this rewrite. If your middleware needs to intercept specific file extensions (like `.md`), ensure the extension is in `staticFileExtensions`.
+- **Vite build runs prettier on source files**: Running `npx vite build` may reformat source files via prettier. After building, check `git diff` and revert formatting-only changes before committing.
+- **Copy Page button location**: Inside ArticleSidebar, only visible on `lg` breakpoint screens (1024px+). Requires `showToc=true` (default for docs pages). Use 1920x1920 viewport.
+- **Clipboard testing**: Use `context.grantPermissions(["clipboard-read", "clipboard-write"])` and `page.evaluate(() => navigator.clipboard.readText())` to verify clipboard content.
