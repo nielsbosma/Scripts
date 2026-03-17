@@ -105,6 +105,7 @@ NOTES:
 #### Test Failures & UX Issues
 - If `review-tests.md` shows external issues, document them as plans
 - If `review-ux.md` has recommendations, assess if they point to framework widget gaps - anything we can improve in the agent?
+- When creating plans from `review-ux.md` findings, list the screenshots referenced in `review-ux.md` in the plan's `## Evidence` section. Screenshots are stored at `{WorkDir}/.ivy/tests/screenshots/`. Include the full absolute path for each relevant screenshot (e.g., `D:\Temp\IvyAgentTestManager\2026-03-17\00257-Campaign-Dashboard\Test.Campaign-Dashboard\.ivy\tests\screenshots\01-initial-load.png`). The `review-ux.md` file uses `### [filename.png]` headings — parse these filenames and construct the full path using `{WorkDir}/.ivy/tests/screenshots/{filename}`. Only include screenshots relevant to the specific issue being planned.
 
 #### Hallucinations
 - If `langfuse-hallucinations.md` reports hallucinated APIs, check if a refactoring rule could prevent it
@@ -141,7 +142,7 @@ NOTES:
 For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
 
 - Read the counter from `.counter` (default 200 if missing), allocate IDs, increment
-- Format: `<ID>-<RepositoryName>-Feature-<Title>.md`
+- Format: `<ID>-<RepositoryName>-<Title>.md`
 - Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`
 - Before creating a plan, search existing plans to avoid duplicates — update existing plans if they partially cover the finding
 - Read `{WorkDir}/.ivy/plans.md` if it exists — this lists plans created in previous runs of this script. Skip creating plans already listed there
@@ -149,7 +150,7 @@ For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
   ```markdown
   # Created Plans
 
-  - D:\Repos\_Ivy\.plans\268-Scripts-Feature-Example.md
+  - D:\Repos\_Ivy\.plans\268-Scripts-Example.md
   ```
 
 Plan format:
@@ -164,6 +165,10 @@ session: {SessionId}
 ## Problem
 
 [What went wrong, with evidence from review files]
+
+## Evidence
+
+[Optional — absolute paths to relevant screenshot(s) from {WorkDir}/.ivy/tests/screenshots/ that demonstrate the problem. Only include when the plan was derived from screenshot/UX analysis.]
 
 ## Solution
 
