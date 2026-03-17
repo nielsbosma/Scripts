@@ -14,7 +14,9 @@
       { "command": "ivy.splitPlan", "title": "Ivy: Split Plan" },
       { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan" },
       { "command": "ivy.makePlan", "title": "Ivy: Make Plan" },
-      { "command": "ivy.createIvyFrameworkIssue", "title": "Ivy: Create Ivy-Framework Issue" }
+      { "command": "ivy.createIvyFrameworkIssue", "title": "Ivy: Create Ivy-Framework Issue" },
+      { "command": "ivy.testPlan", "title": "Ivy: Test" },
+      { "command": "ivy.followUpPlan", "title": "Ivy: Follow-Up Plan" }
     ],
     "menus": {
       "explorer/context": [
@@ -46,6 +48,16 @@
           "command": "ivy.createIvyFrameworkIssue",
           "when": "resourceExtname == .md",
           "group": "2_workspace@6"
+        },
+        {
+          "command": "ivy.testPlan",
+          "when": "resourceExtname == .md",
+          "group": "2_workspace@7"
+        },
+        {
+          "command": "ivy.followUpPlan",
+          "when": "resourceExtname == .md",
+          "group": "2_workspace@8"
         }
       ]
     },
@@ -77,6 +89,11 @@
       {
         "command": "ivy.createIvyFrameworkIssue",
         "key": "ctrl+alt+i",
+        "when": "editorTextFocus && resourceExtname == .md"
+      },
+      {
+        "command": "ivy.testPlan",
+        "key": "ctrl+alt+t",
         "when": "editorTextFocus && resourceExtname == .md"
       }
     ]
