@@ -8,11 +8,12 @@ We have the following repositories on this machine:
 
 Read ../.shared/Repos.md
 
-This tool helps organize unpushed commits into logical PRs by:
+This tool helps organize unpushed commits into issue-based PRs by:
 1. Checking for uncommitted changes (and optionally committing them)
 2. Analyzing all unpushed commits across repositories
-3. Grouping commits into logical PR proposals
-4. Creating PRs via cherry-picking commits to new branches
+3. Fetching all open issues across repos for smart matching
+4. Matching commits to issues (explicit references → smart matching → feature grouping)
+5. Creating PRs via cherry-picking commits to new branches
 
 ## Execution Steps
 
@@ -39,74 +40,178 @@ For each repository:
 - Get unpushed commits: `git log origin/[branch]..HEAD --format=%H|%s|%an|%ci` (or all commits if no remote tracking branch)
 - Collect commit data: hash, subject, author, date, repo, branch
 
-### 3. Analyze and Group Commits
+### 2.5. Fetch All Open Issues
 
-Using the collected commits, analyze them to suggest logical PR groupings based on:
-- Related functionality (e.g., all commits about a specific feature)
-- Same repository and functional area
-- Temporal proximity (commits made around the same time often relate)
-- Commit message patterns (look for related keywords)
+For each repository in Repos.md, fetch all open issues:
 
-Create a PR plan with groups like:
-```
-PR Group 1: [Ivy-Framework] Add RadialBarChart widget
-  - Commits: 3 commits
-  - abc1234 Add RadialBarChart backend widget class
-  - def5678 Add RadialBarChart frontend component
-  - ghi9012 Add RadialBarChart sample and docs
-
-PR Group 2: [Ivy-Agent] Fix session timeout handling
-  - Commits: 2 commits
-  - jkl3456 Refactor session management
-  - mno7890 Add timeout configuration
-```
-
-#### Search for Related GitHub Issues
-
-After grouping commits, for each group:
-1. Determine the repo's GitHub `owner/repo` from the git remote URL (`git remote get-url origin`)
-2. Extract keywords from the proposed PR title (strip common prefixes like "Add", "Fix", "Update", "Refactor")
-3. Search for open issues in that repo:
+1. Determine `owner/repo` from the git remote URL: `git remote get-url origin`
+2. Fetch open issues:
    ```bash
-   gh search issues "<keywords>" --repo <owner/repo> --state open --json title,url,number,body --limit 10
+   gh issue list --repo <owner/repo> --state open --json number,title,body,labels,url --limit 100
    ```
-4. Also search using keywords extracted from commit messages
-5. Parse commit messages for existing issue references (e.g., `#123`) and include those automatically
-6. Deduplicate results and store the matched issues per group
+3. Store issues with metadata: number, title, body, labels, URL, repo path, owner/repo
+
+Skip repos where `gh issue list` fails (e.g., no GitHub remote). Issues are scoped per repo — a commit in Ivy-Framework should only match to Ivy-Framework issues, not Ivy-Agent issues.
+
+### 3. Smart Commit-to-Issue Matching
+
+Match commits to issues using a three-phase approach. Each commit is marked as "matched" once assigned to an issue group, preventing double-assignment.
+
+#### Phase 1: Explicit References (High Confidence)
+
+For each commit, extract explicit issue references from the commit message:
+- Patterns: `#123`, `Fixes #123`, `Closes #123`, `Resolves #123` (case-insensitive)
+- Cross-repo references: `Ivy-Interactive/Ivy-Framework#42`
+- A commit may reference multiple issues — include it in each issue's group
+- Mark these commits as "matched"
+
+All commits referencing the same issue number (within the same repo) go into one group. Validate each referenced issue:
+```bash
+gh issue view <number> --repo <owner/repo> --json state,title,url
+```
+- Use the issue title to enhance the PR title
+- If the issue doesn't exist or is closed, warn but still allow PR creation
+
+#### Phase 2: Intelligent Matching (Medium Confidence)
+
+For each **unmatched** commit, score it against all open issues **in the same repo**:
+
+1. **Keyword Matching** (0-40 points):
+   - Extract meaningful keywords from commit subject (strip common verbs: "fix", "add", "update", "remove", "refactor", "change")
+   - Extract keywords from issue title and body
+   - Score based on keyword overlap: `(matching_keywords / total_commit_keywords) * 40`
+
+2. **File Path Matching** (0-30 points):
+   - Get file paths changed in commit: `git show --name-only --format= <hash>`
+   - Compare with file paths or component names mentioned in issue title/body
+   - Score based on path overlap (e.g., both mention `Widgets/`, `RadialBarChart`, `Session`)
+   - Partial path matches count (directory name match = 15, full file match = 30)
+
+3. **Label Matching** (0-15 points):
+   - If commit message contains "bug"/"fix" → boost match to issues labeled "bug"
+   - If commit message contains "feature"/"feat" → boost match to issues labeled "enhancement"/"feature"
+   - If commit message contains "docs"/"readme" → boost match to issues labeled "documentation"
+
+4. **Title Similarity** (0-15 points):
+   - Compare commit subject words against issue title words (case-insensitive)
+   - Score: `(common_words / max(commit_words, title_words)) * 15`
+
+**Matching Thresholds**:
+- Score ≥ 70: **Auto-match** — commit is assigned to the highest-scoring issue
+- Score 40-69: **Suggested match** — present to user for approval
+- Score < 40: **No match** — commit moves to Phase 3
+
+If a commit scores ≥ 70 on multiple issues, assign to the highest-scoring one. If tied, prefer the issue whose title most closely matches the commit subject.
+
+#### Phase 3: Feature-Based Grouping (Unmatched Commits)
+
+For commits that scored < 40 on all issues (or had no open issues in their repo):
+
+1. **Group by file path similarity**: Commits touching the same directories or files go together
+2. **Group by keyword similarity**: Commits with overlapping subject keywords go together
+3. **Derive a group title**: Use the most common directory name or keyword as the feature name
+   - Example: Two commits touching `Logging/` → "Feature: Logging improvements"
+   - Example: Three commits about "session" → "Feature: Session management"
+4. Single unrelated commits become their own group
+
+#### PR Group Format
+
+Three types of PR groups:
+
+```
+PR 1: [Ivy-Framework] #42 Add RadialBarChart widget
+  Repo: D:\Repos\_Ivy\Ivy-Framework
+  Base: origin/main
+  Branch: main
+  Issue: https://github.com/Ivy-Interactive/Ivy-Framework/issues/42
+  Confidence: Explicit reference
+  Commits:
+    - abc1234 Add RadialBarChart backend widget class (Closes #42)
+    - def5678 Add RadialBarChart frontend component (#42)
+
+PR 2: [Ivy-Agent] #15 Session timeout handling
+  Repo: D:\Repos\_Ivy\Ivy-Agent
+  Base: origin/main
+  Branch: main
+  Issue: https://github.com/Ivy-Interactive/Ivy-Agent/issues/15
+  Confidence: Smart match (score: 85)
+  Commits:
+    - jkl3456 Refactor session management
+    - mno7890 Add timeout configuration
+
+Suggested Match (requires approval):
+  Commit: xyz1234 Fix badge border styling (Ivy-Framework)
+  → Issue #67 "Badge component border issues" (score: 65)
+  Accept match? (y/n)
+
+PR 3: [Ivy-Mcp] Feature: Logging improvements
+  Repo: D:\Repos\_Ivy\Ivy-Mcp
+  Base: origin/main
+  Branch: main
+  Commits:
+    - pqr1234 Add structured logging
+    - stu5678 Improve error messages
+```
 
 ### 4. Present Plan to User
 
-**Enter plan mode** (using the EnterPlanMode tool) and present the PR groups as a plan. Each group should show:
+**Enter plan mode** (using the EnterPlanMode tool) and present the PR groups as a plan.
+
+First, present any **Suggested Matches** (score 40-69) for user approval:
+```
+Suggested Matches (approve or reject each):
+
+  1. Commit: xyz1234 Fix badge border styling (Ivy-Framework)
+     → Issue #67 "Badge component border issues" (score: 65)
+     Accept? (y/n)
+
+  2. Commit: abc9876 Update session config (Ivy-Agent)
+     → Issue #15 "Session timeout handling" (score: 52)
+     Accept? (y/n)
+```
+
+After processing suggested matches, present the full PR plan. Each group should show:
 - Proposed PR title
 - Full repo path on disk
 - Current branch name (to restore after cherry-pick)
 - List of commits (short hash + subject)
 - Estimated base branch (usually origin/main or origin/master)
-- Linked issues (if any were found in the GitHub issue search or referenced in commit messages). Omit the `Links:` line if no relevant issues exist.
+- Linked issue (shown as `Issue:` line) — for issue-based PRs only
+- Confidence level (Explicit reference, Smart match with score, or Feature-based)
 
 Example plan format:
 ```
-PR 1: [Ivy-Framework] Add RadialBarChart widget
+PR 1: [Ivy-Framework] #42 Add RadialBarChart widget
   Repo: D:\Repos\_Ivy\Ivy-Framework
   Base: origin/main
   Branch: main
+  Issue: https://github.com/Ivy-Interactive/Ivy-Framework/issues/42
+  Confidence: Explicit reference
   Commits:
-    - abc1234 Add RadialBarChart backend widget class
-    - def5678 Add RadialBarChart frontend component
-  Links:
-    - https://github.com/Ivy-Interactive/Ivy-Framework/issues/42 Add RadialBarChart widget support
-    - https://github.com/Ivy-Interactive/Ivy-Framework/issues/38 Missing chart types
+    - abc1234 Add RadialBarChart backend widget class (Closes #42)
+    - def5678 Add RadialBarChart frontend component (#42)
 
-PR 2: [Ivy-Agent] Refactor session management
+PR 2: [Ivy-Agent] #15 Session timeout handling
   Repo: D:\Repos\_Ivy\Ivy-Agent
   Base: origin/main
   Branch: main
+  Issue: https://github.com/Ivy-Interactive/Ivy-Agent/issues/15
+  Confidence: Smart match (score: 85)
   Commits:
     - jkl3456 Refactor session management
     - mno7890 Add timeout configuration
+
+PR 3: [Ivy-Mcp] Feature: Logging improvements
+  Repo: D:\Repos\_Ivy\Ivy-Mcp
+  Base: origin/main
+  Branch: main
+  Confidence: Feature-based grouping
+  Commits:
+    - pqr1234 Add structured logging
+    - stu5678 Improve error messages
 ```
 
-Not every PR group will have related issues — that's fine. Group commits logically by functionality regardless of whether matching issues exist.
+Issue-based PRs (explicit + smart match) include the `Issue:` and `Confidence:` lines. Feature-based PRs omit the `Issue:` line but include `Confidence: Feature-based grouping`.
 
 After all PR groups, append the following **Execution Instructions** section to the plan:
 
@@ -120,7 +225,7 @@ For each PR group above, execute these steps:
 3. `git checkout pr/<first-commit-short-hash>-<sanitized-title>`
 4. `git cherry-pick <commit1> <commit2> ...` (all commits listed in the group, in order)
 5. `git push -u origin pr/<first-commit-short-hash>-<sanitized-title>`
-6. `gh pr create --head pr/<first-commit-short-hash>-<sanitized-title> --base main --title "<PR title>" --body "<Summary from commits, with Closes #N for linked issues>"`
+6. `gh pr create --head pr/<first-commit-short-hash>-<sanitized-title> --base main --title "<PR title>" --body "<Summary from commits, with Closes #N for issue-based PRs>"`
 7. `git checkout <Branch>` (restore original branch)
 8. Open the PR URL in the browser
 9. Drop the cherry-picked commits from `<Branch>`: `git checkout <Branch>` then `git rebase --onto <commit-before-first-cherry-picked> <last-cherry-picked> <Branch>` (or use `git rebase -i` equivalent). This always happens — the commits are "lifted out" of the original branch into the PR branch.
@@ -129,7 +234,7 @@ For each PR group above, execute these steps:
 Notes:
 - Sanitize title for branch name: lowercase, replace spaces with hyphens, remove special chars, truncate to ~50 chars
 - If cherry-pick fails, abort (`git cherry-pick --abort`), clean up the branch, and skip this PR
-- If issues were linked, append `Closes #N` lines to the PR body
+- For issue-based PRs (explicit reference or smart match), append `Closes #N` to the PR body; omit for feature-based PRs
 ```
 
 > **Important**: The plan must be fully self-contained because exiting plan mode clears context. The PR groups plus the Execution Instructions section must include everything needed to create the PRs from scratch — the agent executing these steps will have NO other context beyond this plan text.
@@ -145,8 +250,9 @@ For each PR group that remains in the approved plan:
 #### A. Get PR Details from User
 - **PR Title** (suggest from commits, allow editing)
 - **PR Body** (generate summary from commits, allow editing)
-  - If issues were linked in Step 4, append `Closes #N` lines to the body (one per linked issue)
+  - For issue-based PRs (explicit reference or smart match), append a single `Closes #N` line to the body
   - For cross-repo issues, use full URL syntax: `Closes Ivy-Interactive/Ivy-Framework#42`
+  - For feature-based PRs, don't include any Closes references
 - **Base Branch** (suggest origin/main, allow changing)
 - **Assignee** (optional):
   - None (leave unassigned)
@@ -168,14 +274,14 @@ Follow the pattern from ReviewCommits.ps1:
 
 #### C. Push and Create PR
 1. Push branch to origin: `git push -u origin [branch-name]`
-2. Build the PR body with summary and issue references:
+2. Build the PR body with summary and issue reference:
    ```markdown
    ## Summary
    <generated summary from commits>
 
    Closes #42
-   Closes #38
    ```
+   For feature-based PRs, omit the `Closes` line entirely.
 3. Create PR using gh CLI:
    ```powershell
    gh pr create --repo [repo-url] --head [branch-name] --base [base-branch] --title "[title]" --body "[body-with-closes-refs]"
@@ -207,7 +313,8 @@ Display final summary:
 ## Args Flags
 
 Parse Args for optional flags:
-- `-AutoApprove`: Skip approval prompt and create all suggested PRs automatically. For issue linking, automatically link all issues whose title has high similarity (>70%) to the PR title
+- `-AutoApprove`: Skip plan approval prompt and create all PRs automatically. For smart matching: auto-approves high-confidence matches (score ≥ 70) but still prompts for suggested matches (score 40-69)
+- `-AutoApproveAll`: Like `-AutoApprove` but also auto-accepts suggested matches (score 40-69) without prompting
 - `-AutoAssign [user]`: Automatically assign all PRs to the specified user
 - `-SkipUncommitted`: Skip the uncommitted changes check and only work with committed changes
 - `-Repo [name]`: Only process the specified repository (e.g., `-Repo Ivy-Framework`)
@@ -219,8 +326,7 @@ Parse Args for optional flags:
 - If cherry-pick conflicts occur, abort and skip that PR
 - If gh CLI not available, error and exit (gh is required)
 - If repo not found, skip it with a warning
-- If `gh search issues` fails or returns no results, skip issue linking silently for that group
-- If issue search returns results but none are relevant, skip the linking prompt
+- If `gh issue view` fails for a referenced issue, warn but continue with PR creation
 
 ## Tools
 
@@ -228,6 +334,7 @@ Store reusable PowerShell functions in Tools/ such as:
 - `Get-UnpushedCommits.ps1` - Get unpushed commits for a repo
 - `New-PrBranch.ps1` - Create and cherry-pick commits to new branch
 - `Group-CommitsByTopic.ps1` - Smart grouping logic
+- `Match-CommitToIssue.ps1` - Score a commit against an issue (keyword, file path, label, and title similarity matching). Returns a score 0-100 and breakdown by category. Reusable outside MakePrs.
 
 ## Notes
 

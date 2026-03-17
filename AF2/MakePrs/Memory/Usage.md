@@ -29,8 +29,14 @@ D:\Repos\_Personal\Scripts\AF2\MakePrs.ps1 -AutoApprove -AutoAssign @me
    - Creates logical commits inspired by Sync.ps1
 
 2. **Commit Analysis**: Gathers all unpushed commits across repositories
-   - Analyzes commit messages and timing
-   - Groups related commits together
+   - Fetches all open issues from each repo's GitHub for smart matching
+   - Matches commits to issues using three phases:
+     - **Explicit references**: `#123`, `Fixes #123`, etc. → auto-matched
+     - **Smart matching**: Keyword, file path, label, and title similarity scoring (0-100)
+       - Score ≥ 70: auto-matched
+       - Score 40-69: suggested to user for approval
+       - Score < 40: unmatched
+     - **Feature grouping**: Unmatched commits grouped by file path/keyword similarity
 
 3. **PR Plan Presentation**: Shows suggested PR groupings
    - Each group includes commit list and proposed title
@@ -47,7 +53,8 @@ D:\Repos\_Personal\Scripts\AF2\MakePrs.ps1 -AutoApprove -AutoAssign @me
 
 | Flag | Description |
 |------|-------------|
-| `-AutoApprove` | Skip approval prompt and create all suggested PRs |
+| `-AutoApprove` | Skip plan approval; still prompts for suggested matches (40-69) |
+| `-AutoApproveAll` | Skip all prompts including suggested match approval |
 | `-AutoAssign [user]` | Automatically assign PRs to specified user (@me, copilot, username) |
 | `-SkipUncommitted` | Skip uncommitted changes check |
 | `-Repo [name]` | Only process specified repository |

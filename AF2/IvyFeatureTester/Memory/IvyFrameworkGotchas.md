@@ -474,6 +474,27 @@ The WidgetSerializer strips properties that match the parameterless constructor 
 
 📝 **Warning**: When rewriting any of these files (e.g., during plan implementation), always preserve null guards. They've been lost before during file rewrites.
 
+## Extension Hooks on IViewContext (UseLoading, UseAlert, etc.)
+
+### Must use `this.Context.UseXxx()` from ViewBase
+❌ **`UseLoading()`** — direct call from ViewBase fails with CS0103 "does not exist in current context"
+✅ **`this.Context.UseLoading()`** — extension methods on `IViewContext` must be called via `this.Context`
+📝 **Why**: `ViewBase` wraps hooks like `UseState`, `UseEffect` as protected methods delegating to `this.Context`. But extension methods defined on `IViewContext` (like `UseLoading`, `UseAlert`) aren't wrapped, so you must call them through `this.Context` explicitly.
+
+## Clicking Buttons Behind Modal Dialog Overlays (Playwright)
+
+### Dialog overlay intercepts all pointer events
+❌ **`page.getByTestId('btn').click()`** — times out, overlay div intercepts pointer events
+❌ **`page.getByTestId('btn').click({ force: true })`** — fires click event but Ivy's event handler doesn't process it
+✅ **Use `page.evaluate` with `dispatchEvent`:**
+```typescript
+await page.evaluate((id) => {
+  const btn = document.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+  if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+}, 'my-button-testid');
+```
+📝 **Why**: Ivy's dialog uses a fixed overlay div (`class="fixed inset-0 z-50 bg-black/30"`) that intercepts all pointer events. Playwright's `force: true` dispatches pointer events but they don't propagate through Ivy's websocket-based event system correctly. `dispatchEvent` on the actual DOM element triggers the native click handler which Ivy does process.
+
 ## Future Gotchas to Document
 
 As we encounter more issues during feature testing, add them here with:
