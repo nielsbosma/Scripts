@@ -136,6 +136,20 @@ await server.RunAsync();
 ❌ **Using namespace matching widget type name** (e.g., `namespace ScreenshotFeedback` when using `Ivy.Widgets.ScreenshotFeedback.ScreenshotFeedback`)
 ✅ **Use different namespace**: e.g., `namespace ScreenshotFeedbackTest` to avoid `CS0118: 'X' is a namespace but is used like a type`
 
+### ScreenshotFeedback Extension Methods Don't Work (CS1660)
+❌ **`.OnSave(() => {...})` and `.OnCancel(() => {...})`** — causes CS1660: "Cannot convert lambda expression to type 'Event<ScreenshotFeedback, AnnotationData>'"
+❌ **This also affects the official sample app** in `.samples/Program.cs`
+✅ **Use `with` expression instead**:
+```csharp
+new ScreenshotFeedback() with
+{
+    IsOpen = isOpen.Value,
+    OnSave = e => { /* handle */ return ValueTask.CompletedTask; },
+    OnCancel = e => { /* handle */ return ValueTask.CompletedTask; }
+}
+```
+📝 **Why**: The `OnSave`/`OnCancel` properties are `Func<Event<SF, AD>, ValueTask>?`. C# resolves property getter + delegate invocation before extension methods. So `.OnSave(lambda)` is interpreted as "get the OnSave delegate and invoke it with lambda as argument" rather than "call the OnSave extension method". The Button widget avoids this by using `EventHandler<>` wrapper type with `new()` in extensions.
+
 ## Ivy.Analyser Integration
 
 ### Local Analyser Reference
@@ -337,7 +351,6 @@ if (maxDate) disabledMatcher.push({ after: maxDate });
 ✅ **`volume.Value.ToString("F2", CultureInfo.InvariantCulture)`** — always produces dot separator
 📝 **Why**: The Ivy server runs with the system's locale. On Windows with European regional settings, `float.ToString("F2")` uses comma as decimal separator. Always use `CultureInfo.InvariantCulture` when the formatted text needs to be matched in Playwright tests.
 
-<<<<<<< HEAD
 ## DateTimeInput Popover Click Target
 
 ### DateInput is NOT a `<button>` — it's a Popover trigger div
