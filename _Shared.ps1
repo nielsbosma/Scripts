@@ -178,7 +178,12 @@ Rules:
 "@
         }
 
-        $namespace = (LlmComplete -Prompt $llmPrompt).Trim()
+        $result = LlmComplete -Prompt $llmPrompt
+        if (-not $result) {
+            Write-Warning "LlmComplete returned null, retrying..."
+            continue
+        }
+        $namespace = $result.Trim()
 
         # Validate format: two PascalCase parts separated by a dot
         if ($namespace -notmatch '^[A-Z][a-zA-Z0-9]+\.[A-Z][a-zA-Z0-9]+$') {
