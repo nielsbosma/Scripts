@@ -63,13 +63,17 @@ if ($json.input -and $json.input.message) {
 if (-not $message -or -not $message.'$type') { continue }
 ```
 
-### Tool-Based Events Still in Input
+### Tool-Based Events Also Moved to Metadata
 
-Tool-based events (non-message format) remain in `input`:
-- IvyQuestion: `input.toolName`, `input.request`, `input.response`
-- IvyDocs: `input.toolName`, `input.request`, `input.response`
-- WebFetch: `input.toolName`, `input.request`, `input.response`
-- ToolFeedback (direct format): `input.toolName`, `input.feedback`
+As of 2026-03-16, tool-based events (non-message format) have ALSO moved to `metadata`:
+- IvyDocs request: `metadata.path`, `metadata.content` (was `input.path`, `input.content`)
+- LocalResponse: `metadata.toolName`, `metadata.response` (was `input.toolName`, `input.response`)
+- IvyQuestion, WebFetch, ToolFeedback: likely also in `metadata` now
+
+All tools must check BOTH `input` and `metadata` for tool-based events, not just for message events.
+
+**Critical pattern**: Any tool loop starting with `if (-not $input) { continue }` will skip all new-format events.
+The correct approach is to check both locations before filtering.
 
 ### Example Files
 

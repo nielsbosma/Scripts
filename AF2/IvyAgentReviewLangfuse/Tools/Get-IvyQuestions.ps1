@@ -59,7 +59,7 @@ foreach ($traceFolder in $traceFolders) {
                     ObservationFile = $fileName
                     Direction = "Request"
                     Source = "AnswerAgent"
-                    Question = $input.question
+                    Question = $question
                     Success = $null
                     AnswerLength = $null
                     Error = $null
@@ -78,14 +78,17 @@ foreach ($traceFolder in $traceFolders) {
                 continue
             }
 
-            # --- Direct IvyQuestion event: input.question (no toolName) ---
-            if ($input.question -and -not $toolName) {
+            # --- Direct IvyQuestion event: question field (no toolName) ---
+            $directQuestion = $null
+            if ($input -and $input.question) { $directQuestion = $input.question }
+            elseif ($json.metadata -and $json.metadata.question) { $directQuestion = $json.metadata.question }
+            if ($directQuestion -and -not $toolName) {
                 $results += [PSCustomObject]@{
                     TraceName = $traceFolder.Name
                     ObservationFile = $fileName
                     Direction = "Request"
                     Source = "IvyQuestion"
-                    Question = $input.question
+                    Question = $directQuestion
                     Success = $null
                     AnswerLength = $null
                     Error = $null
@@ -95,25 +98,27 @@ foreach ($traceFolder in $traceFolders) {
 
             if ($toolName -ne 'IvyQuestion') { continue }
 
-            # --- IvyQuestion LocalResponse: request ---
-            if ($input.request) {
+            # --- IvyQuestion LocalResponse: check both input (old) and metadata (new) ---
+            $req = if ($input -and $input.request) { $input.request } elseif ($json.metadata -and $json.metadata.request) { $json.metadata.request } else { $null }
+            $resp = if ($input -and $input.response) { $input.response } elseif ($json.metadata -and $json.metadata.response) { $json.metadata.response } else { $null }
+
+            if ($req) {
                 $results += [PSCustomObject]@{
                     TraceName = $traceFolder.Name
                     ObservationFile = $fileName
                     Direction = "Request"
                     Source = "IvyQuestion"
-                    Question = $input.request.question
+                    Question = $req.question
                     Success = $null
                     AnswerLength = $null
                     Error = $null
                 }
             }
 
-            # --- IvyQuestion LocalResponse: response ---
-            if ($input.response) {
-                $success = $input.response.success -eq $true
-                $answerLen = $input.response.answerLength
-                $errMsg = $input.response.error
+            if ($resp) {
+                $success = $resp.success -eq $true
+                $answerLen = $resp.answerLength
+                $errMsg = $resp.error
                 $results += [PSCustomObject]@{
                     TraceName = $traceFolder.Name
                     ObservationFile = $fileName
