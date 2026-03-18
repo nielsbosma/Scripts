@@ -36,10 +36,15 @@ WorkingDirectory is the target directory. Find the git repository root from ther
 ### 5. Commit
 
 - Create the commit with the generated message
-- If Args contains `-Push`, also push to remote
 - If Args contains `-NoVerify`, add `--no-verify` to the commit
 
-### 6. Summary
+### 6. Push
+
+- If Args contains `-Push`, push to remote automatically
+- Otherwise, ask the user if they want to push to origin
+- If the user confirms, push to remote
+
+### 7. Summary
 
 - Show the commit details (`git log -1 --oneline`)
 - If pushed, confirm push success

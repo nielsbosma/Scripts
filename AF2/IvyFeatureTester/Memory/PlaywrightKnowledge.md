@@ -692,3 +692,9 @@ This is different from `[ExternalWidget]` "Unknown component type" errors which 
 - **Vite build runs prettier on source files**: Running `npx vite build` may reformat source files via prettier. After building, check `git diff` and revert formatting-only changes before committing.
 - **Copy Page button location**: Inside ArticleSidebar, only visible on `lg` breakpoint screens (1024px+). Requires `showToc=true` (default for docs pages). Use 1920x1920 viewport.
 - **Clipboard testing**: Use `context.grantPermissions(["clipboard-read", "clipboard-write"])` and `page.evaluate(() => navigator.clipboard.readText())` to verify clipboard content.
+
+### 2026-03-18 — Optimistic Rendering (All Input Widgets)
+- **Input widget TestId wraps Field container**: `.TestId()` on input widgets (BoolInput, SelectInput, etc.) is applied to the outer Field wrapper, not the inner interactive element. Using `getByTestId('x').locator('button[role="switch"]')` times out. Instead use `page.locator('button[role="switch"]').first()` or `page.locator('button[role="checkbox"]').nth(index)`.
+- **Range inputs use tuple state, not two separate states**: `UseState<(DateOnly?, DateOnly?)>()` and `UseState<(int, int)>()` are required for `ToDateRangeInput()` and `ToNumberRangeInput()` — these extend `IAnyState`, not tuples of individual states.
+- **Multi-select List variant**: Uses `button[role="checkbox"]` elements. When the same option labels appear in multiple sections (radio, toggle, checkbox), use role-based locators rather than text-based ones to target the correct section.
+- **Optimistic rendering verification**: The `useOptimisticValue` hook provides instant feedback. Tests can use short waits (300-500ms) after interactions rather than waiting for server round-trip. Rapid interaction tests (6 toggles in ~1s) work reliably.
