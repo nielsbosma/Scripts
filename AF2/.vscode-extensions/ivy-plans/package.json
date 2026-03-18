@@ -1,6 +1,5 @@
 {
   "name": "ivy-plans",
-  "publisher": "local",
   "displayName": "Ivy Plans",
   "description": "Plan management commands: Update, Approve, Split, and Make plans",
   "version": "0.1.0",
@@ -10,44 +9,17 @@
   "main": "./extension.js",
   "contributes": {
     "commands": [
-      { "command": "ivy.updatePlan", "title": "Ivy: Update Plan", "icon": "$(edit)" },
-      { "command": "ivy.expandPlan", "title": "Ivy: Expand Plan", "icon": "$(expand-all)" },
-      { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan", "icon": "$(check)" },
-      { "command": "ivy.splitPlan", "title": "Ivy: Split Plan", "icon": "$(split-horizontal)" },
-      { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan", "icon": "$(close)" },
+      { "command": "ivy.updatePlan", "title": "Ivy: Update Plan" },
+      { "command": "ivy.expandPlan", "title": "Ivy: Expand Plan" },
+      { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan" },
+      { "command": "ivy.splitPlan", "title": "Ivy: Split Plan" },
+      { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan" },
       { "command": "ivy.makePlan", "title": "Ivy: Make Plan" },
       { "command": "ivy.createIvyFrameworkIssue", "title": "Ivy: Create Ivy-Framework Issue" },
       { "command": "ivy.testPlan", "title": "Ivy: Test" },
       { "command": "ivy.followUpPlan", "title": "Ivy: Follow-Up Plan" }
     ],
     "menus": {
-      "editor/title": [
-        {
-          "command": "ivy.approvePlan",
-          "when": "resourceExtname == .md && (resourcePath =~ /\\.plans\\\\/ || resourcePath =~ /\\.plans\\//)",
-          "group": "navigation@1"
-        },
-        {
-          "command": "ivy.updatePlan",
-          "when": "resourceExtname == .md && (resourcePath =~ /\\.plans\\\\/ || resourcePath =~ /\\.plans\\//)",
-          "group": "navigation@2"
-        },
-        {
-          "command": "ivy.expandPlan",
-          "when": "resourceExtname == .md && (resourcePath =~ /\\.plans\\\\/ || resourcePath =~ /\\.plans\\//)",
-          "group": "navigation@3"
-        },
-        {
-          "command": "ivy.splitPlan",
-          "when": "resourceExtname == .md && (resourcePath =~ /\\.plans\\\\/ || resourcePath =~ /\\.plans\\//)",
-          "group": "navigation@4"
-        },
-        {
-          "command": "ivy.skipPlan",
-          "when": "resourceExtname == .md && (resourcePath =~ /\\.plans\\\\/ || resourcePath =~ /\\.plans\\//)",
-          "group": "navigation@5"
-        }
-      ],
       "explorer/context": [
         {
           "command": "ivy.approvePlan",
