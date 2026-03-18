@@ -16,6 +16,8 @@ Read about the important paths and files in ../.shared/Paths.md
 
 Args contains the user's task description. If it references related plans with `[number]` syntax (e.g. `[205]`), find and read those plan files from `D:\Repos\_Ivy\.plans\` for context.
 
+**Extract Criticality Level**: Look for a criticality or priority level indicator in Args (e.g., "How critical is this fix:" followed by CRITICAL, NICETOHAVE, or NITPICK). If not specified, default to NICETOHAVE.
+
 ### 2. Allocate Plan ID
 
 - Read the counter from `D:\Repos\_Ivy\.plans\.counter` (default 200 if missing)
@@ -37,10 +39,17 @@ Args contains the user's task description. If it references related plans with `
 ### 4. Create Plan
 
 Write a single plan file to `D:\Repos\_Ivy\.plans\` with the naming convention:
-`<ID>-<Queue>-<Title>.md`
+`<ID>-<Queue>-<LEVEL>-<Title>.md`
 
 Queue: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`, `Scripts`, `VsExtension`, `TestManager`, `IvyMcp`, ...
-Every project is executed sequentially in a queue of it's own to avoid build errors and conflicting changes.  
+Every project is executed sequentially in a queue of it's own to avoid build errors and conflicting changes.
+
+LEVEL (priority/criticality):
+- **CRITICAL** — Must be fixed immediately, blocks work or causes severe issues
+- **NICETOHAVE** — Improves functionality but not urgent
+- **NITPICK** — Minor polish, cosmetic fixes, or low-priority refinements
+
+Example: `670-IvyFramework-CRITICAL-FaqCardVsBoxComposition.md`  
 
 Plan format:
 
@@ -117,7 +126,7 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 
 If the IvyFeatureTester discovers problems during verification, it should **automatically create a new implementation plan** to fix the discovered issues:
 
-1. Create a new plan file in D:\Repos\_Ivy\.plans\ with a descriptive name (e.g., 417-IvyFramework-RadialBarChart-FollowUpFix.md)
+1. Create a new plan file in D:\Repos\_Ivy\.plans\ with a descriptive name (e.g., 417-IvyFramework-CRITICAL-RadialBarChart-FollowUpFix.md)
 2. The plan should include:
    - Clear problem description from test results
    - Root cause analysis if identifiable

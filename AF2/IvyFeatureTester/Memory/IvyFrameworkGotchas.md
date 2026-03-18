@@ -532,6 +532,33 @@ await page.evaluate((id) => {
 ✅ **Fix**: Added default value `mode = 'Upload'` in `FileDialogWidget.tsx` destructuring
 📝 **Why**: This is another instance of the WidgetSerializer stripping default enum values (same as DataTable `ColType.Number`). Any new widget with enum props that have value 0 as the "active" mode will hit this bug.
 
+## NumberInput TestId and Clear Button DOM Structure
+
+### TestId is on the `<input>` element, NOT a wrapper
+❌ **`page.getByTestId('my-number').locator('input')`** — times out because testid IS the input, there's no child input
+✅ **`page.getByTestId('my-number')`** — directly references the `<input>` element
+✅ **`page.getByPlaceholder('placeholder text')`** — alternative locator for NumberInput
+
+### Clear (X) button is NOT inside the testid element
+❌ **`page.getByTestId('my-number').locator('svg')`** — SVG is not a descendant of the `<input>` element
+✅ **Walk up the DOM** to find the SVG clear button:
+```typescript
+await page.evaluate(() => {
+  const input = document.querySelector('[data-testid="my-number"]');
+  let container = input?.parentElement;
+  let svg: SVGElement | null = null;
+  for (let i = 0; i < 5 && container && !svg; i++) {
+    svg = container.querySelector('svg');
+    if (!svg) container = container.parentElement;
+  }
+  if (svg) {
+    const clickTarget = svg.closest('button') || svg.closest('div[class*="absolute"]') || svg.parentElement || svg;
+    (clickTarget as HTMLElement).click();
+  }
+});
+```
+📝 **Why**: NumberInput renders `data-testid` directly on the HTML `<input>` element (not an `<ivy-widget>` wrapper). The clear X icon is a sibling element at a higher DOM level (`<div class="relative">` > `<input>` + `<div class="absolute">` containing the SVG). The `<input>` has no children.
+
 ## Future Gotchas to Document
 
 As we encounter more issues during feature testing, add them here with:
