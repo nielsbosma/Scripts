@@ -302,7 +302,36 @@ When an Ivy app displays "Unknown component type: Ivy.WidgetName" instead of ren
 
 This is different from `[ExternalWidget]` "Unknown component type" errors which are Framework bundle serving issues.
 
+## File Dialog Testing (UseFileDialog/UseSaveDialog/UseFolderDialog)
+
+### Disabling File System Access API for Playwright
+Chromium supports `showOpenFilePicker` / `showSaveFilePicker` / `showDirectoryPicker`, which Playwright CANNOT intercept. To use the fallback `<input type="file">` path that Playwright CAN intercept via `filechooser` events:
+```typescript
+await page.addInitScript(() => {
+  Object.defineProperty(window, 'showOpenFilePicker', { value: undefined, configurable: true, writable: true });
+  Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true, writable: true });
+  Object.defineProperty(window, 'showDirectoryPicker', { value: undefined, configurable: true, writable: true });
+  delete (window as any).showOpenFilePicker;
+  delete (window as any).showSaveFilePicker;
+  delete (window as any).showDirectoryPicker;
+});
+```
+
+### Folder Dialog with webkitdirectory
+Playwright's `fileChooser.setFiles()` for `<input webkitdirectory>` requires passing a **directory path**, not individual file paths.
+
+### Save Dialog Fallback
+In headless mode with File System Access API disabled, the save dialog uses `<a download>` fallback. Use `page.waitForEvent('download')` to capture it.
+
 ## Run History
+
+### 2026-03-17 — UseFileDialog/UseSaveDialog/UseFolderDialog Hooks
+- File dialog hooks with browser API detection (File System Access API → fallback input)
+- **BUG FOUND**: `FileDialogMode.Upload` (enum value 0) stripped by WidgetSerializer → `mode` undefined on frontend → upload silently skipped. Fixed with `mode = 'Upload'` default in `FileDialogWidget.tsx`
+- Must disable File System Access API via `addInitScript` for Playwright to intercept file selection
+- Folder dialog `<input webkitdirectory>` requires passing directory path to `fileChooser.setFiles()`
+- Save dialog fallback uses `<a download>` → capture with `page.waitForEvent('download')`
+- 6 tests, 3 fix rounds (TestId on Text, locator fixes, mode serializer bug), all passed, logs clean
 
 ### 2026-03-13 — CameraInput Widget
 - Camera input widget with idle/active/captured states, upload via MemoryStreamUploadHandler

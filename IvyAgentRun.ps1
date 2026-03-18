@@ -68,7 +68,7 @@ if (-not $env:IVY_AGENT_DEBUG_FOLDER) {
     Write-Host "Set it with: `$env:IVY_AGENT_DEBUG_FOLDER = 'D:\Temp\ivy-agent'"
 }
 
-$args = @("code", "--staging", "--debug-agent-server", "http://localhost:$port", "--log-verbose", "--local-source", "--exit-on-complete", "--yes-to-all")
+$args = @("code", "--staging", "--debug-agent-server", "http://localhost:$port", "--log-verbose", "--local-source", "--exit-on-complete")
 
 if (-not [string]::IsNullOrWhiteSpace($Prompt)) {
     $args += "-p"
