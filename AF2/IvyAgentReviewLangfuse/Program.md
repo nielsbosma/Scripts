@@ -34,10 +34,11 @@ Each observation JSON has a structure like:
 
 ## Execution Steps
 
-### 1. Validate
+### 1. Validate & Prepare
 
 - Confirm `LangfuseDir` exists and contains trace folders
 - Confirm `WorkDir` exists
+- Run `Expand-EmbeddedObservations.ps1 -LangfuseDir` to extract any observations embedded in trace.json into separate files (required by all other tools)
 
 ### 2. Run Tools & Generate Reports
 
