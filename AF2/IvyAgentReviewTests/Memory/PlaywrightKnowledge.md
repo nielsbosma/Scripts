@@ -8,6 +8,7 @@
 - The `Build()` method returns the UI tree
 - State is managed via `UseState<T>()` which returns reactive state objects
 - Services are injected via `UseService<T>()`
+- `Program.cs` MUST call `server.AddAppsFromAssembly()` before `server.UseDefaultApp()` — without it, no apps are registered and the server throws `InvalidOperationException: No serviceable apps are registered`. This is a common bug in generated projects.
 
 ## Ivy UI Components
 
@@ -127,6 +128,8 @@
 - Ivy apps MUST have a parameterless constructor — `AppDescriptor.CreateApp()` uses `Activator.CreateInstance` without DI
 - Do NOT use primary constructor injection like `MyApp(IClientProvider client) : ViewBase` — causes `MissingMethodException` at runtime
 - Instead, use `var client = UseService<IClientProvider>()` inside the `Build()` method
+- **`UseDefaultApp(type)` does NOT register the app** — it only sets `DefaultAppId`. You MUST also call `server.AddAppsFromAssembly()` (or `server.AddApp(type)`) to scan and register `[App]`-attributed classes. Without this, the server returns "No serviceable apps are registered" at runtime.
+- `waitForServer` should accept ANY HTTP response (not just 200) — Ivy root URL may redirect (302) to the default app, so checking only for status 200 will cause timeout
 
 ## Card Component
 

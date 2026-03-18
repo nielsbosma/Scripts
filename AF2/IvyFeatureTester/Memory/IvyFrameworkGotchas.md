@@ -524,6 +524,14 @@ await page.evaluate((id) => {
 - When testing **sidebar labels, navigation items, or app names in the sidebar**, do NOT use `?chrome=false`
 - Only use `?chrome=false` when testing app content in isolation without sidebar interference
 
+## FileDialog Upload Mode — mode Prop Stripped by Serializer (FIXED)
+
+### FileDialogMode.Upload is default enum value 0 → stripped from JSON
+❌ **`mode` prop arrives as `undefined` on frontend** — `FileDialogMode.Upload` is enum value 0 (the parameterless constructor default), so the WidgetSerializer strips it from the serialized JSON
+❌ **Upload silently falls through to PathOnly** — `mode === 'Upload'` is false when mode is undefined, so `handleFiles()` takes the PathOnly branch (fires OnFilesSelected without uploading)
+✅ **Fix**: Added default value `mode = 'Upload'` in `FileDialogWidget.tsx` destructuring
+📝 **Why**: This is another instance of the WidgetSerializer stripping default enum values (same as DataTable `ColType.Number`). Any new widget with enum props that have value 0 as the "active" mode will hit this bug.
+
 ## Future Gotchas to Document
 
 As we encounter more issues during feature testing, add them here with:

@@ -29,7 +29,7 @@ Args contains the path to a plan file. Resolve it to an absolute path.
 ### 4. Create Split Plans
 
 Write each split plan to `D:\Repos\_Ivy\.plans\` with the naming convention:
-`<ID>-<RepositoryName>-Feature-<Title>.md`
+`<ID>-<RepositoryName>-<Title>.md`
 
 Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`, `Scripts` etc.
 
