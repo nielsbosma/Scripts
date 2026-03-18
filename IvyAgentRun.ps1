@@ -63,7 +63,12 @@ if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
 
 Set-Location $targetDir
 
-$args = @("code", "--staging", "--debug-agent-server", "http://localhost:$port", "--log-verbose", "--local-source", "--log-output", "--exit-on-complete", "--yes-to-all")
+if (-not $env:IVY_AGENT_DEBUG_FOLDER) {
+    Write-Host "WARNING: IVY_AGENT_DEBUG_FOLDER is not set. --log-output and --log-verbose require it."
+    Write-Host "Set it with: `$env:IVY_AGENT_DEBUG_FOLDER = 'D:\Temp\ivy-agent'"
+}
+
+$args = @("code", "--staging", "--debug-agent-server", "http://localhost:$port", "--log-verbose", "--local-source", "--exit-on-complete", "--yes-to-all")
 
 if (-not [string]::IsNullOrWhiteSpace($Prompt)) {
     $args += "-p"
@@ -74,7 +79,10 @@ if ($NonInteractive) {
     $args += "--non-interactive"
 }
 
+Write-Host "Running: ivy-local $($args -join ' ')"
 ivy-local @args
+$exitCode = $LASTEXITCODE
+Write-Host "ivy-local exited with code: $exitCode"
 
 if ($Debug) {
     pwsh -ExecutionPolicy Bypass -File "$PSScriptRoot\AF2\IvyAgentDebug.ps1"
