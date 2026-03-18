@@ -10,6 +10,7 @@
   "contributes": {
     "commands": [
       { "command": "ivy.updatePlan", "title": "Ivy: Update Plan" },
+      { "command": "ivy.expandPlan", "title": "Ivy: Expand Plan" },
       { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan" },
       { "command": "ivy.splitPlan", "title": "Ivy: Split Plan" },
       { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan" },
@@ -31,33 +32,38 @@
           "group": "2_workspace@2"
         },
         {
-          "command": "ivy.splitPlan",
+          "command": "ivy.expandPlan",
           "when": "resourceExtname == .md",
           "group": "2_workspace@3"
         },
         {
-          "command": "ivy.skipPlan",
+          "command": "ivy.splitPlan",
           "when": "resourceExtname == .md",
           "group": "2_workspace@4"
         },
         {
-          "command": "ivy.makePlan",
+          "command": "ivy.skipPlan",
+          "when": "resourceExtname == .md",
           "group": "2_workspace@5"
+        },
+        {
+          "command": "ivy.makePlan",
+          "group": "2_workspace@6"
         },
         {
           "command": "ivy.createIvyFrameworkIssue",
           "when": "resourceExtname == .md",
-          "group": "2_workspace@6"
+          "group": "2_workspace@7"
         },
         {
           "command": "ivy.testPlan",
           "when": "resourceExtname == .md",
-          "group": "2_workspace@7"
+          "group": "2_workspace@8"
         },
         {
           "command": "ivy.followUpPlan",
           "when": "resourceExtname == .md",
-          "group": "2_workspace@8"
+          "group": "2_workspace@9"
         }
       ]
     },
@@ -69,6 +75,11 @@
       {
         "command": "ivy.updatePlan",
         "key": "ctrl+alt+u",
+        "when": "editorTextFocus && resourceExtname == .md"
+      },
+      {
+        "command": "ivy.expandPlan",
+        "key": "ctrl+alt+e",
         "when": "editorTextFocus && resourceExtname == .md"
       },
       {

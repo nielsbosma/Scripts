@@ -8,6 +8,7 @@
 - The `Build()` method returns the UI tree
 - State is managed via `UseState<T>()` which returns reactive state objects
 - Services are injected via `UseService<T>()`
+- `Program.cs` MUST call `server.AddAppsFromAssembly()` before `server.UseDefaultApp()` — without it, no apps are registered and the server throws `InvalidOperationException: No serviceable apps are registered`. This is a common bug in generated projects.
 
 ## Ivy UI Components
 
@@ -27,12 +28,13 @@
 - Tests live in `.ivy/tests/` within the Ivy project
 - Use `package.json` with `@playwright/test` dependency
 - `playwright.config.ts` targets Chromium only, single worker, no retries
-- Config uses `process.env.APP_PORT` for base URL
+- Config does NOT need `baseURL` — use full URLs in `page.goto()` with the dynamic port variable instead, because the port is assigned in `beforeAll` after config is already loaded
 
 ### App Lifecycle in Tests
 - `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
 - `afterAll`: kill the spawned process
-- `beforeEach`: navigate to `http://localhost:<port>`
+- `beforeEach`: set up console log capture
+- Use `page.goto(\`http://localhost:\${appPort}/app-id?chrome=false\`)` with the module-level port variable
 - Use `cwd: process.cwd().replace(/[/\\]\.ivy[/\\]tests$/, "")` to resolve project root from test dir
 - Wait for server with polling loop (500ms interval, 30s timeout)
 
@@ -72,7 +74,7 @@
 - `state.ToBoolInput().Variant(BoolInputVariants.Checkbox)` renders as `<button role="checkbox">` (Radix UI), NOT a native `<input type="checkbox">` — `getByRole("checkbox", { name: /.../ })` and `getByLabel()` do NOT work for locating these; use `page.locator('[role="checkbox"]').nth(N)` by index order instead
 - `new Card(content, header: Text.H3("Title"))` — the card header text (e.g., "Monthly Revenue") will match `getByText()` along with any content containing the same substring (e.g., "Total Monthly Revenue:"), causing strict mode violations. Always use `getByRole("heading", { name: "Title" })` for card headers
 - `new Card(content).Title("X")` — Card `.Title()` does NOT render as an HTML heading element (`<h1>`-`<h6>`), so `getByRole("heading", { name: "X" })` will fail. Use `getByText("X", { exact: true }).first()` instead. Only explicit `Text.H2()`/`Text.H3()` passed as card header render as headings.
-- **NumberInput** (`state.ToNumberInput()`) renders as a regular text `<input>` in the DOM, NOT `<input type="number">`. `page.locator('input[type="number"]')` will find nothing. Use `page.locator('input[value="200"]')` to locate by current value, or find inputs relative to their label text.
+- **NumberInput** (`state.ToNumberInput()`) renders as a regular text `<input>` in the DOM, NOT `<input type="number">`. `page.locator('input[type="number"]')` will find nothing. Additionally, `.WithLabel()` doesn't create proper HTML label associations, so `getByLabel()` won't work. **Recommended approach**: Use `page.locator('input[value="9"]')` to locate by current/default value when tests start fresh, or use `.nth(N)` to target by position relative to other inputs in the form.
 - **CodeInput copy buttons**: `.ShowCopyButton()` and code editors add `aria-label="Copy to clipboard"` icon buttons. Combined with explicit "Copy" `Button` widgets, `getByRole("button", { name: "Copy" })` may match multiple elements — always use `{ exact: true }` for the explicit Copy button.
 - **Webhooks require state parameter**: Ivy webhook URLs require an internal `state` query parameter. Server-side `HttpClient` calls to `webhook.BaseUrl` without this parameter return 400 "The 'state' query parameter is required." — Test Endpoint features using server-side HTTP calls to webhooks will fail.
 - `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
@@ -127,6 +129,8 @@
 - Ivy apps MUST have a parameterless constructor — `AppDescriptor.CreateApp()` uses `Activator.CreateInstance` without DI
 - Do NOT use primary constructor injection like `MyApp(IClientProvider client) : ViewBase` — causes `MissingMethodException` at runtime
 - Instead, use `var client = UseService<IClientProvider>()` inside the `Build()` method
+- **`UseDefaultApp(type)` does NOT register the app** — it only sets `DefaultAppId`. You MUST also call `server.AddAppsFromAssembly()` (or `server.AddApp(type)`) to scan and register `[App]`-attributed classes. Without this, the server returns "No serviceable apps are registered" at runtime.
+- `waitForServer` should accept ANY HTTP response (not just 200) — Ivy root URL may redirect (302) to the default app, so checking only for status 200 will cause timeout
 
 ## Card Component
 

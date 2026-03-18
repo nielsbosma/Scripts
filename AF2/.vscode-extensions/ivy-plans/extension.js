@@ -52,6 +52,21 @@ function activate(context) {
         })
     );
 
+    // Expand Plan - runs ExpandPlan.ps1 on the selected .md file
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ivy.expandPlan', async (uri) => {
+            if (!uri && vscode.window.activeTextEditor) {
+                uri = vscode.window.activeTextEditor.document.uri;
+            }
+            if (!uri) return;
+            await saveAndClose(uri);
+            const terminal = vscode.window.createTerminal({ name: 'Expand Plan', shellPath: 'pwsh' });
+            terminal.show();
+            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\ExpandPlan.ps1" "${uri.fsPath}"`);
+            await openNextPlan(path.dirname(uri.fsPath), path.basename(uri.fsPath));
+        })
+    );
+
     // Approve Plan - moves .md file to approved/ subdirectory
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.approvePlan', async (uri) => {

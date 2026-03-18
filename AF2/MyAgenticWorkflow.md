@@ -216,9 +216,9 @@ The extension adds 5 commands to VS Code, available via the Command Palette, con
 
 Firmware-based agent that generates plan files. Opens Notepad (or accepts args) for your task description, researches the codebase, searches GitHub issues for duplicates, and produces a numbered plan file in `.plans/`.
 
-- Plan IDs are auto-incremented via `.counter` file
-- Filename format: `XXX-<Queue>-<Title>.md` (e.g., `205-IvyFramework-AddStepper.md`)
-- Supports `[NNN]` references to pull in related plans as context
+- Plan IDs are auto-incremented via a lock-file counter to avoid collisions when multiple plans are generated concurrently.
+- Filename format: `XXX-<RepoName>-<Title>.md`
+- Supports `[NNN]` references in the first line to pull in related plans as context.
 - READ-ONLY for source code — only writes to `.plans/`
 - Includes special checklists for new widgets (6 required artifacts)
 - Can trigger visual verification via `IvyFeatureTester.ps1`

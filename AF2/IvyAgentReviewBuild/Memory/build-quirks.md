@@ -12,6 +12,18 @@ Concurrent builds or rapid retries can cause `csc` to hold a lock on `Ivy.Analys
 
 **Fix**: Wait a moment and retry, or kill the locking `csc` process. The MSB3026 warnings from Ivy.Analyser are transient framework build noise — ignore them.
 
+## IVYHOOK005: Hook ordering in Build()
+
+The Ivy analyzer enforces that all hooks (UseState, UseEffect, UseUpload, UseDownload, etc.) are called at the top of Build(), before any non-hook statements. The analyzer appears to check declaration order — so if UseUpload comes before UseEffect, the latter triggers IVYHOOK005.
+
+**Fix**: Order hooks as: UseState → UseEffect → UseUpload/UseDownload → non-hook code.
+
+## IVYHOOK001B: Hooks inside lambdas
+
+When a hook like UseDownload is called inside a lambda or helper method called from Build(), it triggers IVYHOOK001B. This commonly happens when rendering dynamic collections (e.g., a card per sheet with its own download).
+
+**Fix**: Extract the rendering into a separate `ViewBase` subclass. Each instance gets its own Build() where the hook is at the top level. Pass the data via constructor parameter.
+
 ## IVYHOOK001 false positive inside FuncView lambdas
 
 Static hook-helper methods (e.g. `UseProductListRecord(context, record)`) called inside a `FuncView` lambda trigger IVYHOOK001 because the analyzer flags any `UseXxx(...)` unqualified call inside a lambda/local function. The Ivy samples use this exact pattern but aren't compiled with the analyzer.
