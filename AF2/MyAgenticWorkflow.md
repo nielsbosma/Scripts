@@ -326,7 +326,7 @@ Firmware-based agent. Tests a new Ivy Framework feature end-to-end:
 
 1. Parses feature spec from args
 2. Researches the feature in source code, docs, and recent plans
-3. Creates a temp project (`D:\Temp\IvyFeatureTester\`) with demo apps
+3. Creates a temp project (`D:\Temp\IvyFeatureTester\<yyyy-MM-dd>\`) with demo apps
 4. Creates Playwright tests with screenshots
 5. Runs tests with up to 10 fix rounds
 6. Produces visual quality and feature verification reports
