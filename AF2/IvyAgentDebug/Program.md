@@ -169,15 +169,19 @@ NOTES:
 For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
 
 - Read the counter from `.counter` (default 200 if missing), allocate IDs, increment
-- Format: `<ID>-<RepositoryName>-<Title>.md`
+- Format: `<ID>-<RepositoryName>-<LEVEL>-<Title>.md`
 - Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`
+- LEVEL (priority/criticality):
+  - **CRITICAL** — Must be fixed immediately, blocks work or causes severe issues (build failures, crashes, data loss)
+  - **NICETOHAVE** — Improves functionality but not urgent (hallucinations, missing docs, workflow improvements)
+  - **NITPICK** — Minor polish, cosmetic fixes, or low-priority refinements (cosmetic issues, minor doc tweaks, formatting)
 - Before creating a plan, search existing plans to avoid duplicates — update existing plans if they partially cover the finding
 - Read `{WorkDir}/.ivy/plans.md` if it exists — this lists plans created in previous runs of this script. Skip creating plans already listed there
 - After creating new plans, append their paths to `{WorkDir}/.ivy/plans.md` (create the file if it doesn't exist) using this format:
   ```markdown
   # Created Plans
 
-  - D:\Repos\_Ivy\.plans\268-Scripts-Example.md
+  - D:\Repos\_Ivy\.plans\268-Scripts-NICETOHAVE-Example.md
   ```
 
 Plan format:
