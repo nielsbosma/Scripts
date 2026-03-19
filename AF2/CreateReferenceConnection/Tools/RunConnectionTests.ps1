@@ -3,27 +3,20 @@
     Orchestrates the full test suite for an Ivy connection implementation.
 
 .DESCRIPTION
-    This script creates a temp test directory, copies the connection project,
-    sets up Playwright tests, runs all test categories, collects results,
-    and generates a comprehensive test report.
+    Runs build, unit tests, app launch, and Playwright E2E tests against
+    the connection in its source directory.
 
 .PARAMETER ServiceName
-    The name of the service/connection to test (e.g., "Claude", "Stripe")
+    The name of the service/connection to test (e.g., "CoinGecko", "Stripe")
 
 .PARAMETER ConnectionPath
     Optional. Path to the connection directory. Defaults to D:\Repos\_Ivy\Ivy\connections\<ServiceName>
 
-.PARAMETER TestDir
-    Optional. Path to test directory. Defaults to D:\Temp\CreateReferenceConnectionTest\<ServiceName>
-
-.PARAMETER MaxRetries
-    Optional. Maximum number of fix/retry cycles. Defaults to 5.
+.PARAMETER ResultsDir
+    Optional. Path to store test results. Defaults to D:\Temp\CreateReferenceConnectionTest\<ServiceName>
 
 .EXAMPLE
-    .\RunConnectionTests.ps1 -ServiceName "Claude"
-
-.EXAMPLE
-    .\RunConnectionTests.ps1 -ServiceName "Stripe" -MaxRetries 3
+    .\RunConnectionTests.ps1 -ServiceName "CoinGecko"
 #>
 
 param(
@@ -31,166 +24,178 @@ param(
     [string]$ServiceName,
 
     [Parameter(Mandatory=$false)]
-    [string]$ConnectionPath = "",
-
-    [Parameter(Mandatory=$false)]
-    [string]$TestDir = "",
-
-    [Parameter(Mandatory=$false)]
-    [int]$MaxRetries = 5
+    [string]$ConnectionPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 
-# Set default paths if not provided
 if ([string]::IsNullOrEmpty($ConnectionPath)) {
     $ConnectionPath = "D:\Repos\_Ivy\Ivy\connections\$ServiceName"
 }
 
-if ([string]::IsNullOrEmpty($TestDir)) {
-    $TestDir = "D:\Temp\CreateReferenceConnectionTest\$ServiceName"
-}
-
 $ProjectPath = "$ConnectionPath\Ivy.Connections.$ServiceName"
-$TestResultsPath = "$TestDir\.ivy\tests"
+$TestsDir = "$ProjectPath\.ivy\tests"
 
 Write-Host "=====================================" -ForegroundColor Cyan
 Write-Host "  Connection Test Runner" -ForegroundColor Cyan
 Write-Host "  Service: $ServiceName" -ForegroundColor Cyan
+Write-Host "  Source:  $ProjectPath" -ForegroundColor Cyan
+Write-Host "  Tests:   $TestsDir" -ForegroundColor Cyan
 Write-Host "=====================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Validate connection exists
-if (-not (Test-Path $ConnectionPath)) {
-    Write-Host "ERROR: Connection directory not found: $ConnectionPath" -ForegroundColor Red
-    exit 1
-}
-
 if (-not (Test-Path $ProjectPath)) {
-    Write-Host "ERROR: Project directory not found: $ProjectPath" -ForegroundColor Red
+    Write-Host "[FAIL] Project directory not found: $ProjectPath" -ForegroundColor Red
     exit 1
 }
 
-# Step 1: Create test directory structure
-Write-Host "[1/7] Creating test directory..." -ForegroundColor Yellow
-if (Test-Path $TestDir) {
-    Write-Host "  Cleaning existing test directory..." -ForegroundColor Gray
-    Remove-Item -Path $TestDir -Recurse -Force
+# Create test directory structure in-place
+if (Test-Path "$TestsDir\screenshots") {
+    Remove-Item -Path "$TestsDir\screenshots\*" -Force -ErrorAction SilentlyContinue
+}
+New-Item -Path "$TestsDir\screenshots" -ItemType Directory -Force | Out-Null
+# Clean previous logs
+Get-ChildItem -Path $TestsDir -Filter "*.log" -ErrorAction SilentlyContinue | Remove-Item -Force
+
+# Track results
+$results = @{
+    Build = $false
+    UnitTests = $false
+    AppLaunch = $false
+    Playwright = $false
 }
 
-New-Item -Path $TestDir -ItemType Directory -Force | Out-Null
-New-Item -Path "$TestResultsPath\screenshots" -ItemType Directory -Force | Out-Null
-Write-Host "  ✓ Test directory created: $TestDir" -ForegroundColor Green
-
-# Step 2: Copy connection project
-Write-Host "[2/7] Copying connection project..." -ForegroundColor Yellow
-Copy-Item -Path $ProjectPath -Destination "$TestDir\Ivy.Connections.$ServiceName" -Recurse -Force
-Write-Host "  ✓ Connection project copied" -ForegroundColor Green
-
-# Step 3: Set up Playwright tests
-Write-Host "[3/7] Setting up Playwright tests..." -ForegroundColor Yellow
-$CreatePlaywrightScript = Join-Path $PSScriptRoot "CreatePlaywrightTests.ps1"
-if (-not (Test-Path $CreatePlaywrightScript)) {
-    Write-Host "  ERROR: CreatePlaywrightTests.ps1 not found" -ForegroundColor Red
-    exit 1
-}
-
-& $CreatePlaywrightScript -ServiceName $ServiceName -TestDir $TestDir -ProjectPath "$TestDir\Ivy.Connections.$ServiceName"
-Write-Host "  ✓ Playwright tests configured" -ForegroundColor Green
-
-# Step 4: Build Test
-Write-Host "[4/7] Running build test..." -ForegroundColor Yellow
-$buildOutput = ""
+# ---- Step 1: Build ----
+Write-Host "[1/4] Building project..." -ForegroundColor Yellow
 try {
-    Push-Location "$TestDir\Ivy.Connections.$ServiceName"
+    Push-Location $ProjectPath
     $buildOutput = dotnet build 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) {
-        throw "Build failed"
-    }
-    Write-Host "  ✓ Build succeeded" -ForegroundColor Green
-    $buildPassed = $true
-} catch {
-    Write-Host "  ✗ Build failed" -ForegroundColor Red
-    $buildPassed = $false
-} finally {
-    Pop-Location
-}
-$buildOutput | Out-File -FilePath "$TestResultsPath\build.log" -Encoding UTF8
-
-# Step 5: Unit Tests
-Write-Host "[5/7] Running unit tests..." -ForegroundColor Yellow
-$testOutput = ""
-$testPassed = $false
-$testCount = 0
-try {
-    Push-Location "$TestDir\Ivy.Connections.$ServiceName"
-    $testOutput = dotnet test --no-build --verbosity normal 2>&1 | Out-String
+    $buildOutput | Out-File -FilePath "$TestsDir\build.log" -Encoding UTF8
     if ($LASTEXITCODE -eq 0) {
-        $testPassed = $true
-        # Try to extract test count
-        if ($testOutput -match "Passed!\s+-\s+Failed:\s+(\d+),\s+Passed:\s+(\d+),\s+Skipped:\s+(\d+)") {
-            $testCount = [int]$matches[2]
-        }
-        Write-Host "  ✓ Unit tests passed ($testCount tests)" -ForegroundColor Green
+        $results.Build = $true
+        Write-Host "  [PASS] Build succeeded" -ForegroundColor Green
     } else {
-        Write-Host "  ✗ Unit tests failed" -ForegroundColor Red
+        Write-Host "  [FAIL] Build failed" -ForegroundColor Red
     }
 } catch {
-    Write-Host "  ✗ Unit tests failed" -ForegroundColor Red
+    Write-Host "  [FAIL] Build error: $_" -ForegroundColor Red
 } finally {
     Pop-Location
 }
-$testOutput | Out-File -FilePath "$TestResultsPath\unit-tests.log" -Encoding UTF8
 
-# Step 6: Playwright Tests
-Write-Host "[6/7] Running Playwright tests..." -ForegroundColor Yellow
-$playwrightPassed = $false
+if (-not $results.Build) {
+    Write-Host ""
+    Write-Host "[ABORT] Build failed. Cannot continue." -ForegroundColor Red
+    & "$PSScriptRoot\AnalyzeTestResults.ps1" -ServiceName $ServiceName -TestDir $ProjectPath -ProjectPath $ProjectPath
+    exit 1
+}
+
+# ---- Step 2: Unit Tests ----
+Write-Host "[2/4] Running unit tests..." -ForegroundColor Yellow
 try {
-    Push-Location $TestResultsPath
+    Push-Location $ProjectPath
+    $testOutput = dotnet test --no-build --verbosity normal 2>&1 | Out-String
+    $testOutput | Out-File -FilePath "$TestsDir\unit-tests.log" -Encoding UTF8
+    if ($LASTEXITCODE -eq 0) {
+        $results.UnitTests = $true
+        if ($testOutput -match "Total tests:\s+(\d+)") {
+            Write-Host "  [PASS] $($matches[1]) test(s) passed" -ForegroundColor Green
+        } else {
+            Write-Host "  [PASS] Unit tests passed" -ForegroundColor Green
+        }
+    } else {
+        Write-Host "  [FAIL] Unit tests failed" -ForegroundColor Red
+    }
+} catch {
+    Write-Host "  [FAIL] Test error: $_" -ForegroundColor Red
+} finally {
+    Pop-Location
+}
 
-    # Install Playwright if needed
+# ---- Step 3: App Launch Smoke Test ----
+Write-Host "[3/4] Testing app launch..." -ForegroundColor Yellow
+$port = 5199
+try {
+    Push-Location $ProjectPath
+    $appProcess = Start-Process -FilePath "dotnet" -ArgumentList "run", "--no-build", "--", "--port", $port, "--chrome=false" -PassThru -NoNewWindow -RedirectStandardOutput "$TestsDir\app-stdout.log" -RedirectStandardError "$TestsDir\app-stderr.log"
+
+    $started = $false
+    for ($i = 0; $i -lt 20; $i++) {
+        Start-Sleep -Seconds 1
+        try {
+            $response = Invoke-WebRequest -Uri "http://localhost:$port" -UseBasicParsing -TimeoutSec 2 -ErrorAction SilentlyContinue
+            if ($response.StatusCode -eq 200) {
+                $started = $true
+                break
+            }
+        } catch { }
+    }
+
+    if ($started) {
+        $results.AppLaunch = $true
+        Write-Host "  [PASS] App launched on port $port (HTTP 200, $($response.Content.Length) bytes)" -ForegroundColor Green
+    } else {
+        Write-Host "  [FAIL] App did not start within 20 seconds" -ForegroundColor Red
+    }
+} catch {
+    Write-Host "  [FAIL] App launch error: $_" -ForegroundColor Red
+} finally {
+    if ($appProcess -and -not $appProcess.HasExited) {
+        Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    }
+    Pop-Location
+}
+
+# ---- Step 4: Playwright E2E Tests ----
+Write-Host "[4/4] Running Playwright E2E tests..." -ForegroundColor Yellow
+try {
+    & "$PSScriptRoot\CreatePlaywrightTests.ps1" -ServiceName $ServiceName -TestDir $ProjectPath -ProjectPath $ProjectPath
+
+    Push-Location $TestsDir
+
+    # Use Continue for npm/npx - they write to stderr even on success
+    $prevPref = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
     if (-not (Test-Path "node_modules")) {
-        Write-Host "  Installing Playwright..." -ForegroundColor Gray
+        Write-Host "  Installing dependencies..." -ForegroundColor Gray
         npm install --silent 2>&1 | Out-Null
         npx playwright install chromium --with-deps 2>&1 | Out-Null
     }
 
-    # Run Playwright tests
     $playwrightOutput = npx playwright test --reporter=list 2>&1 | Out-String
-    $playwrightOutput | Out-File -FilePath "$TestResultsPath\playwright.log" -Encoding UTF8
+    $playwrightOutput | Out-File -FilePath "$TestsDir\playwright.log" -Encoding UTF8
+
+    $ErrorActionPreference = $prevPref
 
     if ($LASTEXITCODE -eq 0) {
-        $playwrightPassed = $true
-        Write-Host "  ✓ Playwright tests passed" -ForegroundColor Green
+        $results.Playwright = $true
+        Write-Host "  [PASS] Playwright tests passed" -ForegroundColor Green
     } else {
-        Write-Host "  ✗ Playwright tests failed" -ForegroundColor Red
+        Write-Host "  [FAIL] Playwright tests failed" -ForegroundColor Red
+        Write-Host $playwrightOutput -ForegroundColor Gray
     }
 } catch {
-    Write-Host "  ✗ Playwright tests failed" -ForegroundColor Red
+    Write-Host "  [SKIP] Playwright error: $_" -ForegroundColor Yellow
 } finally {
-    Pop-Location
+    $ErrorActionPreference = "Stop"
+    Pop-Location 2>$null
 }
 
-# Step 7: Analyze results and generate report
-Write-Host "[7/7] Generating test report..." -ForegroundColor Yellow
-$AnalyzeScript = Join-Path $PSScriptRoot "AnalyzeTestResults.ps1"
-if (-not (Test-Path $AnalyzeScript)) {
-    Write-Host "  ERROR: AnalyzeTestResults.ps1 not found" -ForegroundColor Red
-    exit 1
-}
+# ---- Generate Report ----
+Write-Host ""
+Write-Host "Generating report..." -ForegroundColor Yellow
+& "$PSScriptRoot\AnalyzeTestResults.ps1" -ServiceName $ServiceName -TestDir $ProjectPath -ProjectPath $ProjectPath
 
-& $AnalyzeScript -ServiceName $ServiceName -TestDir $TestDir
-
+# ---- Summary ----
 Write-Host ""
 Write-Host "=====================================" -ForegroundColor Cyan
-Write-Host "  Test Report: $TestResultsPath\report.md" -ForegroundColor Cyan
+$passed = ($results.Values | Where-Object { $_ }).Count
+$total = $results.Count
+Write-Host "  Results: $passed/$total passed" -ForegroundColor $(if ($passed -eq $total) { "Green" } else { "Yellow" })
+Write-Host "  Report:  $TestsDir\report.md" -ForegroundColor Cyan
 Write-Host "=====================================" -ForegroundColor Cyan
 
-# Return exit code based on overall results
-if ($buildPassed -and $testPassed -and $playwrightPassed) {
-    Write-Host "✓ All tests passed!" -ForegroundColor Green
-    exit 0
-} else {
-    Write-Host "✗ Some tests failed. Check report for details." -ForegroundColor Red
-    exit 1
-}
+if ($passed -eq $total) { exit 0 } else { exit 1 }

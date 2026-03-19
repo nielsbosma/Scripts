@@ -672,8 +672,10 @@ public interface IHaveSecrets
     public Secret[] GetSecrets();
 }
 
-public sealed record Secret(string Key);
+public sealed record Secret(string Key, string? Preset = null, bool Optional = false);
 ```
+
+**Optional secrets:** If an API works without credentials (e.g., CoinGecko public API), use `new Secret("Key", Optional: true)`. Ivy skips optional secrets when checking for missing configuration at startup. The connection should still read the key from config and use it if present (for higher rate limits, etc.), but not require it.
 
 #### Testing Guidelines
 
@@ -738,95 +740,70 @@ help: | # Instructions on how to obtain the required secrets. Keep it focused: o
 
 Example tags: `payments`, `llm`, `crm`, `marketing`, `email`, `sms`, `analytics`, `developer`, `ecommerce`, `storage`
 
-[ ] **Ask the user to verify** the connection works by running the project.
+[ ] **Verify the connection via Ivy CLI** (these are separate commands — they cannot be combined in one invocation):
+
+```bash
+dotnet run -- --test-connection <ConnectionName>
+dotnet run -- --describe-connection <ConnectionName>
+```
+
+- `--test-connection` must return `OK: ...` — if it reports missing secrets, the secret may need `Optional: true` or the user needs to configure credentials.
+- `--describe-connection` must output the connection's name, type, namespace, context, secrets, and entities as YAML.
+- Both commands must exit cleanly (exit code 0).
 
 ### 6. Testing Phase
 
-Create comprehensive tests to verify the connection implementation:
+Run the automated test suite via the PowerShell tool. Tests live in-place at `.ivy/tests/` inside the connection project directory (NOT in a temp directory).
 
-- [ ] Create `D:\Temp\CreateReferenceConnectionTest\<ServiceName>\` test directory
-- [ ] Copy the generated connection project from `D:\Repos\_Ivy\Ivy\connections\<ServiceName>\Ivy.Connections.<ServiceName>\`
-- [ ] Create `.ivy/tests/` directory structure:
-   - `package.json` with Playwright dependencies
-   - `playwright.config.ts` (Chromium, single worker, 1920x1920 viewport)
-   - `connection.spec.ts` for connection tests
-   - `apps.spec.ts` for demo app tests
+```powershell
+& "D:\Repos\_Personal\Scripts\AF2\CreateReferenceConnection\Tools\RunConnectionTests.ps1" -ServiceName "<ConnectionName>"
+```
 
-**Test Coverage:**
+The test runner executes 4 phases:
 
-1. **Build Test** - Verify `dotnet build` succeeds
-2. **Unit Tests** - Run `dotnet test` and verify all unit tests pass
-3. **Connection Test** - Verify connection class:
-   - Implements IConnection interface
-   - GetName() returns expected name
-   - GetConnectionType() returns correct type
-   - GetSecrets() returns expected secrets
-   - GetEntities() returns valid entities
-   - RegisterServices() registers services without errors
-4. **App Tests** - For each demo app:
-   - Launch with `dotnet run -- --port <port> --chrome=false`
-   - Navigate to app URL
-   - Verify app renders without console errors
-   - Take screenshot at `.ivy/tests/screenshots/<app-name>.png`
-   - Capture backend logs to `.ivy/tests/backend.log`
-   - Capture browser console to `.ivy/tests/console.log`
-5. **Integration Test** (if credentials available):
-   - Call TestConnection() method
-   - Verify it returns success
-   - If available, test a simple API call through the client
+1. **Build** — `dotnet build`
+2. **Unit Tests** — `dotnet test` (xUnit tests in Tests/ folder)
+3. **App Launch** — HTTP smoke test (start app, verify HTTP 200)
+4. **Playwright E2E** — Agentic tests generated from app source code:
+   - Discovers apps via `dotnet run --describe`
+   - Reads app `.cs` files to understand UI elements (inputs, buttons, cards, etc.)
+   - Generates per-app `.spec.ts` with real interactions (fill inputs, click buttons, verify results)
+   - Takes numbered screenshots at each step
+   - Captures console + backend logs
+   - Checks for runtime errors both in logs and visually in screenshots
 
-- [ ] Run tests and collect results
-- [ ] Review all screenshots for visual quality
-- [ ] Check logs for errors or warnings
+Tests output to `Ivy.Connections.<ConnectionName>/.ivy/tests/`:
+- `*.spec.ts` — generated test specs
+- `screenshots/` — numbered screenshots (01-initial-load.png, 02-after-search.png, etc.)
+- `console.log`, `backend.log` — captured logs
+- `report.md` — summary report
+
+**IMPORTANT:** Add `.ivy/` to `.gitignore` in the connection project so test artifacts don't get committed.
+
+[ ] Run the test suite and verify 4/4 pass
+[ ] Review screenshots for visual quality and runtime errors
+[ ] Check console.log and backend.log for exceptions
 
 ### 7. Fix Loop
 
 If tests fail:
-1. Analyze the failure type (build error, runtime error, visual issue, API error)
-2. Determine if it's:
-   - A bug in the generated connection code → create a plan to fix the workflow
-   - Missing credentials → prompt user to configure secrets
-   - A test issue → fix the test code
-   - Expected behavior → document as a known limitation
-3. Apply fixes and rerun tests (max 5 rounds)
+1. Analyze the failure — check screenshots, console.log, backend.log, playwright.log
+2. Determine where the fix belongs:
+   - **Test code** (wrong selectors, timing, rate limits) — fix the `.spec.ts` or the generator
+   - **App code** (runtime errors, broken UI) — fix the `.cs` files
+   - **Connection code** (API errors, auth issues) — fix the connection class
+3. Apply fixes and rerun (max 5 rounds)
+4. For external API rate limiting: tests should handle gracefully (accept Loading/error states)
 
-### 8. Report
+### 8. Screenshot Review
 
-Generate a comprehensive test report at `.ivy/tests/report.md`:
+After tests pass, review ALL screenshots in `.ivy/tests/screenshots/`. Check for:
+- Runtime error indicators (error callouts, stack traces, "Something went wrong")
+- Broken layouts or empty areas where content should appear
+- Missing data or UI elements
+- Visual quality and usability
 
-```markdown
-# Connection Test Report: <ServiceName>
-
-## Result
-[✅ All tests passed / ⚠️ Partial / ❌ Failed]
-
-## Build Status
-[Pass/Fail with details]
-
-## Unit Tests
-[Pass/Fail with count]
-
-## Connection Interface
-| Method | Status | Notes |
-|--------|--------|-------|
-| GetName | Pass/Fail | |
-| GetConnectionType | Pass/Fail | |
-| GetSecrets | Pass/Fail | |
-| GetEntities | Pass/Fail | |
-| RegisterServices | Pass/Fail | |
-| TestConnection | Pass/Fail | |
-
-## Demo Apps
-| App | Build | Launch | Render | Console Clean | Backend Clean | Screenshot |
-|-----|-------|--------|--------|---------------|---------------|------------|
-
-## Issues Found
-| Issue | Severity | Area | Details |
-|-------|----------|------|---------|
-
-## Recommendations
-[Any suggestions for improvement]
-```
+Note any UX issues found for the user.
 
 ### Rules
 
