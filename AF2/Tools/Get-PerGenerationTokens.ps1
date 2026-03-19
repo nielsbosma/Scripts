@@ -13,7 +13,7 @@
     Path to write output files (CSV, report). Defaults to parent of LangfuseDir.
 
 .EXAMPLE
-    .\Get-PerGenerationTokens.ps1 -LangfuseDir "D:\Temp\ivy-agent\session\langfuse" -OutputDir "D:\output"
+    .\Get-PerGenerationTokens.ps1 -LangfuseDir "{projectDir}\.ivy\sessions\{sessionId}\langfuse" -OutputDir "D:\output"
 #>
 [CmdletBinding()]
 param(

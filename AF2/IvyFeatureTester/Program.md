@@ -47,7 +47,7 @@ Skip this step for non-widget features (utilities, services, non-visual APIs).
 
 ### 4. Create Temp Project
 
-- Create folder: `D:\Temp\IvyFeatureTester\<FeatureName>\`
+- Create folder: `D:\Temp\IvyFeatureTester\<yyyy-MM-dd>\<FeatureName>\` where `<yyyy-MM-dd>` is the current date (e.g., `2026-03-19`)
 - Create a new Ivy project:
 
 **`<FeatureName>.csproj`:**

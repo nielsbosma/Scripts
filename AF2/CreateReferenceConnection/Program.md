@@ -182,6 +182,21 @@ connections/[ConnectionName]/
 
 For published connections outside the monorepo, use the `Ivy` NuGet package instead.
 
+[ ] Add the Ivy.Analyser Roslyn analyzer reference. In the monorepo, add a `<ProjectReference>` to `Ivy.Analyser.csproj` configured as an analyzer-only reference:
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\..\..\..\Ivy-Framework\src\Ivy.Analyser\Ivy.Analyser.csproj">
+    <PrivateAssets>all</PrivateAssets>
+    <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    <OutputItemType>Analyzer</OutputItemType>
+  </ProjectReference>
+</ItemGroup>
+```
+
+The relative path should be at the same depth as the Ivy.csproj reference, replacing `Ivy/Ivy.csproj` with `Ivy.Analyser/Ivy.Analyser.csproj`.
+
 [ ] Add the project to `connections.slnx` (in the parent of the working directory). Use the dotnet CLI — don't put it in a folder!
 
 ---

@@ -45,12 +45,13 @@ Also check for `.ivy/feedback.md` — this contains free-form feedback from the 
 
 Check the logs:  
 
-IVY_AGENT_DEBUG_FOLDER\<session-id>\
+{WorkDir}/.ivy/sessions/<session-id>/
   <session-id>-client-verbose.log
   <session-id>-client-output.log
   <session-id>-server-verbose.log
   <task-trace-id>-client-verbose.log
   <task-trace-id>-server-verbose.log
+  langfuse/
 
 Anything that stands out that we should look into?
 
@@ -134,22 +135,27 @@ NOTES:
 - If `review-ux.md` has recommendations, assess if they point to framework widget gaps - anything we can improve in the agent?
 - When creating plans from `review-ux.md` findings, list the screenshots referenced in `review-ux.md` in the plan's `## Evidence` section. Screenshots are stored at `{WorkDir}/.ivy/tests/screenshots/`. Include the full absolute path for each relevant screenshot (e.g., `D:\Temp\IvyAgentTestManager\2026-03-17\00257-Campaign-Dashboard\Test.Campaign-Dashboard\.ivy\tests\screenshots\01-initial-load.png`). The `review-ux.md` file uses `### [filename.png]` headings — parse these filenames and construct the full path using `{WorkDir}/.ivy/tests/screenshots/{filename}`. Only include screenshots relevant to the specific issue being planned.
 
-#### Hallucinations
-- If `langfuse-hallucinations.md` reports hallucinated APIs, check if a refactoring rule could prevent it
-- Check `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` for missing or unclear documentation
-- Add to `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Hallucinations.md` (if not already there)
-- Check if samples cover the misused pattern
-- When updating Hallucinations.md we should also check if some sections can be removed. We might have updated the APIs in Ivy-Framework. 
+#### Hallucinations (DIRECT EDIT — no plans)
 
-#### Failed Questions
-- If `langfuse-questions.md` shows failed IvyQuestion calls, the answer should be added as a FAQ entry on the **relevant doc page** (not the central Faq.md):
-  - Find the most relevant doc page under `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` (e.g., a widget doc, hook doc, or concept page)
-  - Append the Q&A under a `## Faq` section at the end of that doc page (create the section if it doesn't exist)
-  - Use `### <question>` format for each entry within the Faq section
-  - Only add to `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Faq.md` if the question is truly cross-cutting and doesn't belong on any specific doc page
-- Check if the question is already answered in a doc page's Faq section — if so, assess if the answer needs improvement
-- NOTE! Just because we have documented something in a doc page's Faq section doesn't mean that IvyMcp has been updated with that info yet.
-- When adding FAQ entries, also check if existing Faq sections have entries that can be removed because APIs have been updated in Ivy-Framework
+When `langfuse-hallucinations.md` reports hallucinated APIs, **directly update** `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Hallucinations.md` instead of creating a plan. This is an exception to the read-only rule.
+
+Steps for each hallucination:
+1. Check if the hallucinated API already has a section in Hallucinations.md — if yes, add the session UUID to the "Found In" list
+2. If new, add a new `##` section following the existing format (Hallucinated API code block, Error, Correct API, Found In)
+3. Check if a refactoring rule could prevent it (see Memory/RefactoringRules.md) — if a rule is warranted, create a plan for that separately
+4. Check `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` for missing or unclear documentation
+5. Check if samples cover the misused pattern
+
+**Every time Hallucinations.md is edited, also:**
+- **Prune stale entries**: Check whether each existing section's hallucinated API has since been added to the framework (i.e., is no longer a hallucination). If the API now exists, either remove the section or mark it `— now supported`. Verify by searching the Ivy-Framework source.
+- **Rerank all `##` sections** by descending frequency using these rules:
+  - Count each unique UUID in "Found In" as 1
+  - `(multiple sessions)` = 3
+  - `(session not yet recorded)` = 1
+  - Entries with "appeared in ALL sub-tasks" get +2 bonus
+  - Entries with no "Found In" section = 0
+  - Ties: preserve existing relative order (stable sort)
+  - `— now supported` entries always go to the bottom regardless of count
 
 #### System Reminders
 - If `langfuse-system-reminders.md` shows reminders firing, check:
@@ -158,26 +164,24 @@ NOTES:
   - Check the analyser source in `D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent\Agents\Analysers\` for prompt quality
   - Consider if the analyser threshold is too low (firing too early) or too high (firing too late)
 
-#### Doc 404s
-- If `langfuse-docs.md` shows failed doc reads, check what path was requested and whether:
-  - The doc exists at a different path
-  - The doc should be created
-  - The agent's doc path resolution has a bug
-
 ### 4. Create Plan Files
 
 For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
 
 - Read the counter from `.counter` (default 200 if missing), allocate IDs, increment
-- Format: `<ID>-<RepositoryName>-<Title>.md`
+- Format: `<ID>-<RepositoryName>-<LEVEL>-<Title>.md`
 - Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`
+- LEVEL (priority/criticality):
+  - **CRITICAL** — Must be fixed immediately, blocks work or causes severe issues (build failures, crashes, data loss)
+  - **NICETOHAVE** — Improves functionality but not urgent (hallucinations, missing docs, workflow improvements)
+  - **NITPICK** — Minor polish, cosmetic fixes, or low-priority refinements (cosmetic issues, minor doc tweaks, formatting)
 - Before creating a plan, search existing plans to avoid duplicates — update existing plans if they partially cover the finding
 - Read `{WorkDir}/.ivy/plans.md` if it exists — this lists plans created in previous runs of this script. Skip creating plans already listed there
 - After creating new plans, append their paths to `{WorkDir}/.ivy/plans.md` (create the file if it doesn't exist) using this format:
   ```markdown
   # Created Plans
 
-  - D:\Repos\_Ivy\.plans\268-Scripts-Example.md
+  - D:\Repos\_Ivy\.plans\268-Scripts-NICETOHAVE-Example.md
   ```
 
 Plan format:
@@ -186,6 +190,8 @@ Plan format:
 ---
 source: {WorkDir}/.ivy/
 session: {SessionId}
+workflow: <workflows used in this session, from langfuse-workflows.md>
+references: <reference connection files read, from langfuse-reference-connections.md>
 ---
 # [Title]
 
@@ -229,11 +235,12 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 
 ### Rules
 
-- **Everything must be expressed as plans** — hallucination fixes, FAQ edits, doc improvements, workflow fixes
+- **Everything must be expressed as plans** — FAQ edits, doc improvements, workflow fixes
+- **Exception**: Hallucinations.md updates are applied directly (not as plans) — see the Hallucinations section above
 - ONE issue per plan file
 - Plans must include all paths and information for an LLM coding agent to execute end-to-end
 - Keep plans short and concise
-- Do NOT modify any source code directly — only read files and create plan files
+- Do NOT modify any source code directly — only read files and create plan files. **Exception**: `Hallucinations.md` may be edited directly.
 - Missing review files are not failures — analyze what's available
 - When annotating review files in `.plans\review\`, preserve the original content — only prepend notes at the top
 - If a review file's checklist is fully verified (all items proven), move it to `.plans\review\verified\`

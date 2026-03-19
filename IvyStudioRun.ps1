@@ -3,8 +3,27 @@ param(
     [switch]$NoBuild
 )
 
-# Kill any existing ivy-local process to avoid DLL locks during build
-Get-Process -Name "ivy-local" -ErrorAction SilentlyContinue | Stop-Process -Force
+# Kill any existing ivy-local process tree to avoid DLL locks during build
+$procs = Get-Process -Name "ivy-local" -ErrorAction SilentlyContinue
+if ($procs) {
+    foreach ($proc in $procs) {
+        # Kill the entire process tree (parent + children)
+        taskkill /F /T /PID $proc.Id 2>$null | Out-Null
+    }
+    # Wait for processes to fully exit
+    $procs | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+    # Brief pause to let OS release file handles
+    Start-Sleep -Milliseconds 500
+    Write-Host "Stopped $($procs.Count) ivy-local process(es)."
+}
+
+# Verify all ivy-local processes are gone
+$remaining = Get-Process -Name "ivy-local" -ErrorAction SilentlyContinue
+if ($remaining) {
+    Write-Host "WARNING: $($remaining.Count) ivy-local process(es) still running after kill. Waiting..."
+    $remaining | Wait-Process -Timeout 15 -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
+}
 
 if (-not $NoBuild) {
     dotnet build "D:\Repos\_Ivy\Ivy\Ivy.Console\Ivy.Console.csproj"
