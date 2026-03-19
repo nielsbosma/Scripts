@@ -12,7 +12,8 @@
 #>
 param(
     [Parameter(Mandatory)][string]$LangfuseDir,
-    [string]$TaskDescription = ""
+    [string]$TaskDescription = "",
+    [string]$IvyDir = ""
 )
 
 $traceFolders = Get-ChildItem -Path $LangfuseDir -Directory | Sort-Object Name
@@ -41,6 +42,7 @@ $stats = @{
     LspCount = 0
     ToolFeedbackCount = 0
     TotalCost = [decimal]0
+    HasGenerationFailure = $false
 }
 
 foreach ($traceFolder in $traceFolders) {
@@ -125,9 +127,43 @@ foreach ($traceFolder in $traceFolders) {
                     'LspMessage' { $stats.LspCount++ }
                     'WorkflowStartMessage' { if ($message.workflowName) { $stats.WorkflowNames.Add($message.workflowName) | Out-Null } }
                     'ToolFeedback' { $stats.ToolFeedbackCount++ }
+                    'FailedMessage' { $stats.HasGenerationFailure = $true }
                 }
             }
         } catch {}
+    }
+}
+
+# Parse review-spec.md for spec completion data
+$specResults = $null
+if ($IvyDir) {
+    $reviewSpecPath = Join-Path $IvyDir "review-spec.md"
+    if (Test-Path $reviewSpecPath) {
+        $specContent = Get-Content $reviewSpecPath -Raw
+        $implemented = 0; $partial = 0; $missing = 0
+        # Count status markers in the review-spec tables
+        $implemented = ([regex]::Matches($specContent, '✅\s*Implemented')).Count
+        $partial = ([regex]::Matches($specContent, '⚠️\s*Partial')).Count
+        $missing = ([regex]::Matches($specContent, '❌\s*Missing')).Count
+
+        # Fallback: parse the summary table if markers weren't found
+        if (($implemented + $partial + $missing) -eq 0) {
+            $implMatch = [regex]::Match($specContent, 'Implemented\s*\|\s*(\d+)')
+            $partMatch = [regex]::Match($specContent, 'Partial\s*\|\s*(\d+)')
+            $missMatch = [regex]::Match($specContent, 'Missing\s*\|\s*(\d+)')
+            if ($implMatch.Success) { $implemented = [int]$implMatch.Groups[1].Value }
+            if ($partMatch.Success) { $partial = [int]$partMatch.Groups[1].Value }
+            if ($missMatch.Success) { $missing = [int]$missMatch.Groups[1].Value }
+        }
+
+        if (($implemented + $partial + $missing) -gt 0) {
+            $specResults = [PSCustomObject]@{
+                Implemented = $implemented
+                Partial = $partial
+                Missing = $missing
+                HasGenerationFailure = $stats.HasGenerationFailure
+            }
+        }
     }
 }
 
@@ -157,6 +193,7 @@ $partialSummary = [PSCustomObject]@{
 }
 $oneShotScoreArgs = @{ Summary = $partialSummary }
 if ($TaskDescription) { $oneShotScoreArgs.TaskDescription = $TaskDescription }
+if ($specResults) { $oneShotScoreArgs.SpecResults = $specResults }
 $oneShotScore = & "$PSScriptRoot\Get-OneShotScore.ps1" @oneShotScoreArgs
 
 return [PSCustomObject]@{
@@ -184,4 +221,8 @@ return [PSCustomObject]@{
     ToolFeedbackCount = $stats.ToolFeedbackCount
     TotalCost = $stats.TotalCost
     OneShotScore = $oneShotScore
+    HasGenerationFailure = $stats.HasGenerationFailure
+    SpecImplemented = if ($specResults) { $specResults.Implemented } else { -1 }
+    SpecPartial = if ($specResults) { $specResults.Partial } else { -1 }
+    SpecMissing = if ($specResults) { $specResults.Missing } else { -1 }
 }

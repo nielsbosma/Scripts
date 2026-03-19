@@ -54,6 +54,33 @@ IVY_AGENT_DEBUG_FOLDER\<session-id>\
 
 Anything that stands out that we should look into?
 
+### 1b. Cross-Reference Pending Review Files
+
+Check `D:\Repos\_Ivy\.plans\review\` for any review/verification files. For each file:
+
+1. **Parse the review checklist** — extract the plan ID, what was changed, and each verification item
+2. **Match against current session data**:
+   - If the review mentions a **widget or API** (e.g., DataTable, Empty state), check:
+     - `langfuse-hallucinations.md` for hallucinated usage of that API
+     - `langfuse-build-errors.md` for build errors related to that API
+     - `review-ux.md` / screenshots for visual evidence
+     - `langfuse-timeline.md` for tool calls involving that feature
+   - If the review mentions **token/cost metrics**, check:
+     - `summary.yaml` for token counts
+     - `langfuse-timeline.md` for per-generation data
+     - Langfuse raw data for cache metrics (`cacheRead`, `cacheCreationInputTokens`)
+   - If the review mentions **analyser behavior**, check:
+     - `langfuse-system-reminders.md` for analyser firing patterns
+     - `langfuse-build-errors.md` for build retry counts
+   - If the review mentions **specific sessions**, check if the current session ID matches
+3. **Annotate the review file** — prepend a `## Debug Notes (Session {SessionId})` section at the top of the review file with:
+   - Which checklist items have evidence (proven/disproven/inconclusive)
+   - Relevant data excerpts from the session
+   - Date of the cross-reference check
+4. **Create follow-up plans** if the cross-reference reveals:
+   - A review item is definitively disproven (the fix didn't work) → create a fix plan
+   - New issues discovered while investigating the review item → create separate plans
+
 ### 2. Search GitHub Issues
 
 Before creating plans, search GitHub issues to check if a finding is already tracked or has a planned fix. This avoids creating workaround plans for things that are already being built.
@@ -208,6 +235,9 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 - Keep plans short and concise
 - Do NOT modify any source code directly — only read files and create plan files
 - Missing review files are not failures — analyze what's available
+- When annotating review files in `.plans\review\`, preserve the original content — only prepend notes at the top
+- If a review file's checklist is fully verified (all items proven), move it to `.plans\review\verified\`
+- Review cross-references should be concise — link to evidence, don't copy large data blocks
 
 ## Finally 
 

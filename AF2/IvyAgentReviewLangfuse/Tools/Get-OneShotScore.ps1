@@ -11,7 +11,8 @@
 #>
 param(
     [Parameter(Mandatory)][PSCustomObject]$Summary,
-    [string]$TaskDescription = ""
+    [string]$TaskDescription = "",
+    [PSCustomObject]$SpecResults = $null
 )
 
 . "$PSScriptRoot\..\..\..\_Shared.ps1"
@@ -21,6 +22,21 @@ $buildFailureRate = if ($Summary.BuildAttempts -gt 0) { [math]::Round($Summary.B
 $bashFailureRate = if ($Summary.BashCount -gt 0) { [math]::Round($Summary.BashFailures / $Summary.BashCount * 100) } else { 0 }
 
 $taskContext = if ($TaskDescription) { "`nTask description: $TaskDescription`nUse this to judge whether the session complexity (generations, builds, files) is reasonable for the task.`n" } else { "" }
+
+$specContext = ""
+if ($SpecResults) {
+    $total = $SpecResults.Implemented + $SpecResults.Partial + $SpecResults.Missing
+    $completionPct = if ($total -gt 0) { [math]::Round(($SpecResults.Implemented + $SpecResults.Partial * 0.5) / $total * 100) } else { 0 }
+    $specContext = @"
+
+Spec completion (from automated review of what the agent actually built vs what was requested):
+- Requirements implemented: $($SpecResults.Implemented) of $total ($completionPct% complete)
+- Partially implemented: $($SpecResults.Partial)
+- Missing (not built at all): $($SpecResults.Missing)
+- Session ended with generation failure: $($SpecResults.HasGenerationFailure)
+
+"@
+}
 
 $prompt = @"
 You are evaluating an AI coding agent session. Score it from 1 to 10 on how well it performed as a "one-shot" execution (10 = perfect first attempt, 1 = completely failed).
@@ -39,16 +55,26 @@ Session statistics:
 - LSP calls: $($Summary.LspCount)
 - Total input tokens: $($Summary.TotalInputTokens)
 - Total output tokens: $($Summary.TotalOutputTokens)
+$specContext
+Scoring guidelines:
 
-Scoring guidelines (use failure RATIOS, not absolute counts — a complex task with many builds is fine if the failure rate is low):
-- 10: Zero build failures, zero tool feedback corrections. Clean execution.
-- 8-9: At most 1 build failure or 1 correction. Low ratio of failures to total actions.
-- 6-7: A few build failures or corrections, but reasonable for the task complexity. Build failure rate under 33%.
-- 4-5: Build failure rate over 33%, or excessive iterations for a simple task, or multiple IvyQuestion failures.
-- 2-3: More failures than successes, many tool feedback corrections, signs of being stuck in loops.
-- 1: Complete failure — never produced working output, or nearly every action failed.
+CRITICAL: Spec completion is the MOST important factor. An agent that runs cleanly but delivers only half the requirements is NOT a good session. The score MUST reflect what was actually delivered.
 
-Important: Do NOT penalize high absolute counts (many generations, many builds) if the failure rate is low. A 52-generation session with 0 build failures is excellent. Focus on the ratio of failures to attempts.
+Spec completion scoring (primary factor — overrides operational metrics):
+- 10: 100% of requirements implemented, zero build failures, clean execution.
+- 8-9: 90%+ requirements implemented, at most 1 build failure or correction.
+- 6-7: 70-89% requirements implemented, reasonable failure rates.
+- 4-5: 40-69% requirements implemented, OR build failure rate over 33%.
+- 2-3: Under 40% requirements implemented, OR more failures than successes.
+- 1: Complete failure — nothing implemented, or session crashed/failed entirely.
+
+If spec completion data is not available, fall back to operational metrics only:
+- Use failure RATIOS, not absolute counts — a complex task with many builds is fine if the failure rate is low.
+- A 52-generation session with 0 build failures is excellent if it delivered results.
+
+Additional penalties:
+- If the session ended with a generation failure, cap the score at 5 maximum (the agent didn't finish).
+- If there are missing requirements AND a generation failure, the score should be 1-3.
 
 Respond with ONLY a single integer from 1 to 10. Nothing else.
 "@
