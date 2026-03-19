@@ -4,7 +4,12 @@ param(
 )
 
 # Kill any existing ivy-local process to avoid DLL locks during build
-Get-Process -Name "ivy-local" -ErrorAction SilentlyContinue | Stop-Process -Force
+$procs = Get-Process -Name "ivy-local" -ErrorAction SilentlyContinue
+if ($procs) {
+    $procs | Stop-Process -Force
+    $procs | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+    Write-Host "Stopped $($procs.Count) ivy-local process(es)."
+}
 
 if (-not $NoBuild) {
     dotnet build "D:\Repos\_Ivy\Ivy\Ivy.Console\Ivy.Console.csproj"
