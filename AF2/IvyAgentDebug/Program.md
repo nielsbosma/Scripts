@@ -134,12 +134,27 @@ NOTES:
 - If `review-ux.md` has recommendations, assess if they point to framework widget gaps - anything we can improve in the agent?
 - When creating plans from `review-ux.md` findings, list the screenshots referenced in `review-ux.md` in the plan's `## Evidence` section. Screenshots are stored at `{WorkDir}/.ivy/tests/screenshots/`. Include the full absolute path for each relevant screenshot (e.g., `D:\Temp\IvyAgentTestManager\2026-03-17\00257-Campaign-Dashboard\Test.Campaign-Dashboard\.ivy\tests\screenshots\01-initial-load.png`). The `review-ux.md` file uses `### [filename.png]` headings — parse these filenames and construct the full path using `{WorkDir}/.ivy/tests/screenshots/{filename}`. Only include screenshots relevant to the specific issue being planned.
 
-#### Hallucinations
-- If `langfuse-hallucinations.md` reports hallucinated APIs, check if a refactoring rule could prevent it
-- Check `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` for missing or unclear documentation
-- Add to `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Hallucinations.md` (if not already there)
-- Check if samples cover the misused pattern
-- When updating Hallucinations.md we should also check if some sections can be removed. We might have updated the APIs in Ivy-Framework. 
+#### Hallucinations (DIRECT EDIT — no plans)
+
+When `langfuse-hallucinations.md` reports hallucinated APIs, **directly update** `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Hallucinations.md` instead of creating a plan. This is an exception to the read-only rule.
+
+Steps for each hallucination:
+1. Check if the hallucinated API already has a section in Hallucinations.md — if yes, add the session UUID to the "Found In" list
+2. If new, add a new `##` section following the existing format (Hallucinated API code block, Error, Correct API, Found In)
+3. Check if a refactoring rule could prevent it (see Memory/RefactoringRules.md) — if a rule is warranted, create a plan for that separately
+4. Check `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` for missing or unclear documentation
+5. Check if samples cover the misused pattern
+
+**Every time Hallucinations.md is edited, also:**
+- **Prune stale entries**: Check whether each existing section's hallucinated API has since been added to the framework (i.e., is no longer a hallucination). If the API now exists, either remove the section or mark it `— now supported`. Verify by searching the Ivy-Framework source.
+- **Rerank all `##` sections** by descending frequency using these rules:
+  - Count each unique UUID in "Found In" as 1
+  - `(multiple sessions)` = 3
+  - `(session not yet recorded)` = 1
+  - Entries with "appeared in ALL sub-tasks" get +2 bonus
+  - Entries with no "Found In" section = 0
+  - Ties: preserve existing relative order (stable sort)
+  - `— now supported` entries always go to the bottom regardless of count
 
 #### System Reminders
 - If `langfuse-system-reminders.md` shows reminders firing, check:
@@ -219,11 +234,12 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 
 ### Rules
 
-- **Everything must be expressed as plans** — hallucination fixes, FAQ edits, doc improvements, workflow fixes
+- **Everything must be expressed as plans** — FAQ edits, doc improvements, workflow fixes
+- **Exception**: Hallucinations.md updates are applied directly (not as plans) — see the Hallucinations section above
 - ONE issue per plan file
 - Plans must include all paths and information for an LLM coding agent to execute end-to-end
 - Keep plans short and concise
-- Do NOT modify any source code directly — only read files and create plan files
+- Do NOT modify any source code directly — only read files and create plan files. **Exception**: `Hallucinations.md` may be edited directly.
 - Missing review files are not failures — analyze what's available
 - When annotating review files in `.plans\review\`, preserve the original content — only prepend notes at the top
 - If a review file's checklist is fully verified (all items proven), move it to `.plans\review\verified\`
