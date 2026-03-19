@@ -203,6 +203,16 @@ if ($debugFolder) {
     }
 }
 
+# --- Collect pending review files ---
+$reviewPath = "D:\Repos\_Ivy\.plans\review"
+$reviewFiles = @()
+if (Test-Path $reviewPath) {
+    $reviewFiles = Get-ChildItem -Path $reviewPath -Filter "*.md" | Select-Object -ExpandProperty FullName
+    if ($reviewFiles.Count -gt 0) {
+        Write-Host "Found $($reviewFiles.Count) pending review file(s) for cross-reference" -ForegroundColor Cyan
+    }
+}
+
 # --- Phase 3: Agentic analysis ---
 Write-Host ""
 Write-Host "=== Phase 3: Analysis ===" -ForegroundColor Cyan
