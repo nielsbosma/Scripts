@@ -141,28 +141,12 @@ NOTES:
 - Check if samples cover the misused pattern
 - When updating Hallucinations.md we should also check if some sections can be removed. We might have updated the APIs in Ivy-Framework. 
 
-#### Failed Questions
-- If `langfuse-questions.md` shows failed IvyQuestion calls, the answer should be added as a FAQ entry on the **relevant doc page** (not the central Faq.md):
-  - Find the most relevant doc page under `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` (e.g., a widget doc, hook doc, or concept page)
-  - Append the Q&A under a `## Faq` section at the end of that doc page (create the section if it doesn't exist)
-  - Use `### <question>` format for each entry within the Faq section
-  - Only add to `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Faq.md` if the question is truly cross-cutting and doesn't belong on any specific doc page
-- Check if the question is already answered in a doc page's Faq section — if so, assess if the answer needs improvement
-- NOTE! Just because we have documented something in a doc page's Faq section doesn't mean that IvyMcp has been updated with that info yet.
-- When adding FAQ entries, also check if existing Faq sections have entries that can be removed because APIs have been updated in Ivy-Framework
-
 #### System Reminders
 - If `langfuse-system-reminders.md` shows reminders firing, check:
   - Are reminders firing excessively? (>3 of same type = agent likely stuck)
   - Did the agent change behavior after the reminder? If not, the analyser text may need improvement
   - Check the analyser source in `D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent\Agents\Analysers\` for prompt quality
   - Consider if the analyser threshold is too low (firing too early) or too high (firing too late)
-
-#### Doc 404s
-- If `langfuse-docs.md` shows failed doc reads, check what path was requested and whether:
-  - The doc exists at a different path
-  - The doc should be created
-  - The agent's doc path resolution has a bug
 
 ### 4. Create Plan Files
 
@@ -190,6 +174,8 @@ Plan format:
 ---
 source: {WorkDir}/.ivy/
 session: {SessionId}
+workflow: <workflows used in this session, from langfuse-workflows.md>
+references: <reference connection files read, from langfuse-reference-connections.md>
 ---
 # [Title]
 
