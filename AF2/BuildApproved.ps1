@@ -355,10 +355,29 @@ The file should contain a short, actionable checklist of what to verify. Example
 - Check UI rendering
 
 If the change is purely mechanical (e.g., renaming, formatting, trivial config) and needs no human review, skip creating the file.
-We don't need to review faq updates, doc fixes, or simple code changes that are low-risk. 
+We don't need to review faq updates, doc fixes, or simple code changes that are low-risk.
 "@
 
-                    & claude -p ($content + $preCommitInstructions + $reviewInstructions) --dangerously-skip-permissions 2>&1
+                    $ambiguityInstructions = @"
+
+## Ambiguity Handling (REQUIRED)
+
+You are running in non-interactive mode and CANNOT ask the user questions. If at any point you:
+- Are unsure about the intended behavior or requirements
+- Need clarification on scope, approach, or edge cases
+- Encounter conflicting instructions in the plan
+- Cannot find the files, functions, or patterns referenced in the plan
+- Would normally ask a clarifying question before proceeding
+
+Then you MUST stop immediately and fail with a clear message explaining:
+1. What you were trying to do
+2. What specific question(s) you need answered
+3. What information was missing or ambiguous
+
+Do NOT guess or make assumptions when uncertain. It is better to fail with a clear explanation than to silently produce incorrect work.
+"@
+
+                    & claude -p ($content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions) --dangerously-skip-permissions 2>&1
                     if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
                 } -ArgumentList $file, $workDir, $ReviewPath
 
