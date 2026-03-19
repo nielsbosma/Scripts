@@ -45,12 +45,13 @@ Also check for `.ivy/feedback.md` — this contains free-form feedback from the 
 
 Check the logs:  
 
-IVY_AGENT_DEBUG_FOLDER\<session-id>\
+{WorkDir}/.ivy/sessions/<session-id>/
   <session-id>-client-verbose.log
   <session-id>-client-output.log
   <session-id>-server-verbose.log
   <task-trace-id>-client-verbose.log
   <task-trace-id>-server-verbose.log
+  langfuse/
 
 Anything that stands out that we should look into?
 

@@ -7,13 +7,8 @@ $sessionId = GetLatestSessionId
 $args = CollectArgs $args -Optional
 
 # Resolve langfuse data folder
-$debugFolder = if ($env:IVY_AGENT_DEBUG_FOLDER) { $env:IVY_AGENT_DEBUG_FOLDER.Trim() } else { $null }
-if (-not $debugFolder) {
-    Write-Host "Error: IVY_AGENT_DEBUG_FOLDER environment variable is not set." -ForegroundColor Red
-    exit 1
-}
-
-$langfuseDir = Join-Path (Join-Path $debugFolder $sessionId) "langfuse"
+$workDir = (Get-Location).Path
+$langfuseDir = Join-Path $workDir ".ivy" "sessions" $sessionId "langfuse"
 
 # Download langfuse data if not already present
 if (-not (Test-Path $langfuseDir)) {
@@ -27,7 +22,7 @@ if (-not (Test-Path $langfuseDir)) {
         # Last resort: use the build output directly
         $ivyAgent = "D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Console\bin\Debug\net9.0\ivy-agent.exe"
     }
-    & $ivyAgent langfuse session get $sessionId
+    & $ivyAgent langfuse session get $sessionId -d $workDir
     if (-not (Test-Path $langfuseDir)) {
         Write-Host "Error: Download completed but no langfuse data was created." -ForegroundColor Red
         exit 1

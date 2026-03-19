@@ -154,7 +154,7 @@ Hardcoded paths appear throughout. If your repos live elsewhere, update:
 |---|---|---|
 | `OPENAI_API_KEY` | Yes | API key for the LLM used by helper scripts (CreateCommit, CreatePullRequest, etc.). Despite the name, this is routed through an OpenAI-compatible endpoint — it currently calls `claude-sonnet-4-6`. |
 | `OPENAI_ENDPOINT` | No | Override the API base URL. Defaults to `https://api.openai.com`. Set this if you use a proxy, Azure OpenAI, or an OpenRouter-style gateway. |
-| `IVY_AGENT_DEBUG_FOLDER` | No | Path where Ivy agent debug sessions store logs and Langfuse traces (e.g. `D:\Temp\ivy-agent`). Used by `IvyAgentDebug.ps1`. |
+
 
 ### Installing the VS Code Extension
 
