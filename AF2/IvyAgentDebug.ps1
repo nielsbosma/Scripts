@@ -165,7 +165,7 @@ if ($debugFolder) {
     if (Test-Path $langfuseDir) {
         Write-Host "Generating summary.yaml..." -ForegroundColor Cyan
         $summaryScript = Join-Path $PSScriptRoot "IvyAgentReviewLangfuse\Tools\Get-SessionSummary.ps1"
-        $summaryArgs = @{ LangfuseDir = $langfuseDir }
+        $summaryArgs = @{ LangfuseDir = $langfuseDir; IvyDir = (Join-Path $workDir ".ivy") }
         if ($taskDescription) { $summaryArgs.TaskDescription = $taskDescription }
         $summary = & $summaryScript @summaryArgs
 
@@ -196,6 +196,10 @@ if ($debugFolder) {
             "toolFeedbackCount: $($summary.ToolFeedbackCount)"
             "totalCost: $($summary.TotalCost)"
             "oneShotScore: $($summary.OneShotScore)"
+            "hasGenerationFailure: $($summary.HasGenerationFailure)"
+            "specImplemented: $($summary.SpecImplemented)"
+            "specPartial: $($summary.SpecPartial)"
+            "specMissing: $($summary.SpecMissing)"
             "workflows: [$($summary.WorkflowNames -join ', ')]"
         )
         $yamlLines | Set-Content (Join-Path $ivyDir "summary.yaml")
