@@ -57,6 +57,8 @@ Plan format:
 ---
 source: <path-to-source-directory-if-applicable>
 session: <SessionId from header>
+workflow: <workflows used in the session, from args or langfuse-workflows.md>
+references: <reference connection files read, from args or langfuse-reference-connections.md>
 ---
 # [Title]
 
@@ -71,7 +73,39 @@ session: <SessionId from header>
 Commit!
 ```
 
-The `source:` frontmatter is optional — only include when the task references a specific source location. The `session:` frontmatter should always be included — it contains the SessionId from the header args, allowing the user to resume this Claude session with `claude --resume <session-id>`.
+### Automated Testing Guidelines
+
+Every plan's `## Tests` section MUST include a detailed automated testing plan. Never leave it as just "build and verify manually". Follow these rules:
+
+1. **Identify the relevant test project(s)** based on queue:
+   - `IvyFramework` -> `Ivy.Test`, `Ivy.Tests`, `Ivy.Analyser.Test`, `Ivy.Filters.Tests`, `Ivy.Agent.Filter.Tests`, `Ivy.Agent.EfQuery.Test`, `Ivy.Docs.Test`, `Ivy.Docs.Tools.Test`, `Ivy.XamlBuilder.Test` (all in `D:\Repos\_Ivy\Ivy-Framework\src\`)
+   - `IvyAgent` -> `Ivy.Agent.Test`, `Ivy.Agent.Shared.Test`, `Ivy.Llm.Test`, `Ivy.Agent.Eval.Test`, `Ivy.Lsp.Tests`, `Ivy.Workflows.SourceGenerator.Test` (all in `D:\Repos\_Ivy\Ivy-Agent\`)
+   - `IvyConsole` / `General` -> `Ivy.Console.Test`, `Ivy.Internals.Test` (in `D:\Repos\_Ivy\Ivy\`)
+   - `IvyMcp` -> test projects in `D:\Repos\_Ivy\Ivy-Mcp\`
+
+2. **Specify concrete test cases to write** — each test must include:
+   - Test class name and method name (e.g. `MyWidgetTests.Should_Handle_NullInput`)
+   - Which test project the test belongs in
+   - What the test asserts (expected vs actual behavior)
+   - For **bug fixes**: always include a regression test that reproduces the original bug
+
+3. **Include the exact `dotnet test` commands** to run:
+   ```bash
+   # Run specific tests
+   cd D:\Repos\_Ivy\Ivy-Framework\src
+   dotnet test Ivy.Test --filter "FullyQualifiedName~ClassName"
+
+   # Run full test project to check for regressions
+   dotnet test Ivy.Test
+   ```
+
+4. **Always run ALL existing tests** in affected test project(s) to catch regressions
+
+5. If no suitable test project exists for the change (rare), explicitly state why and propose where tests should go
+
+The test framework is **xUnit** (`[Fact]`, `[Theory]`, `Assert.*`). All test projects use this convention.
+
+The `source:` frontmatter is optional — only include when the task references a specific source location. The `session:` frontmatter should always be included — it contains the SessionId from the header args, allowing the user to resume this Claude session with `claude --resume <session-id>`. The `workflow:` and `references:` frontmatter fields capture which workflows and reference connection files were used in the session — include when available from args or from langfuse review files.
 
 ### New Widget Checklist
 

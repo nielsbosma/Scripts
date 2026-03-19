@@ -61,24 +61,41 @@ $md | Out-File "$OutputDir\langfuse-hallucinations.md" -Encoding utf8
 Write-Host "Generating questions..."
 $questions = Invoke-Tool "Get-IvyQuestions"
 $md = "# IvyQuestion Log: $SessionId`n`n"
-if ($questions.Count -eq 0) {
+# Pair request/response rows: requests have Question, responses have Success
+$requests = $questions | Where-Object { $_.Direction -eq "Request" }
+$responses = $questions | Where-Object { $_.Direction -eq "Response" }
+if ($requests.Count -eq 0) {
     $md += "No IvyQuestions asked during this session.`n"
 } else {
     $md += "## Questions`n`n"
     $qNum = 1
-    foreach ($q in $questions) {
-        $status = if ($q.Success) { "✅ Success" } else { "❌ Failed" }
-        $md += "### Q$qNum`: $($q.Question)`n`n"
-        $md += "**Source**: $($q.Source)`n"
+    foreach ($req in $requests) {
+        # Find matching response (next response in same trace after this request)
+        $resp = $responses | Where-Object { $_.TraceName -eq $req.TraceName -and $_.ObservationFile -gt $req.ObservationFile } | Select-Object -First 1
+        $status = if ($resp -and $resp.Success) { "✅ Success" } elseif ($resp) { "❌ Failed" } else { "❓ No response" }
+        $md += "### Q$qNum`: $($req.Question)`n`n"
+        $md += "**Source**: $($req.Source)`n"
         $md += "**Status**: $status`n"
-        if ($q.Success) {
-            $md += "**Answer length**: $($q.AnswerLength) chars`n"
-        } else {
-            $md += "**Error**: $($q.Error)`n"
+        if ($resp -and $resp.Success) {
+            $md += "**Answer length**: $($resp.AnswerLength) chars`n"
+        } elseif ($resp -and $resp.Error) {
+            $md += "**Error**: $($resp.Error)`n"
         }
         $md += "`n"
         $qNum++
     }
+
+    $successCount = ($responses | Where-Object { $_.Success -eq $true }).Count
+    $failedCount = ($responses | Where-Object { $_.Success -eq $false }).Count
+    $totalChars = ($responses | Where-Object { $_.Success -eq $true } | Measure-Object -Property AnswerLength -Sum).Sum
+
+    $md += "## Summary`n`n"
+    $md += "| Metric | Count |`n"
+    $md += "|--------|-------|`n"
+    $md += "| Total IvyQuestions | $($requests.Count) |`n"
+    $md += "| Successful | $successCount |`n"
+    $md += "| Failed | $failedCount |`n"
+    $md += "| Total answer chars | $totalChars |`n"
 }
 $md | Out-File "$OutputDir\langfuse-questions.md" -Encoding utf8
 
@@ -99,7 +116,7 @@ if ($workflows.Count -eq 0) {
 
         $states = $events | Where-Object { $_.StateName } | Select-Object -ExpandProperty StateName -Unique
         if ($states) {
-            $md += "**States**: $($states -join ' → ')`n"
+            $md += "**States**: $($states -join ' -> ')`n"
         }
 
         if ($events[0].Error) {
@@ -177,14 +194,14 @@ if ($builds.Count -eq 0) {
 } else {
     foreach ($build in $builds) {
         $status = if ($build.Success) { "✅ OK" } else { "❌ FAILED" }
-        $md += "## Build #$($build.BuildNumber) ($($build.ObservationFile)) — $status`n`n"
+        $md += "## Build #$($build.BuildNumber) ($($build.ObservationFile)) - $status`n`n"
 
         if (-not $build.Success -and $build.Errors) {
             $errByFile = $build.Errors | Group-Object RelativePath
             foreach ($fileGroup in $errByFile) {
                 $md += "### $($fileGroup.Name)`n"
                 foreach ($err in $fileGroup.Group) {
-                    $md += "- ``$($err.ErrorCode):$($err.Line)`` — $($err.Message)`n"
+                    $md += "- ``$($err.ErrorCode):$($err.Line)`` - $($err.Message)`n"
                 }
                 $md += "`n"
             }

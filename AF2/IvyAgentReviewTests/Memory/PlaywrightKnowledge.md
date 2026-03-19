@@ -124,6 +124,11 @@
 - Clicking `ListItem` in Ivy lists: extract the visible item title text from the page (e.g., via regex on body text) and use `getByText(name, { exact: true }).dispatchEvent("click")`. Filtering parent divs by `hasText` matches too many ancestors
 - `page.goBack()` in Ivy SPA may not reliably restore blade state — prefer re-navigating or keeping blade context
 
+## Ivy Connection Secrets
+
+- **Ivy server blocks startup when secrets are missing** — projects with `IConnection` + `IHaveSecrets` (e.g., OpenAI) fail with "Missing secrets detected. The Ivy server cannot start." before binding any port. Tests must configure user secrets BEFORE spawning the server: `dotnet user-secrets set "SecretKey" "value"` from the project directory. Check the spec for API keys/tokens to use.
+- Secret keys and presets are discoverable via `dotnet run --describe` (listed under `secrets:`)
+
 ## Ivy App Construction
 
 - Ivy apps MUST have a parameterless constructor — `AppDescriptor.CreateApp()` uses `Activator.CreateInstance` without DI
@@ -548,3 +553,49 @@
 - `ChromeSettings` still missing from NuGet (confirmed) — simplified to `server.UseChrome()`
 - `UseState<string?>(null)` ambiguity (confirmed same as GridQuest.Pathfinder) — fix with explicit typed variable
 - Clean run: 11 tests passed, 0 fix rounds, no runtime errors, logs clean
+
+### 2026-03-19 — Test.BookingSystemConference
+- CRUD booking system with 2 apps (Rooms, Bookings), Chrome sidebar + tabs, UseBlades, SQLite EF Core, Bogus seeder (15 rooms, ~900 bookings)
+- **`UseService<IBladeService>()` vs `UseContext<IBladeService>()`**: `IBladeService` is context-scoped (provided by `UseBlades()`), NOT a DI-registered service. `UseService<IBladeService>()` returns null, causing `NullReferenceException` when clicking list items to push blades. Always use `UseContext<IBladeService>()` in blade views.
+- **`BladeHeader` hides child content**: `BladeHeader(Layout.Horizontal() | searchInput | iconButton)` renders the header bar but `ToSearchInput()` and `Text.H3()` are not visible — only icon buttons show. The Bookings app works around this by placing search and title outside the `BladeHeader`
+- **`Icons.Plus.ToButton().Ghost().ToTrigger()` in BladeHeader**: The trigger icon button inside BladeHeader doesn't open the dialog via Playwright click/dispatchEvent — may be a rendering constraint of BladeHeader
+- `DefaultApp<RoomsApp>().UseTabs(preventDuplicates: true)` auto-opens the Rooms tab on Chrome load (confirmed same as prior single-app auto-open pattern)
+- 13 tests passed after 3 fix rounds (2 project fixes: UseService→UseContext), logs clean
+
+### 2026-03-19 — Test.PasswordGenerator
+- Single-page password generator with slider, switches, strength indicator, copy/regenerate buttons
+- **`Text.Monospaced()` renders as `<code>` element** with classes `font-mono text-sm font-semibold` — use `page.locator("code").first()` to locate password text. Do NOT use `[class*='mono']` selector — the Ivy footer "MADE WITH" text also has `font-mono` class, causing ambiguous matches
+- `ToSwitchInput().WithLabel("Label")` renders as `role="switch"` elements — `page.getByRole("switch").nth(N)` works reliably for toggling by index order
+- Radix slider `Home`/`End` keys fire multiple state changes (one per step from current to min/max) — each triggers UseEffect, so add extra wait time (2-3s) after pressing Home/End before asserting password length
+- Clean run: 10 tests passed after 2 test-only fix rounds (password locator), no project fixes, no runtime errors, logs clean
+
+### 2026-03-19 — Test.AICoverLetterGeneratorV3
+- AI cover letter generator with OpenAI API (via llmproxy.ivy.app), two textareas (job posting + resume), optional instructions input, generate button, Markdown result display, download button
+- **Ivy blocks startup when connection secrets are missing** — `OpenAI:ApiKey` had to be set via `dotnet user-secrets set` before server would start. Spec contained the API key (`sk-8V1zgOqfbiBOSC7XFRkS4A`)
+- `UseDefaultApp` — no Chrome sidebar, direct access via `/<app-id>?chrome=false`
+- `UseDownload()` with sync factory renders as `role="link"` (Download button with Outline variant)
+- `new Markdown(result.Value)` renders AI-generated markdown correctly as formatted content
+- `Button.Loading(loading)` shows loading state during async API calls
+- Empty field guard (`string.IsNullOrWhiteSpace`) prevents generation without input — no crash, no error, just no-op
+- Clean run: 10 tests passed, 0 project fixes, no runtime errors, logs clean
+
+### 2026-03-19 — Test.AIMeetingNotesExtractorV3
+- AI meeting notes extractor using LlmProxy (OpenAI-compatible API) with `IChatClient.GetResponseAsync<MeetingAnalysis>()` structured output
+- `UseDefaultApp` — no Chrome sidebar, direct access via `/meeting-notes-extractor?chrome=false`
+- **All connection secrets must be set** — `LlmProxy:ApiKey`, `LlmProxy:Endpoint`, `LlmProxy:Model` all required. Server blocks startup on ANY missing secret from `IHaveSecrets.GetSecrets()`, even if the code has fallback defaults. Must `dotnet user-secrets init` + set all secrets before tests
+- `new Table([new TableRow(...).IsHeader(), ...items])` renders standard HTML `<table>` with header row — column headers locatable via `getByText("Header", { exact: true })`
+- `Badge.Variant(BadgeVariant.Destructive/Warning/Success)` renders color-coded badges (red/yellow/green) for priority levels
+- `Callout()` without `.Error()` renders as info callout with icon — used for key decisions display
+- `Badge.Outline()` renders outlined badges — used for participant names in horizontal layout
+- Clean run: 10 tests passed, 0 fix rounds, no project fixes, no runtime errors, logs clean
+
+### 2026-03-19 — Test.AIDataClassifierV3
+- AI data classifier using LlmProxy (OpenAI-compatible API via Refit), CSV upload + paste, configurable categories, results table
+- **Project had NO app** — only the LlmProxy connection was generated. Had to create `AIDataClassifierApp.cs` from scratch based on the spec
+- **`LayoutView.Children()` removed** — `Layout.Vertical().Children(...)` no longer exists in current Ivy. Must use `|` pipe operator chaining instead
+- **`ToFileInput` API changed** — now requires `IState<UploadContext>` from `UseUpload(handler)` instead of `IUploadHandler` directly. Old: `fileState.ToFileInput(upload)`, New: `fileState.ToFileInput(uploadContext)` where `uploadContext = UseUpload(MemoryStreamUploadHandler.Create(fileState))`
+- **`Size.Fraction(1, 2)` removed** — now `Size.Fraction(0.5f)` takes a single float
+- **`App` attribute uses `title:` not `path:`** and `ViewBase` has no `Name` property to override
+- Refit-generated `LlmProxyClient.cs` is 2.3MB. `Messages8` uses `[JsonExtensionData]` with `AdditionalProperties` dict for role/content
+- `UseChrome(new ChromeSettings().UseTabs(preventDuplicates: true))` with single app auto-opens the tab
+- Clean run: 10 tests passed, 0 fix rounds (first pass), 1 major project fix (created entire app), logs clean
