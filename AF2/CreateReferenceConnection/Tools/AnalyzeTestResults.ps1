@@ -3,17 +3,20 @@
     Analyzes test results and generates a comprehensive report.
 
 .DESCRIPTION
-    Processes test output, analyzes screenshots, reviews log files,
-    and generates a markdown summary report.
+    Processes test output from build, unit tests, app launch, and Playwright E2E,
+    then generates a markdown summary report including screenshot inventory.
 
 .PARAMETER ServiceName
     The name of the service/connection tested
 
 .PARAMETER TestDir
-    The test directory path
+    The results directory path (contains .ivy/tests/)
+
+.PARAMETER ProjectPath
+    Path to the connection project (source directory)
 
 .EXAMPLE
-    .\AnalyzeTestResults.ps1 -ServiceName "Claude" -TestDir "D:\Temp\CreateReferenceConnectionTest\Claude"
+    .\AnalyzeTestResults.ps1 -ServiceName "CoinGecko" -TestDir "D:\Temp\CreateReferenceConnectionTest\CoinGecko" -ProjectPath "D:\Repos\_Ivy\Ivy\connections\CoinGecko\Ivy.Connections.CoinGecko"
 #>
 
 param(
@@ -21,160 +24,126 @@ param(
     [string]$ServiceName,
 
     [Parameter(Mandatory=$true)]
-    [string]$TestDir
+    [string]$TestDir,
+
+    [Parameter(Mandatory=$false)]
+    [string]$ProjectPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 $TestsDir = "$TestDir\.ivy\tests"
 
-# Helper function to determine pass/fail status
-function Get-TestStatus {
-    param([string]$LogPath, [string]$Pattern)
+if ([string]::IsNullOrEmpty($ProjectPath)) {
+    $ProjectPath = "D:\Repos\_Ivy\Ivy\connections\$ServiceName\Ivy.Connections.$ServiceName"
+}
 
-    if (-not (Test-Path $LogPath)) {
-        return "Not Run"
-    }
+function Get-LogStatus {
+    param([string]$LogPath, [string]$SuccessPattern)
+    if (-not (Test-Path $LogPath)) { return "NOT RUN" }
+    $content = Get-Content $LogPath -Raw -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrEmpty($content)) { return "EMPTY" }
+    if ($content -match $SuccessPattern) { return "PASS" }
+    return "FAIL"
+}
 
-    $content = Get-Content $LogPath -Raw
-    if ($content -match $Pattern) {
-        return "✅ Pass"
-    } else {
-        return "❌ Fail"
+# Analyze each phase
+$buildStatus = Get-LogStatus "$TestsDir\build.log" "Build succeeded"
+$unitTestStatus = Get-LogStatus "$TestsDir\unit-tests.log" "Test Run Successful"
+$playwrightStatus = Get-LogStatus "$TestsDir\playwright.log" "passed"
+
+# Unit test count
+$unitTestDetails = ""
+$unitLog = ""
+if (Test-Path "$TestsDir\unit-tests.log") {
+    $unitLog = Get-Content "$TestsDir\unit-tests.log" -Raw
+    if ($unitLog -match "Total tests:\s+(\d+)") {
+        $unitTestDetails = "$($matches[1]) test(s)"
     }
 }
 
-# Helper function to extract test count
-function Get-TestCount {
-    param([string]$LogPath)
-
-    if (-not (Test-Path $LogPath)) {
-        return "N/A"
-    }
-
-    $content = Get-Content $LogPath -Raw
-    if ($content -match "Passed!\s+-\s+Failed:\s+(\d+),\s+Passed:\s+(\d+),\s+Skipped:\s+(\d+)") {
-        return "$($matches[2]) passed, $($matches[1]) failed, $($matches[3]) skipped"
-    }
-
-    return "Unable to parse"
-}
-
-# Helper function to analyze screenshot
-function Test-Screenshot {
-    param([string]$ScreenshotPath)
-
-    if (-not (Test-Path $ScreenshotPath)) {
-        return "❌ Missing"
-    }
-
-    $fileInfo = Get-Item $ScreenshotPath
-    if ($fileInfo.Length -lt 1KB) {
-        return "⚠️ Too small"
-    }
-
-    return "✅ Present"
-}
-
-# Analyze build results
-$buildStatus = Get-TestStatus -LogPath "$TestsDir\build.log" -Pattern "Build succeeded"
-$buildDetails = ""
-if (Test-Path "$TestsDir\build.log") {
-    $buildLog = Get-Content "$TestsDir\build.log" -Raw
-    if ($buildLog -match "(\d+) Error\(s\)") {
-        $errorCount = $matches[1]
-        if ($errorCount -ne "0") {
-            $buildDetails = "$errorCount error(s) found"
-        }
-    }
-}
-
-# Analyze unit test results
-$unitTestStatus = Get-TestStatus -LogPath "$TestsDir\unit-tests.log" -Pattern "Passed!"
-$unitTestDetails = Get-TestCount -LogPath "$TestsDir\unit-tests.log"
-
-# Analyze Playwright results
-$playwrightStatus = Get-TestStatus -LogPath "$TestsDir\playwright.log" -Pattern "passed"
+# Playwright test count
 $playwrightDetails = ""
 if (Test-Path "$TestsDir\playwright.log") {
-    $playwrightLog = Get-Content "$TestsDir\playwright.log" -Raw
-    if ($playwrightLog -match "(\d+) passed") {
+    $pwLog = Get-Content "$TestsDir\playwright.log" -Raw
+    if ($pwLog -match "(\d+) passed") {
         $playwrightDetails = "$($matches[1]) test(s) passed"
     }
-}
-
-# Analyze demo app screenshots
-$screenshots = @()
-if (Test-Path "$TestsDir\screenshots") {
-    $screenshots = Get-ChildItem -Path "$TestsDir\screenshots" -Filter "*.png" | ForEach-Object {
-        @{
-            App = $_.BaseName
-            Status = Test-Screenshot -ScreenshotPath $_.FullName
-            Path = $_.FullName
-        }
+    if ($pwLog -match "(\d+) failed") {
+        $playwrightDetails += ", $($matches[1]) failed"
     }
 }
 
-# Check for common connection methods
-$projectPath = "$TestDir\Ivy.Connections.$ServiceName"
-$connectionFile = "$projectPath\Connections\$($ServiceName)Connection.cs"
-$connectionMethods = @{
-    GetName = "Not Found"
-    GetConnectionType = "Not Found"
-    GetSecrets = "Not Found"
-    GetEntities = "Not Found"
-    RegisterServices = "Not Found"
-    TestConnection = "Not Found"
-}
-
+# Connection methods
+$connectionFile = "$ProjectPath\Connections\$($ServiceName)Connection.cs"
+$methodRows = ""
+$methods = @("GetName", "GetConnectionType", "GetEntities", "RegisterServices", "TestConnection", "GetContext", "GetNamespace", "GetSecrets")
 if (Test-Path $connectionFile) {
-    $connectionContent = Get-Content $connectionFile -Raw
-    foreach ($method in $connectionMethods.Keys) {
-        if ($connectionContent -match "public.*\s+$method\s*\(") {
-            $connectionMethods[$method] = "✅ Present"
-        }
+    $content = Get-Content $connectionFile -Raw
+    foreach ($m in $methods) {
+        $status = if ($content -match $m) { "PRESENT" } else { "MISSING" }
+        $methodRows += "| $m | $status |`n"
+    }
+} else {
+    foreach ($m in $methods) {
+        $methodRows += "| $m | FILE NOT FOUND |`n"
     }
 }
 
-# Determine overall result
-$overallResult = "✅ All tests passed"
-if ($buildStatus -like "*Fail*" -or $unitTestStatus -like "*Fail*" -or $playwrightStatus -like "*Fail*") {
-    $overallResult = "❌ Failed"
-} elseif ($buildStatus -like "*Not Run*" -or $unitTestStatus -like "*Not Run*") {
-    $overallResult = "⚠️ Partial"
+# Screenshots
+$screenshotRows = ""
+$screenshotFiles = @()
+if (Test-Path "$TestsDir\screenshots") {
+    $screenshotFiles = Get-ChildItem -Path "$TestsDir\screenshots" -Filter "*.png" -ErrorAction SilentlyContinue | Sort-Object Name
 }
-
-# Extract issues from logs
-$issues = @()
-
-# Check build log for errors
-if (Test-Path "$TestsDir\build.log") {
-    $buildLog = Get-Content "$TestsDir\build.log" -Raw
-    $errorMatches = [regex]::Matches($buildLog, "error\s+([A-Z0-9]+):\s+(.+?)(?=\r?\n|$)")
-    foreach ($match in $errorMatches) {
-        $issues += @{
-            Issue = $match.Groups[2].Value
-            Severity = "High"
-            Area = "Build"
-            Details = $match.Groups[1].Value
-        }
+if ($screenshotFiles.Count -gt 0) {
+    foreach ($s in $screenshotFiles) {
+        $sizeKB = [math]::Round($s.Length / 1024, 1)
+        $screenshotRows += "| $($s.Name) | ${sizeKB} KB |`n"
     }
+} else {
+    $screenshotRows = "| (none captured) | - |`n"
 }
 
-# Check unit test log for failures
-if (Test-Path "$TestsDir\unit-tests.log") {
-    $testLog = Get-Content "$TestsDir\unit-tests.log" -Raw
-    if ($testLog -match "Failed!\s+-\s+Failed:\s+(\d+)") {
-        $failedCount = $matches[1]
-        if ([int]$failedCount -gt 0) {
-            $issues += @{
-                Issue = "$failedCount unit test(s) failed"
-                Severity = "High"
-                Area = "Unit Tests"
-                Details = "Check unit-tests.log for details"
-            }
+# Console/backend log analysis
+$consoleIssues = ""
+if (Test-Path "$TestsDir\console.log") {
+    $consoleContent = Get-Content "$TestsDir\console.log" -Raw -ErrorAction SilentlyContinue
+    if ($consoleContent) {
+        $errors = ($consoleContent -split "`n") | Where-Object { $_ -match "^\[error\]|^\[pageerror\]" } | Where-Object { $_ -notmatch "favicon|DevTools" }
+        if ($errors.Count -gt 0) {
+            $consoleIssues = "Found $($errors.Count) console error(s):`n" + ($errors | Select-Object -First 5 | ForEach-Object { "- $_" }) -join "`n"
+        } else {
+            $consoleIssues = "Clean (no errors)"
         }
+    } else {
+        $consoleIssues = "Empty"
     }
+} else {
+    $consoleIssues = "Not captured"
 }
+
+$backendIssues = ""
+if (Test-Path "$TestsDir\backend.log") {
+    $backendContent = Get-Content "$TestsDir\backend.log" -Raw -ErrorAction SilentlyContinue
+    if ($backendContent) {
+        $errors = ($backendContent -split "`n") | Where-Object { $_ -match "exception|unhandled|stack trace" -and $_ -notmatch "^\s*$" }
+        if ($errors.Count -gt 0) {
+            $backendIssues = "Found $($errors.Count) backend error(s):`n" + ($errors | Select-Object -First 5 | ForEach-Object { "- $_" }) -join "`n"
+        } else {
+            $backendIssues = "Clean (no exceptions)"
+        }
+    } else {
+        $backendIssues = "Empty"
+    }
+} else {
+    $backendIssues = "Not captured"
+}
+
+# Overall result
+$allPassed = ($buildStatus -eq "PASS") -and ($unitTestStatus -eq "PASS") -and ($playwrightStatus -eq "PASS")
+$overall = if ($allPassed) { "PASS - All tests passed" }
+           elseif ($buildStatus -eq "FAIL") { "FAIL - Build failed" }
+           else { "PARTIAL - Some tests failed" }
 
 # Generate report
 $report = @"
@@ -183,96 +152,46 @@ $report = @"
 **Generated:** $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 
 ## Result
-$overallResult
+**$overall**
 
-## Build Status
-**Status:** $buildStatus
-$(if ($buildDetails) { "**Details:** $buildDetails" })
+## Test Results
 
-## Unit Tests
-**Status:** $unitTestStatus
-**Details:** $unitTestDetails
-
-## Playwright Tests
-**Status:** $playwrightStatus
-$(if ($playwrightDetails) { "**Details:** $playwrightDetails" })
+| Test | Status | Details |
+|------|--------|---------|
+| Build | $buildStatus | |
+| Unit Tests | $unitTestStatus | $unitTestDetails |
+| Playwright E2E | $playwrightStatus | $playwrightDetails |
 
 ## Connection Interface
 
-| Method | Status | Notes |
-|--------|--------|-------|
-| GetName | $($connectionMethods.GetName) | Returns connection name |
-| GetConnectionType | $($connectionMethods.GetConnectionType) | Returns connection type |
-| GetSecrets | $($connectionMethods.GetSecrets) | Returns required secrets |
-| GetEntities | $($connectionMethods.GetEntities) | Returns available entities |
-| RegisterServices | $($connectionMethods.RegisterServices) | Registers DI services |
-| TestConnection | $($connectionMethods.TestConnection) | Tests connection validity |
+| Method | Status |
+|--------|--------|
+$methodRows
+## Screenshots
 
-## Demo Apps
+| File | Size |
+|------|------|
+$screenshotRows
+## Log Review
 
-| App | Screenshot | Path |
-|-----|------------|------|
-"@
+### Console Logs
+$consoleIssues
 
-foreach ($screenshot in $screenshots) {
-    $report += "`n| $($screenshot.App) | $($screenshot.Status) | ``$($screenshot.Path)`` |"
-}
-
-if ($screenshots.Count -eq 0) {
-    $report += "`n| (no apps found) | - | - |"
-}
-
-$report += @"
-
-
-## Issues Found
-
-| Issue | Severity | Area | Details |
-|-------|----------|------|---------|
-"@
-
-foreach ($issue in $issues) {
-    $report += "`n| $($issue.Issue) | $($issue.Severity) | $($issue.Area) | $($issue.Details) |"
-}
-
-if ($issues.Count -eq 0) {
-    $report += "`n| (no issues detected) | - | - | - |"
-}
-
-$report += @"
-
+### Backend Logs
+$backendIssues
 
 ## Log Files
 
-- **Build Log:** ``$TestsDir\build.log``
-- **Unit Test Log:** ``$TestsDir\unit-tests.log``
-- **Playwright Log:** ``$TestsDir\playwright.log``
-
-## Recommendations
-
+| Log | Path |
+|-----|------|
+| Build | $TestsDir\build.log |
+| Unit Tests | $TestsDir\unit-tests.log |
+| Playwright | $TestsDir\playwright.log |
+| Console | $TestsDir\console.log |
+| Backend | $TestsDir\backend.log |
+| App stdout | $TestsDir\app-stdout.log |
 "@
 
-# Add recommendations based on issues
-if ($issues.Count -eq 0) {
-    $report += "- All tests passed successfully. Connection is ready for use.`n"
-} else {
-    $report += "- Review the issues found above and address each one.`n"
-}
-
-if ($buildStatus -like "*Fail*") {
-    $report += "- Fix build errors before proceeding with further testing.`n"
-}
-
-if ($unitTestStatus -like "*Fail*") {
-    $report += "- Address failing unit tests to ensure connection reliability.`n"
-}
-
-if ($screenshots.Count -eq 0) {
-    $report += "- No demo apps found. Consider adding example apps to demonstrate connection usage.`n"
-}
-
-# Write report
 $reportPath = "$TestsDir\report.md"
 $report | Out-File -FilePath $reportPath -Encoding UTF8
-
-Write-Host "  ✓ Test report generated: $reportPath" -ForegroundColor Green
+Write-Host "  [DONE] Report: $reportPath" -ForegroundColor Green
