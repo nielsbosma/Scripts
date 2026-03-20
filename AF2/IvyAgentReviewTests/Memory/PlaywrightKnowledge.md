@@ -98,8 +98,8 @@
 - **NEVER** use `page.locator("dialog")` — it won't match. Always use `page.getByRole("dialog", { name: "Dialog Title" })` or `page.locator("[role='dialog']")`
 - Ivy sheets (`.ToSheet()`) also render with `role="dialog"` — same locator pattern applies
 - Form fields inside dialogs use labels like "Title *" (with asterisk for required) — `getByLabel("Title")` may not match. Use `dialog.getByRole("textbox").nth(N)` to target fields by position within the dialog
-- Edit sheets use "Save" button (not "Submit") for form submission
-- Create dialogs reuse the entity action name as the submit button text (e.g., "Create")
+- `.ToForm("buttonText")` renders a form with the specified text as the submit button label — but when wrapped in `.ToDialog()`, the dialog footer shows "Cancel" and "Save" buttons regardless. Use `dialog.getByRole("button", { name: "Save" })` or target the last button in the dialog
+- `Button().Url(url)` renders as an `<a>` (anchor) element, NOT `role="button"` — `getByRole("button", { name: "..." })` won't match. Use `getByText("...", { exact: true }).first()` instead
 
 ## WithConfirm Dialog
 
@@ -158,6 +158,8 @@
 - `state.ToSelectInput(options).Variant(SelectInputVariants.Toggle)` with string arrays renders radio buttons — use `getByRole("radio", { name: "OptionName" })`.
 - `state.ToSelectInput([new Option<T>("Label", Value), ...])` (without Toggle variant) renders as a dropdown with `role="combobox"` — click to open, then `getByRole("option", { name: "Label" }).click()` to select
 - `.ToTable()` on anonymous object collections renders as a standard HTML `<table>` — buttons in table cells are locatable via `page.locator("table button")`
+- **`.ToTable()` DOM structure**: No `<thead>` — all rows are in `<tbody>`. The header row is the first `<tr>` and uses `<td>` cells (NOT `<th>`). Total `<tr>` count = 1 header + N data rows. To count data rows: `page.locator("table tr").count() - 1`, or use `nth(1)` for first data row. `getByText("Header")` works for column headers since they're plain `<td>` text.
+- **`.ToTable()` with empty list renders as `Ivy.Empty`** — if the backing state is an empty `List<T>`, `.ToTable()` renders nothing (an `ivy-widget type="Ivy.Empty"` element). Wait for data to populate before asserting table presence.
 
 ## DateInput (ToDateInput / ToDateTimeInput) Calendar Popover
 
@@ -200,7 +202,29 @@
 - This is a framework rendering bug — `Layout.Grid(N)` does not produce a proper CSS grid with N columns
 - Workaround: use `Layout.Horizontal()` with equal-width children, or `Layout.Grid().Columns(N)` (see ReversiForge.AI entry — `.Columns(8)` worked)
 
+## PostgreSQL Database Connections
+
+- Projects with PostgreSQL connections need the connection string passed as an environment variable when spawning `dotnet run` in tests: `env: { ...process.env, ConnectionStrings__APPDB_CONNECTION_STRING: "..." }` (double underscore for nested config keys)
+- The connection string value is available from `dotnet run --describe` under `secrets:` with `preset:` value
+- `HasPostgresEnum<TEnum>("enum_name")` in `OnModelCreating` + `NpgsqlDataSourceBuilder.MapEnum<TEnum>()` may fail with Npgsql.EntityFrameworkCore.PostgreSQL v10.0.0 — error: "Reading as 'System.Int32' is not supported for fields having DataTypeName 'public.enum_name'"
+- **Workaround**: Remove `HasPostgresEnum<>()` and add `.HasConversion<string>()` on the enum property mapping in `OnModelCreating`. This reads/writes the PostgreSQL enum as text.
+- `AppDbContextFactory` pattern: builds configuration from env vars + user secrets, gets connection string via `GetConnectionString()`, passes to `UseNpgsql()`
+
+## DiffViewer Framework Bug
+
+- Some apps crash with "ArgumentException: An item with the same key has already been added. Key: DiffViewer" — this is an Ivy Framework bug in component registration
+- Affects apps that use certain combinations of multiple `UseQuery` + `SelectInput` + `.ToSheet()` patterns
+- Cannot be fixed in project code — note as external issue
+- Tests should detect the error callout text ("DiffViewer") and log it as `[FRAMEWORK_ERROR]` rather than failing
+
 ## Run History
+
+### 2026-03-20 — Test.AddPostgreDatabase2
+- PostgreSQL-backed CRUD app with 7 apps: Dashboard, Categories, Tests, TestFiles, TestLinks, TestRuns, CategoryVariants
+- Connection string must be passed as env var `ConnectionStrings__APPDB_CONNECTION_STRING` to spawned dotnet process
+- PostgreSQL enum `test_run_state` failed with `HasPostgresEnum<>()` — fixed with `.HasConversion<string>()` on the State property
+- Test Runs and Test Links apps crash with DiffViewer framework bug (external issue)
+- 11 tests, 5 fix rounds (env var, enum mapping, framework error handling), all passed
 
 ### 2026-03-17 — Test.AgeCalculator
 - Age calculator with date picker and age display (years, months, days, hours)

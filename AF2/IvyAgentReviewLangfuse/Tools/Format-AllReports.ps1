@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Generates all formatted markdown reports from langfuse data.
 .PARAMETER LangfuseDir
@@ -145,10 +145,10 @@ if ($refs.Count -eq 0) {
     $md += "No reference connections used.`n"
 } else {
     $md += "## Connections Used`n`n"
-    $md += "| Connection | Local Path |`n"
-    $md += "|------------|------------|`n"
-    foreach ($ref in $refs | Select-Object -Unique Connection, LocalPath) {
-        $md += "| $($ref.Connection) | ``$($ref.LocalPath)`` |`n"
+    $md += "| Connection | Size |`n"
+    $md += "|------------|------|`n"
+    foreach ($ref in $refs | Select-Object -Property ReferenceName, ContentChars -Unique) {
+        $md += "| $($ref.ReferenceName) | $($ref.ContentChars) chars |`n"
     }
 }
 $md | Out-File "$OutputDir\langfuse-reference-connections.md" -Encoding utf8
