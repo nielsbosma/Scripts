@@ -11,7 +11,7 @@
     "commands": [
       { "command": "ivy.updatePlan", "title": "Ivy: Update Plan" },
       { "command": "ivy.expandPlan", "title": "Ivy: Expand Plan" },
-      { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan" },
+      { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan", "icon": "$(check)" },
       { "command": "ivy.splitPlan", "title": "Ivy: Split Plan" },
       { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan" },
       { "command": "ivy.makePlan", "title": "Ivy: Make Plan" },
@@ -21,6 +21,13 @@
       { "command": "ivy.followUpPlan", "title": "Ivy: Follow-Up Plan" }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "ivy.approvePlan",
+          "when": "resourceExtname == .md && resourcePath =~ /\\.plans[/\\\\]/",
+          "group": "navigation"
+        }
+      ],
       "explorer/context": [
         {
           "command": "ivy.approvePlan",
