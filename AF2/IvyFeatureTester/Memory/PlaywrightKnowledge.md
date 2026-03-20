@@ -55,6 +55,13 @@
 - Config uses `process.env.APP_PORT` for base URL
 - **Viewport configuration**: Use `{ width: 1920, height: 1920 }` for square screenshots that capture sufficient page content without being excessively tall. Must be set in BOTH `use` and `projects[0].use` to override device preset defaults (e.g., `...devices['Desktop Chrome']` sets 1280x720 which is too short)
 
+### Video Recording
+- Enable via `video: { mode: 'on', dir: './videos' }` in both `use` and `projects[0].use` config
+- Videos are saved as `.webm` files in the configured directory
+- Use `test.afterEach` to rename videos with descriptive names matching test titles
+- Access video path via `page.video()?.path()` — only available after the page context closes
+- Videos add ~1-2 seconds overhead per test but provide invaluable debugging evidence
+
 ### App Lifecycle in Tests
 - `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
 - `afterAll`: kill the spawned process
@@ -198,6 +205,22 @@
       return Layout.Vertical() | ...;
   }
   ```
+
+## Kanban Widget
+
+- Kanban column headers include card counts, e.g., "Todo (2)", "In Progress (3)", "Done (1)" — `getByText("Todo", { exact: true })` won't match. Use regex patterns like `/^Todo/` or `/Todo.*\(\d+\)/`
+- `ToKanban()` builder groups items by a selector and renders cards in columns
+- Cards are rendered inside individual column containers
+- The `group:` parameter (not `path:`) is used in the `[App]` attribute for nav grouping
+
+## Calendar Widget
+
+- Calendar renders using react-big-calendar with toolbar (Today, <, >, Month/Week/Day/Agenda)
+- Events display on correct dates with color support (string colors like "Blue", "Green", "Red", "Purple")
+- All-day events span across multiple date cells
+- `OnEventClick` handler receives the event ID — verify via event log text
+- Calendar display modes: `CalendarDisplayMode.Month`, `.Week`, `.Day`, `.Agenda`
+- `.ShowToolbar(false)` hides the navigation toolbar
 
 ## Card Component
 
