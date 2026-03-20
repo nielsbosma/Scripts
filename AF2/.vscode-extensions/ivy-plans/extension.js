@@ -231,116 +231,124 @@ function activate(context) {
     // Follow-Up Plan - like Make Plan but prepends [number] from the source file
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.followUpPlan', async (uri) => {
-            if (!uri && vscode.window.activeTextEditor) {
-                uri = vscode.window.activeTextEditor.document.uri;
-            }
-            if (!uri) return;
+            try {
+                if (!uri && vscode.window.activeTextEditor) {
+                    uri = vscode.window.activeTextEditor.document.uri;
+                }
+                if (!uri) return;
 
-            const fileName = path.basename(uri.fsPath);
-            const match = fileName.match(/^(\d+)[-_]/);
-            if (!match) {
-                vscode.window.showWarningMessage('File does not start with a plan number');
-                return;
-            }
-            const planNumber = match[1]; // preserves leading zeros
+                const fileName = path.basename(uri.fsPath);
+                const match = fileName.match(/^(\d+)[-_]/);
+                if (!match) {
+                    vscode.window.showWarningMessage('File does not start with a plan number');
+                    return;
+                }
+                const planNumber = match[1]; // preserves leading zeros
 
-            const os = require('os');
-            const crypto = require('crypto');
+                const os = require('os');
+                const crypto = require('crypto');
 
-            const tmpDir = os.tmpdir();
-            const tmpFileName = `makeplan-${crypto.randomUUID()}.md`;
-            const tmpPath = path.join(tmpDir, tmpFileName);
+                const tmpDir = os.tmpdir();
+                const tmpFileName = `makeplan-${crypto.randomUUID()}.md`;
+                const tmpPath = path.join(tmpDir, tmpFileName);
 
-            fs.writeFileSync(tmpPath, '', 'utf8');
+                fs.writeFileSync(tmpPath, '', 'utf8');
 
-            const doc = await vscode.workspace.openTextDocument(tmpPath);
-            const editor = await vscode.window.showTextDocument(doc);
+                const doc = await vscode.workspace.openTextDocument(tmpPath);
+                await vscode.window.showTextDocument(doc);
 
-            const saveHandler = vscode.workspace.onDidSaveTextDocument(async (savedDoc) => {
-                if (savedDoc.uri.toString() === doc.uri.toString()) {
-                    saveHandler.dispose();
+                const saveHandler = vscode.workspace.onDidSaveTextDocument(async (savedDoc) => {
+                    if (savedDoc.uri.toString() === doc.uri.toString()) {
+                        saveHandler.dispose();
 
-                    const content = savedDoc.getText().trim();
+                        const content = savedDoc.getText().trim();
 
-                    for (const group of vscode.window.tabGroups.all) {
-                        for (const tab of group.tabs) {
-                            if (tab.input instanceof vscode.TabInputText &&
-                                tab.input.uri.toString() === doc.uri.toString()) {
-                                await vscode.window.tabGroups.close(tab);
+                        for (const group of vscode.window.tabGroups.all) {
+                            for (const tab of group.tabs) {
+                                if (tab.input instanceof vscode.TabInputText &&
+                                    tab.input.uri.toString() === doc.uri.toString()) {
+                                    await vscode.window.tabGroups.close(tab);
+                                }
                             }
                         }
-                    }
 
-                    try { fs.unlinkSync(tmpPath); } catch (err) {}
+                        try { fs.unlinkSync(tmpPath); } catch (err) {}
 
-                    if (content) {
-                        const fullContent = `[${planNumber}] ${content}`;
-                        const terminal = vscode.window.createTerminal({ name: 'Follow-Up Plan', shellPath: 'pwsh' });
-                        terminal.show();
-                        const escapedContent = fullContent.replace(/"/g, '`"');
-                        terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\MakePlan.ps1" "${escapedContent}"`);
-                    } else {
-                        vscode.window.showInformationMessage('Follow-Up Plan cancelled - no content provided');
+                        if (content) {
+                            const fullContent = `[${planNumber}] ${content}`;
+                            const terminal = vscode.window.createTerminal({ name: 'Follow-Up Plan', shellPath: 'pwsh' });
+                            terminal.show();
+                            const escapedContent = fullContent.replace(/"/g, '`"');
+                            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\MakePlan.ps1" "${escapedContent}"`);
+                        } else {
+                            vscode.window.showInformationMessage('Follow-Up Plan cancelled - no content provided');
+                        }
                     }
-                }
-            });
+                });
+            } catch (err) {
+                vscode.window.showErrorMessage(`Follow-Up Plan failed: ${err.message}`);
+            }
         })
     );
 
     // Make Plan - opens temp .md file in VSCode, then passes content to MakePlan.ps1
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.makePlan', async () => {
-            const os = require('os');
-            const crypto = require('crypto');
+            try {
+                const os = require('os');
+                const crypto = require('crypto');
 
-            // Create temp file with .md extension
-            const tmpDir = os.tmpdir();
-            const tmpFileName = `makeplan-${crypto.randomUUID()}.md`;
-            const tmpPath = path.join(tmpDir, tmpFileName);
+                // Create temp file with .md extension
+                const tmpDir = os.tmpdir();
+                const tmpFileName = `makeplan-${crypto.randomUUID()}.md`;
+                const tmpPath = path.join(tmpDir, tmpFileName);
 
-            // Create empty file
-            fs.writeFileSync(tmpPath, '', 'utf8');
+                // Create empty file
+                fs.writeFileSync(tmpPath, '', 'utf8');
 
-            // Open in VSCode
-            const doc = await vscode.workspace.openTextDocument(tmpPath);
-            const editor = await vscode.window.showTextDocument(doc);
+                // Open in VSCode
+                const doc = await vscode.workspace.openTextDocument(tmpPath);
+                await vscode.window.showTextDocument(doc);
 
-            // Trigger on save — onDidCloseTextDocument is unreliable (VS Code delays document disposal)
-            const saveHandler = vscode.workspace.onDidSaveTextDocument(async (savedDoc) => {
-                if (savedDoc.uri.toString() === doc.uri.toString()) {
-                    saveHandler.dispose();
+                // Trigger on save — onDidCloseTextDocument is unreliable (VS Code delays document disposal)
+                const saveHandler = vscode.workspace.onDidSaveTextDocument(async (savedDoc) => {
+                    if (savedDoc.uri.toString() === doc.uri.toString()) {
+                        saveHandler.dispose();
 
-                    const content = savedDoc.getText().trim();
+                        const content = savedDoc.getText().trim();
 
-                    // Close the editor tab
-                    for (const group of vscode.window.tabGroups.all) {
-                        for (const tab of group.tabs) {
-                            if (tab.input instanceof vscode.TabInputText &&
-                                tab.input.uri.toString() === doc.uri.toString()) {
-                                await vscode.window.tabGroups.close(tab);
+                        // Close the editor tab
+                        for (const group of vscode.window.tabGroups.all) {
+                            for (const tab of group.tabs) {
+                                if (tab.input instanceof vscode.TabInputText &&
+                                    tab.input.uri.toString() === doc.uri.toString()) {
+                                    await vscode.window.tabGroups.close(tab);
+                                }
                             }
                         }
-                    }
 
-                    // Clean up temp file
-                    try {
-                        fs.unlinkSync(tmpPath);
-                    } catch (err) {
-                        // Ignore cleanup errors
-                    }
+                        // Clean up temp file
+                        try {
+                            fs.unlinkSync(tmpPath);
+                        } catch (err) {
+                            // Ignore cleanup errors
+                        }
 
-                    // Only proceed if user wrote something
-                    if (content) {
-                        const terminal = vscode.window.createTerminal({ name: 'Make Plan', shellPath: 'pwsh' });
-                        terminal.show();
-                        // Escape content for PowerShell - replace " with `"
-                        const escapedContent = content.replace(/"/g, '`"');
-                        terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\MakePlan.ps1" "${escapedContent}"`);
-                    } else {
-                        vscode.window.showInformationMessage('Make Plan cancelled - no content provided');
+                        // Only proceed if user wrote something
+                        if (content) {
+                            const terminal = vscode.window.createTerminal({ name: 'Make Plan', shellPath: 'pwsh' });
+                            terminal.show();
+                            // Escape content for PowerShell - replace " with `"
+                            const escapedContent = content.replace(/"/g, '`"');
+                            terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\MakePlan.ps1" "${escapedContent}"`);
+                        } else {
+                            vscode.window.showInformationMessage('Make Plan cancelled - no content provided');
+                        }
                     }
-                }
-            });
+                });
+            } catch (err) {
+                vscode.window.showErrorMessage(`Make Plan failed: ${err.message}`);
+            }
         })
     );
 }
