@@ -16,6 +16,7 @@
       { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan" },
       { "command": "ivy.makePlan", "title": "Ivy: Make Plan" },
       { "command": "ivy.createIvyFrameworkIssue", "title": "Ivy: Create Ivy-Framework Issue" },
+      { "command": "ivy.createIvyMcpIssue", "title": "Ivy: Create Ivy-Mcp Issue" },
       { "command": "ivy.testPlan", "title": "Ivy: Test" },
       { "command": "ivy.followUpPlan", "title": "Ivy: Follow-Up Plan" }
     ],
@@ -56,14 +57,19 @@
           "group": "2_workspace@7"
         },
         {
-          "command": "ivy.testPlan",
+          "command": "ivy.createIvyMcpIssue",
           "when": "resourceExtname == .md",
           "group": "2_workspace@8"
         },
         {
-          "command": "ivy.followUpPlan",
+          "command": "ivy.testPlan",
           "when": "resourceExtname == .md",
           "group": "2_workspace@9"
+        },
+        {
+          "command": "ivy.followUpPlan",
+          "when": "resourceExtname == .md",
+          "group": "2_workspace@10"
         }
       ]
     },
