@@ -29,3 +29,9 @@ When a hook like UseDownload is called inside a lambda or helper method called f
 Static hook-helper methods (e.g. `UseProductListRecord(context, record)`) called inside a `FuncView` lambda trigger IVYHOOK001 because the analyzer flags any `UseXxx(...)` unqualified call inside a lambda/local function. The Ivy samples use this exact pattern but aren't compiled with the analyzer.
 
 **Fix**: Qualify the call with the class name: `MyBlade.UseProductListRecord(context, record)`. The analyzer only checks unqualified identifiers and `this.X` calls, so class-qualified calls bypass the check while keeping identical behavior.
+
+## CS0308: Table is non-generic
+
+Agent-generated code often uses `new Table<T>(data)` but `Table` is non-generic. The correct API is `data.ToTable()` which returns `TableBuilder<T>`. Use `.Header(x => x.Prop, "Label")` for column labels (not `.Column()`).
+
+**Important**: `.Height()`, `.Width()`, and similar layout methods return `LayoutView`, breaking the `TableBuilder<T>` fluent chain. Always place layout methods (Height, Width, etc.) **after** all `TableBuilder`-specific calls (Header, Align, ColumnWidth, Builder, etc.).
