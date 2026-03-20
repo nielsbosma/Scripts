@@ -11,7 +11,7 @@
     "commands": [
       { "command": "ivy.updatePlan", "title": "Ivy: Update Plan" },
       { "command": "ivy.expandPlan", "title": "Ivy: Expand Plan" },
-      { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan", "icon": "$(check)" },
+      { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan", "icon": { "light": "icons/approve-light.svg", "dark": "icons/approve-dark.svg" } },
       { "command": "ivy.splitPlan", "title": "Ivy: Split Plan" },
       { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan" },
       { "command": "ivy.makePlan", "title": "Ivy: Make Plan" },
