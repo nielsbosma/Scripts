@@ -9,11 +9,11 @@
   "main": "./extension.js",
   "contributes": {
     "commands": [
-      { "command": "ivy.updatePlan", "title": "Ivy: Update Plan" },
-      { "command": "ivy.expandPlan", "title": "Ivy: Expand Plan" },
-      { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan" },
-      { "command": "ivy.splitPlan", "title": "Ivy: Split Plan" },
-      { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan" },
+      { "command": "ivy.updatePlan", "title": "Ivy: Update Plan", "icon": { "light": "icons/update-light.svg", "dark": "icons/update-dark.svg" } },
+      { "command": "ivy.expandPlan", "title": "Ivy: Expand Plan", "icon": { "light": "icons/expand-light.svg", "dark": "icons/expand-dark.svg" } },
+      { "command": "ivy.approvePlan", "title": "Ivy: Approve Plan", "icon": { "light": "icons/approve-light.svg", "dark": "icons/approve-dark.svg" } },
+      { "command": "ivy.splitPlan", "title": "Ivy: Split Plan", "icon": { "light": "icons/split-light.svg", "dark": "icons/split-dark.svg" } },
+      { "command": "ivy.skipPlan", "title": "Ivy: Skip Plan", "icon": { "light": "icons/skip-light.svg", "dark": "icons/skip-dark.svg" } },
       { "command": "ivy.makePlan", "title": "Ivy: Make Plan" },
       { "command": "ivy.createIvyFrameworkIssue", "title": "Ivy: Create Ivy-Framework Issue" },
       { "command": "ivy.createIvyMcpIssue", "title": "Ivy: Create Ivy-Mcp Issue" },
@@ -21,6 +21,33 @@
       { "command": "ivy.followUpPlan", "title": "Ivy: Follow-Up Plan" }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "ivy.approvePlan",
+          "when": "resourceExtname == .md && resourcePath =~ /\\.plans[/\\\\]/",
+          "group": "navigation"
+        },
+        {
+          "command": "ivy.updatePlan",
+          "when": "resourceExtname == .md && resourcePath =~ /\\.plans[/\\\\]/",
+          "group": "navigation"
+        },
+        {
+          "command": "ivy.splitPlan",
+          "when": "resourceExtname == .md && resourcePath =~ /\\.plans[/\\\\]/",
+          "group": "navigation"
+        },
+        {
+          "command": "ivy.expandPlan",
+          "when": "resourceExtname == .md && resourcePath =~ /\\.plans[/\\\\]/",
+          "group": "navigation"
+        },
+        {
+          "command": "ivy.skipPlan",
+          "when": "resourceExtname == .md && resourcePath =~ /\\.plans[/\\\\]/",
+          "group": "navigation"
+        }
+      ],
       "explorer/context": [
         {
           "command": "ivy.approvePlan",

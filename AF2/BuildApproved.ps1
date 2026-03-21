@@ -20,7 +20,8 @@ param(
     [string]$LogPath      = "D:\Repos\_Ivy\.plans\logs",
     [string]$ReviewPath   = "D:\Repos\_Ivy\.plans\review",
     [string]$PlanWatchPath = "D:\Repos\_Ivy\.plans\plan",
-    [int]   $PollInterval = 3
+    [int]   $PollInterval = 3,
+    [int]   $TimeoutMinutes = 30
 )
 
 # ── Queue name → working directory ──────────────────────────────────────────
@@ -60,6 +61,36 @@ function Get-WorkDir([string]$QueueName) {
     return $DefaultDir
 }
 
+function ConvertFrom-StreamJson([string]$RawOutput) {
+    $lines = $RawOutput -split "`n" | Where-Object { $_.Trim() -ne '' }
+    $readable = [System.Text.StringBuilder]::new()
+    foreach ($line in $lines) {
+        try {
+            $obj = $line | ConvertFrom-Json -ErrorAction Stop
+            switch ($obj.type) {
+                'assistant' {
+                    if ($obj.message.content) {
+                        foreach ($block in $obj.message.content) {
+                            if ($block.type -eq 'text') {
+                                $null = $readable.AppendLine($block.text)
+                            }
+                            elseif ($block.type -eq 'tool_use') {
+                                $null = $readable.AppendLine("[Tool: $($block.name)]")
+                            }
+                        }
+                    }
+                }
+                'result' {
+                    if ($obj.result) { $null = $readable.AppendLine($obj.result) }
+                }
+            }
+        } catch {
+            $null = $readable.AppendLine($line)
+        }
+    }
+    return $readable.ToString()
+}
+
 function Format-Duration([TimeSpan]$ts) {
     if ($ts.TotalHours -ge 1) { return "{0}h {1:00}m" -f [int]$ts.TotalHours, $ts.Minutes }
     return "{0}m {1:00}s" -f [int]$ts.TotalMinutes, $ts.Seconds
@@ -82,22 +113,28 @@ function Show-Status {
     if ($active.Count -gt 0) {
         $null = $buf.AppendLine("  `e[1;33mRUNNING$rst")
         foreach ($q in $active.Keys | Sort-Object) {
-            $info    = $active[$q]
-            $elapsed = Format-Duration ((Get-Date) - $info.Start)
-            $name    = [IO.Path]::GetFileName($info.File)
-            $null = $buf.AppendLine("    > `e[33m$($q.PadRight(18))`e[97m$($name.PadRight(46))`e[33m$elapsed$rst")
+            $info      = $active[$q]
+            $elapsedTs = (Get-Date) - $info.Start
+            $elapsed   = Format-Duration $elapsedTs
+            $name      = [IO.Path]::GetFileName($info.File)
+            $timeColor = if ($elapsedTs.TotalMinutes -ge ($TimeoutMinutes * 0.8)) { "`e[31m" } else { "`e[33m" }
+            $null = $buf.AppendLine("    > `e[33m$($q.PadRight(18))`e[97m$($name.PadRight(46))${timeColor}$elapsed$rst")
         }
         if ($activePlan) {
-            $elapsed = Format-Duration ((Get-Date) - $activePlan.Start)
-            $name    = [IO.Path]::GetFileName($activePlan.File)
-            $null = $buf.AppendLine("    > `e[35mMakePlan          `e[97m$($name.PadRight(46))`e[35m$elapsed$rst")
+            $elapsedTs = (Get-Date) - $activePlan.Start
+            $elapsed   = Format-Duration $elapsedTs
+            $name      = [IO.Path]::GetFileName($activePlan.File)
+            $timeColor = if ($elapsedTs.TotalMinutes -ge ($TimeoutMinutes * 0.8)) { "`e[31m" } else { "`e[35m" }
+            $null = $buf.AppendLine("    > `e[35mMakePlan          `e[97m$($name.PadRight(46))${timeColor}$elapsed$rst")
         }
         $null = $buf.AppendLine("")
     } elseif ($activePlan) {
         $null = $buf.AppendLine("  `e[1;33mRUNNING$rst")
-        $elapsed = Format-Duration ((Get-Date) - $activePlan.Start)
-        $name    = [IO.Path]::GetFileName($activePlan.File)
-        $null = $buf.AppendLine("    > `e[35mMakePlan          `e[97m$($name.PadRight(46))`e[35m$elapsed$rst")
+        $elapsedTs = (Get-Date) - $activePlan.Start
+        $elapsed   = Format-Duration $elapsedTs
+        $name      = [IO.Path]::GetFileName($activePlan.File)
+        $timeColor = if ($elapsedTs.TotalMinutes -ge ($TimeoutMinutes * 0.8)) { "`e[31m" } else { "`e[35m" }
+        $null = $buf.AppendLine("    > `e[35mMakePlan          `e[97m$($name.PadRight(46))${timeColor}$elapsed$rst")
         $null = $buf.AppendLine("")
     }
 
@@ -207,10 +244,11 @@ try {
                 $duration = (Get-Date) - $info.Start
                 Remove-Job $info.Job -Force
 
-                # Write log
+                # Write log (parse stream-json to readable text)
                 $stem    = [IO.Path]::GetFileNameWithoutExtension($info.File)
                 $logFile = Join-Path $LogPath "$stem.log"
-                $outputStr = $output | Out-String
+                $rawStr = $output | Out-String
+                $outputStr = ConvertFrom-StreamJson $rawStr
                 $outputStr | Set-Content $logFile -Encoding utf8
 
                 # Extract failure reason from last non-blank lines of output
@@ -245,6 +283,48 @@ try {
                     Status   = $status
                     Duration = $duration
                     Reason   = $reason
+                    LogFile  = $logFile
+                })
+
+                $active.Remove($q)
+            }
+        }
+
+        # 2c. Check for timed-out jobs
+        foreach ($q in @($active.Keys)) {
+            $info = $active[$q]
+            $elapsed = (Get-Date) - $info.Start
+            if ($elapsed.TotalMinutes -ge $TimeoutMinutes) {
+                # Force stop the hung job
+                Stop-Job $info.Job -ErrorAction SilentlyContinue
+                $output = Receive-Job $info.Job 2>&1
+                Remove-Job $info.Job -Force
+
+                # Write log (parse stream-json to readable text)
+                $stem    = [IO.Path]::GetFileNameWithoutExtension($info.File)
+                $logFile = Join-Path $LogPath "$stem.log"
+                $rawStr = ($output | Out-String)
+                $outputStr = (ConvertFrom-StreamJson $rawStr) + "`n`n--- TIMED OUT after $TimeoutMinutes minutes ---"
+                $outputStr | Set-Content $logFile -Encoding utf8
+
+                # Append timeout note to plan file
+                $timeoutNote = "`n`n## Failed`n`nTimed out after $TimeoutMinutes minutes.`n"
+                if (Test-Path $info.File) {
+                    Add-Content -Path $info.File -Value $timeoutNote -Encoding utf8
+                }
+
+                # Move to failed
+                $fileName = [IO.Path]::GetFileName($info.File)
+                if (Test-Path $info.File) {
+                    Move-Item $info.File (Join-Path $FailPath $fileName) -Force
+                }
+
+                $history.Add([pscustomobject]@{
+                    File     = $info.File
+                    Queue    = $q
+                    Status   = "Failed"
+                    Duration = $elapsed
+                    Reason   = "Timed out after $TimeoutMinutes minutes"
                     LogFile  = $logFile
                 })
 
@@ -294,6 +374,37 @@ try {
             })
 
             $activePlan = $null
+        }
+
+        # 2d. Check for timed-out plan job
+        if ($activePlan) {
+            $elapsed = (Get-Date) - $activePlan.Start
+            if ($elapsed.TotalMinutes -ge $TimeoutMinutes) {
+                Stop-Job $activePlan.Job -ErrorAction SilentlyContinue
+                $output = Receive-Job $activePlan.Job 2>&1
+                Remove-Job $activePlan.Job -Force
+
+                $stem    = [IO.Path]::GetFileNameWithoutExtension($activePlan.File)
+                $logFile = Join-Path $LogPath "plan-$stem.log"
+                $outputStr = ($output | Out-String) + "`n`n--- TIMED OUT after $TimeoutMinutes minutes ---"
+                $outputStr | Set-Content $logFile -Encoding utf8
+
+                $fileName = [IO.Path]::GetFileName($activePlan.File)
+                if (Test-Path $activePlan.File) {
+                    Move-Item $activePlan.File (Join-Path $FailPath "plan-$fileName") -Force
+                }
+
+                $history.Add([pscustomobject]@{
+                    File     = $activePlan.File
+                    Queue    = "MakePlan"
+                    Status   = "Failed"
+                    Duration = $elapsed
+                    Reason   = "Timed out after $TimeoutMinutes minutes"
+                    LogFile  = $logFile
+                })
+
+                $activePlan = $null
+            }
         }
 
         # 3. Start next item for each idle queue
@@ -377,7 +488,7 @@ Then you MUST stop immediately and fail with a clear message explaining:
 Do NOT guess or make assumptions when uncertain. It is better to fail with a clear explanation than to silently produce incorrect work.
 "@
 
-                    & claude -p ($content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions) --dangerously-skip-permissions 2>&1
+                    & claude -p ($content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions) --dangerously-skip-permissions --output-format stream-json --verbose 2>&1
                     if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
                 } -ArgumentList $file, $workDir, $ReviewPath
 

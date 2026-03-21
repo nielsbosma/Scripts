@@ -70,7 +70,7 @@ services:
 
 ### 6. Create Test Directory
 
-- Ensure `.ivy/tests/` and `.ivy/tests/screenshots/` directories exist in the project
+- Ensure `.ivy/tests/`, `.ivy/tests/screenshots/`, and `.ivy/tests/videos/` directories exist in the project
 
 ### 7. Generate Tests
 
@@ -81,7 +81,7 @@ Write the following files directly to `.ivy/tests/`:
 
 **package.json** — minimal, with `@playwright/test` dependency
 
-**playwright.config.ts** — Chromium only, single worker, no retries, uses `process.env.APP_PORT` for base URL, viewport `{ width: 1920, height: 1080 }`
+**playwright.config.ts** — Chromium only, single worker, no retries, uses `process.env.APP_PORT` for base URL, viewport `{ width: 1920, height: 1080 }`, video recording enabled: `video: { mode: 'on', dir: './videos' }` in `use`
 
 **`<app-name>.spec.ts`** — one spec file per app found in the spec and source code:
 - `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
@@ -100,6 +100,11 @@ Write the following files directly to `.ivy/tests/`:
 - Take a screenshot at every important step with descriptive numbered filenames (e.g., `01-initial-load.png`, `02-after-click.png`)
 - Use `fullPage: true`
 - Keep a global counter across all tests
+
+**Videos:**
+- Playwright records a video per test automatically via `video: { mode: 'on', dir: './videos' }`
+- Videos are saved to `.ivy/tests/videos/`
+- After each test, rename the video to match the test name using `test.afterEach`
 
 **Logging — this is critical:**
 - Capture ALL browser console logs → write to `.ivy/tests/console.log`

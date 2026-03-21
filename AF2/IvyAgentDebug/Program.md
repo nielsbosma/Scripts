@@ -133,7 +133,7 @@ NOTES:
 #### Test Failures & UX Issues
 - If `review-tests.md` shows external issues, document them as plans
 - If `review-ux.md` has recommendations, assess if they point to framework widget gaps - anything we can improve in the agent?
-- When creating plans from `review-ux.md` findings, list the screenshots referenced in `review-ux.md` in the plan's `## Evidence` section. Screenshots are stored at `{WorkDir}/.ivy/tests/screenshots/`. Include the full absolute path for each relevant screenshot (e.g., `D:\Temp\IvyAgentTestManager\2026-03-17\00257-Campaign-Dashboard\Test.Campaign-Dashboard\.ivy\tests\screenshots\01-initial-load.png`). The `review-ux.md` file uses `### [filename.png]` headings — parse these filenames and construct the full path using `{WorkDir}/.ivy/tests/screenshots/{filename}`. Only include screenshots relevant to the specific issue being planned.
+- When creating plans from `review-ux.md` findings, list the screenshots referenced in `review-ux.md` in the plan's `## Evidence` section. Screenshots are stored at `{WorkDir}/.ivy/tests/screenshots/` and videos at `{WorkDir}/.ivy/tests/videos/`. Include the full absolute path for each relevant screenshot (e.g., `D:\Temp\IvyAgentTestManager\2026-03-17\00257-Campaign-Dashboard\Test.Campaign-Dashboard\.ivy\tests\screenshots\01-initial-load.png`). The `review-ux.md` file uses `### [filename.png]` headings — parse these filenames and construct the full path using `{WorkDir}/.ivy/tests/screenshots/{filename}`. Include relevant video paths in the `## Evidence` section when the issue involves interactions or animations. Only include screenshots and videos relevant to the specific issue being planned.
 
 #### Hallucinations (DIRECT EDIT — no plans)
 
