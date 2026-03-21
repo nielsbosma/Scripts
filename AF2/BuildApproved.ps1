@@ -21,7 +21,7 @@ param(
     [string]$ReviewPath   = "D:\Repos\_Ivy\.plans\review",
     [string]$PlanWatchPath = "D:\Repos\_Ivy\.plans\plan",
     [int]   $PollInterval = 3,
-    [int]   $TimeoutMinutes = 20
+    [int]   $TimeoutMinutes = 30
 )
 
 # ── Queue name → working directory ──────────────────────────────────────────
@@ -59,6 +59,36 @@ function Get-QueueName([string]$FileName) {
 function Get-WorkDir([string]$QueueName) {
     if ($QueueDirs.ContainsKey($QueueName)) { return $QueueDirs[$QueueName] }
     return $DefaultDir
+}
+
+function ConvertFrom-StreamJson([string]$RawOutput) {
+    $lines = $RawOutput -split "`n" | Where-Object { $_.Trim() -ne '' }
+    $readable = [System.Text.StringBuilder]::new()
+    foreach ($line in $lines) {
+        try {
+            $obj = $line | ConvertFrom-Json -ErrorAction Stop
+            switch ($obj.type) {
+                'assistant' {
+                    if ($obj.message.content) {
+                        foreach ($block in $obj.message.content) {
+                            if ($block.type -eq 'text') {
+                                $null = $readable.AppendLine($block.text)
+                            }
+                            elseif ($block.type -eq 'tool_use') {
+                                $null = $readable.AppendLine("[Tool: $($block.name)]")
+                            }
+                        }
+                    }
+                }
+                'result' {
+                    if ($obj.result) { $null = $readable.AppendLine($obj.result) }
+                }
+            }
+        } catch {
+            $null = $readable.AppendLine($line)
+        }
+    }
+    return $readable.ToString()
 }
 
 function Format-Duration([TimeSpan]$ts) {
@@ -214,10 +244,11 @@ try {
                 $duration = (Get-Date) - $info.Start
                 Remove-Job $info.Job -Force
 
-                # Write log
+                # Write log (parse stream-json to readable text)
                 $stem    = [IO.Path]::GetFileNameWithoutExtension($info.File)
                 $logFile = Join-Path $LogPath "$stem.log"
-                $outputStr = $output | Out-String
+                $rawStr = $output | Out-String
+                $outputStr = ConvertFrom-StreamJson $rawStr
                 $outputStr | Set-Content $logFile -Encoding utf8
 
                 # Extract failure reason from last non-blank lines of output
@@ -269,10 +300,11 @@ try {
                 $output = Receive-Job $info.Job 2>&1
                 Remove-Job $info.Job -Force
 
-                # Write log
+                # Write log (parse stream-json to readable text)
                 $stem    = [IO.Path]::GetFileNameWithoutExtension($info.File)
                 $logFile = Join-Path $LogPath "$stem.log"
-                $outputStr = ($output | Out-String) + "`n`n--- TIMED OUT after $TimeoutMinutes minutes ---"
+                $rawStr = ($output | Out-String)
+                $outputStr = (ConvertFrom-StreamJson $rawStr) + "`n`n--- TIMED OUT after $TimeoutMinutes minutes ---"
                 $outputStr | Set-Content $logFile -Encoding utf8
 
                 # Append timeout note to plan file
@@ -456,7 +488,7 @@ Then you MUST stop immediately and fail with a clear message explaining:
 Do NOT guess or make assumptions when uncertain. It is better to fail with a clear explanation than to silently produce incorrect work.
 "@
 
-                    & claude -p ($content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions) --dangerously-skip-permissions 2>&1
+                    & claude -p ($content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions) --dangerously-skip-permissions --output-format stream-json --verbose 2>&1
                     if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
                 } -ArgumentList $file, $workDir, $ReviewPath
 
