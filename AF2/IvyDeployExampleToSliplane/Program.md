@@ -50,6 +50,26 @@ Use robocopy or PowerShell Copy-Item with appropriate exclusions.
 
 **IMPORTANT:** After copying, check the `.csproj` file for local `ProjectReference` entries (paths like `D:\Repos\_Ivy\Ivy-Framework\...`). These won't work in Docker. Convert them to NuGet `PackageReference` entries. Use `project-demos/helloworld/Helloworld.csproj` as a reference template. Find the latest Ivy version with `dotnet package search Ivy --source https://api.nuget.org/v3/index.json --exact-match`.
 
+### 4.5. Set meta tags in Program.cs
+
+After copying and fixing the csproj, modify `Program.cs` in the target folder to add HTML meta tags for the deployed app.
+
+1. Read `<target-folder>/Program.cs`
+2. Find the line containing `new Server()` assignment
+3. Insert these three lines immediately after it:
+
+```csharp
+server.SetMetaTitle("<Title>");
+server.SetMetaDescription("<Description>");
+server.SetMetaGitHubUrl("https://github.com/Ivy-Interactive/Ivy-Examples/tree/main/agent-demos/<name>");
+```
+
+- **Title**: Human-friendly project name, title-cased with spaces (e.g. "Emoji Voting Booth")
+- **Description**: Same 1-2 sentence description used for the README
+- **GitHubUrl**: Points to the agent-demos subfolder in the Ivy-Examples repo
+
+If the `Program.cs` already contains any of these calls, skip the ones that already exist.
+
 ### 5. Create Dockerfile and .dockerignore
 
 **Dockerfile** - Model after existing project-demos. Template:
