@@ -109,7 +109,7 @@ if ($workflows.Count -eq 0) {
     $workflowGroups = $workflows | Where-Object { $_.WorkflowName } | Group-Object WorkflowName
     foreach ($wf in $workflowGroups) {
         $events = $wf.Group
-        $status = if ($events | Where-Object { $_.EventType -eq "Failed" }) { "❌ Failed" } elseif ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) { "✅ Success" } else { "🔄 Running" }
+        $status = if ($events | Where-Object { $_.EventType -eq "Failed" }) { "❌ Failed" } elseif ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) { "✅ Success" } elseif ($events | Where-Object { $_.EventType -eq "State" -and $_.StateName -eq "Finished" }) { "✅ Success" } else { "🔄 Running" }
 
         $md += "## $($wf.Name)`n`n"
         $md += "**Status**: $status`n"
@@ -130,7 +130,7 @@ if ($workflows.Count -eq 0) {
     $md += "|----------|--------|-------------|`n"
     foreach ($wf in $workflowGroups) {
         $events = $wf.Group
-        $status = if ($events | Where-Object { $_.EventType -eq "Failed" }) { "❌" } elseif ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) { "✅" } else { "🔄" }
+        $status = if ($events | Where-Object { $_.EventType -eq "Failed" }) { "❌" } elseif ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) { "✅" } elseif ($events | Where-Object { $_.EventType -eq "State" -and $_.StateName -eq "Finished" }) { "✅" } else { "🔄" }
         $transCount = ($events | Where-Object { $_.EventType -eq "Transition" }).Count
         $md += "| $($wf.Name) | $status | $transCount |`n"
     }
