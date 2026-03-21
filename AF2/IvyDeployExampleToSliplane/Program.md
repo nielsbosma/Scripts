@@ -70,6 +70,8 @@ server.SetMetaGitHubUrl("https://github.com/Ivy-Interactive/Ivy-Examples/tree/ma
 
 If the `Program.cs` already contains any of these calls, skip the ones that already exist.
 
+> **Note:** These SetMeta methods may not be available in the latest published NuGet version. The local build step (7.5) will catch this. If they fail to compile, comment them out.
+
 ### 5. Create Dockerfile and .dockerignore
 
 **Dockerfile** - Model after existing project-demos. Template:
@@ -222,6 +224,19 @@ git add agent-demos/<name>/README.md agent-demos/<name>/screenshot.png agent-dem
 git commit -m "Add <name> agent demo"
 git push origin main
 ```
+
+### 7.5. Local build validation
+
+Before deploying to Sliplane, verify the project builds successfully with the NuGet package references:
+
+```powershell
+cd D:\Repos\_Ivy\Ivy-Examples\agent-demos\<name>
+dotnet build -c Release
+```
+
+If the build fails due to missing `SetMeta*` methods (SetMetaTitle, SetMetaDescription, SetMetaGitHubUrl), these are not yet published in the latest Ivy NuGet package. Comment out the failing lines in Program.cs with `// TODO: Uncomment when Ivy publishes SetMeta methods`, commit and push the fix, then proceed.
+
+If the build fails for other reasons, diagnose and fix before continuing.
 
 ### 8. Deploy to Sliplane
 
