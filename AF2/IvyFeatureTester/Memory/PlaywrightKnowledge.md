@@ -117,6 +117,7 @@
 - **Webhooks require state parameter**: Ivy webhook URLs require an internal `state` query parameter. Server-side `HttpClient` calls to `webhook.BaseUrl` without this parameter return 400 "The 'state' query parameter is required." — Test Endpoint features using server-side HTTP calls to webhooks will fail.
 - `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
 - `.ToDetails()` on an anonymous object renders key-value pairs with PascalCase property names converted to spaced labels (e.g., `MonthlyNetBurn` → "Monthly Net Burn")
+- **Kanban column headers render as `<h3>` headings** with card counts (e.g., "To Do (2)"). Use `getByRole('heading', { name: /To Do/ })` to locate them. If the app also has instruction text containing the same words, `getByText()` will cause strict mode violations — always use heading role selectors for Kanban column headers.
 
 ## DataTable Gotchas
 
@@ -161,6 +162,14 @@
 - Screenshot/log path resolution: use `path.resolve(__dirname)` in spec files, NOT `process.cwd()` — Playwright may resolve cwd differently than expected, causing silent file write failures
 - Clicking `ListItem` in Ivy lists: extract the visible item title text from the page (e.g., via regex on body text) and use `getByText(name, { exact: true }).dispatchEvent("click")`. Filtering parent divs by `hasText` matches too many ancestors
 - `page.goBack()` in Ivy SPA may not reliably restore blade state — prefer re-navigating or keeping blade context
+
+## VideoPlayer Widget
+
+- `<track>` elements inside `<video>` are NOT accessible via Playwright locators (`page.locator('video track')` returns 0 results). Use `page.evaluate()` to query track elements: `document.querySelectorAll('video')[N].querySelectorAll('track')`
+- When subtitles are configured, the frontend sets `crossOrigin="anonymous"` on the video element. This means the video source URL MUST support CORS headers, otherwise the video will error out and show an error div instead
+- Non-CORS video sources (e.g., w3schools) will fail when subtitles are present. Use CORS-compatible sources like `https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4`
+- Track elements have `kind="subtitles"`, `src`, `label`, and `default` (first track is default)
+- The `textTracks` API on the video element can also be used to detect subtitle tracks
 
 ## Ivy App Construction
 

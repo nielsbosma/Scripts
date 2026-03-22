@@ -241,6 +241,7 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 - Plans must include all paths and information for an LLM coding agent to execute end-to-end
 - Keep plans short and concise
 - Do NOT modify any source code directly — only read files and create plan files. **Exception**: `Hallucinations.md` may be edited directly.
+- **When referencing local files, folders, or screenshots in plans, always prefix paths with `file:///` (e.g. `file:///D:/Repos/_Ivy/Ivy-Framework/src/Ivy/Widgets/Button.cs`). This allows the user to open files directly in VS Code by clicking the link.**
 - Missing review files are not failures — analyze what's available
 - When annotating review files in `.plans\review\`, preserve the original content — only prepend notes at the top
 - If a review file's checklist is fully verified (all items proven), move it to `.plans\review\verified\`

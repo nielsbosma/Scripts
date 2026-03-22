@@ -18,7 +18,7 @@ $toolsDir = Split-Path $PSCommandPath -Parent
 
 # Helper to run tool and get objects
 function Invoke-Tool($name) {
-    & "$toolsDir\$name.ps1" -LangfuseDir $LangfuseDir
+    @(& "$toolsDir\$name.ps1" -LangfuseDir $LangfuseDir)
 }
 
 # 1. Timeline
@@ -171,8 +171,8 @@ if ($docs.Count -eq 0) {
         $num++
     }
 
-    $successful = ($docs | Where-Object Success).Count
-    $failed = ($docs | Where-Object { -not $_.Success }).Count
+    $successful = @($docs | Where-Object Success).Count
+    $failed = @($docs | Where-Object { -not $_.Success }).Count
     $totalChars = ($docs | Where-Object Success | Measure-Object -Property ContentLength -Sum).Sum
 
     $md += "`n## Summary`n`n"

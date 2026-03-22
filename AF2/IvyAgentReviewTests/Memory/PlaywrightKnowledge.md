@@ -52,20 +52,22 @@
 4. **Output validation** — check generated/computed values appear correctly
 
 ### Gotchas & Tips
-- Ivy apps may take a few seconds to start; 30s timeout is safe
+- Ivy apps may take a few seconds to start; use 120s timeout for `waitForServer` and 180s for `beforeAll` hook to account for dotnet build time
 - Use `shell: true` in spawn options on Windows
 - Password/random generation tests: compare two outputs rather than asserting exact values
 - Switch/toggle labels include the label text, use `getByText()` to find them
 - After clicking a button, use `waitForTimeout(500)` or `waitFor()` before asserting changes
 - **Box `.OnClick()` changes role**: `new Box().OnClick(handler)` renders as `role="button"` with `tabindex="0"` and cursor/hover CSS classes. Without `.OnClick()`, Box renders as `role="presentation"`. Always use `role="button"` when locating clickable Box elements.
 - **Box `.WithTooltip()` DOM structure**: `box.WithTooltip("text")` wraps the Box in `ivy-widget[type="Ivy.Tooltip"] > span[data-state] > ivy-widget[type="Ivy.Box"] > div[role="button"]`. The tooltip text is NOT rendered as plain text in the DOM (only shown on hover). Use `ivy-widget[type="Ivy.Tooltip"] div[role="button"]` to locate tooltip-wrapped clickable boxes.
+- **`new Tooltip(content, description)` renders description in two DOM locations** — when hovering, the description text appears in both the tooltip trigger's `span[data-state]` and the tooltip popup. Using `getByText("description text")` causes strict mode violations. Always use `.first()` when asserting tooltip description text visibility.
 - Badges with strength/status text may appear multiple times; use `.first()`
 - `state.ToSelectInput().Variant(SelectInputVariants.Toggle)` renders as radio buttons — use `getByRole("radio", { name: "OptionName" })` to click them, NOT `getByText()` (the option text may appear in headings/descriptions too)
 - `IClientProvider.Toast()` renders both a visible `<div>` and an `aria-live` status `<span>` — use `getByText("message", { exact: true })` to avoid strict mode violations
 - **`Html` component inline styles don't render as expected** — `new Html(...)` with inline CSS properties like `background-color`, `border`, `color`, `width`, `height` are NOT applied to the actual DOM. Do NOT use `page.locator('div[style*="..."]')` selectors to target Html content. Instead use text-based assertions (`page.content().includes(...)`) or `getByText()` locators. Also do NOT check for hex color codes in `page.content()` — they won't appear in the rendered HTML.
 - **UseChrome() crashes without IAuthService** — `UseChrome()` requires `Ivy.IAuthService` to be registered. Without it, navigating to root URL (`/`) throws `InvalidOperationException`. Always test apps with `?chrome=false` to bypass Chrome. The framework should handle this gracefully.
 - **Card.OnClick() + Sheet may render blank** — when `Build()` returns `new object[] { mainContent, new Sheet(...) }`, clicking a Card to set state can cause the page to render blank (only FAB visible). The Sheet never appears. All click methods fail (`.click()`, `dispatchEvent`, `evaluate`, `mouse.click`). If testing Card click → Sheet interactions, be prepared for this failure mode and mark it as a framework issue.
-- **Stale server processes**: The `taskkill` in `afterAll` may not reliably kill all dotnet processes. After multiple test runs, stale `Test.*.exe` processes can lock the EXE and prevent rebuilding. Use `taskkill //im <name>.exe //f` to clean up before retrying.
+- **Stale server processes**: The `taskkill` in `afterAll` may not reliably kill all dotnet processes. After multiple test runs, stale `Test.*.exe` processes can lock the EXE and prevent rebuilding. Use `execSync('taskkill /im <name>.exe /f')` (with `execSync` from `child_process`, not `spawn`) to ensure cleanup completes before afterAll exits. Also kill by name as fallback, not just by PID.
+- **`video.saveAs()` causes afterEach timeout** — calling `page.video().saveAs()` in `afterEach` hangs because the browser context hasn't closed yet. Skip video renaming in afterEach; let Playwright save videos to the default location via config `video: { mode: 'on', dir: './videos' }`.
 - `state.ToTextareaInput()` renders as a standard `<textarea>` element, locatable via `page.locator("textarea").first()`; disabled output textarea is the `.nth(1)`
 - Clipboard `writeText` fails in headless Chromium with "Write permission denied" — this is expected and not an app bug
 - `state.ToSliderInput()` renders as a Radix UI slider with `role="slider"`, NOT a native `<input type="range">` — use `page.getByRole("slider")` and keyboard interaction (ArrowRight/ArrowLeft to increment/decrement by step, Home/End for min/max)
@@ -87,11 +89,23 @@
 ## DataTable Gotchas
 
 - **DataTable uses virtualized grid rendering** — cells are `<td role="gridcell">` elements that Playwright considers "hidden" even when data is present. Use `page.locator('[role="gridcell"]').first()` with `.toBeAttached()` instead of `.toBeVisible()` to verify data loaded.
-- **`.Remove(e => e.Id)` crashes on positional records** — `RemoveFields` in `QueryableExtensions.cs` calls `Expression.New(type)` which requires a parameterless constructor. C# positional records (`record Foo(int X, string Y)`) don't have one. Workaround: don't use `.Remove()` on positional records, or convert to a class with default constructor.
+- **Positional records crash `ToDataTable()`** — `ToDataTable()` (and `.Remove()`) on C# positional records (`record Foo(int X, string Y)`) causes `ArgumentNullException: Value cannot be null. (Parameter 'source')` because the framework internally uses `Expression.New(type)` which requires a parameterless constructor. The error only manifests when the table has data rows. **Fix**: convert positional records to classes with parameterless constructors and public properties, and use object initializer syntax in `.Select()` projections.
 - **Decimal columns display as `0000000000000000`** — `decimal` values in DataTable grid render incorrectly (framework bug). Note as external issue.
 - **DataTable crashes without IChatClient** — `DataTableBuilder.Build()` calls `UseService<IChatClient?>()` which throws `InvalidOperationException` when no AI service is registered. Workaround: use `Table` (`.ToTable()`) with clickable Cards for row interaction instead of DataTable, or register a dummy IChatClient. Note as external framework issue.
 - **DataTable requires `IQueryable<T>`** — `ToDataTable()` only works on `IQueryable<T>`, not `IEnumerable<T>` or arrays. Use `.AsQueryable()` to convert in-memory collections. Also requires concrete types (not anonymous types).
 - **`AppAttribute` uses `group:` not `path:`** — the parameter for sidebar grouping is `group: new[] { "Apps" }`, not `path:`. The AGENTS.md docs are incorrect on this.
+- **DataTable + DbContext concurrent access** — `ToDataTable()` on a database-backed `IQueryable` executes multiple queries (count + data page) concurrently on the same `DbContext`, causing `InvalidOperationException: A second operation was started on this context instance`. This is intermittent and depends on data size/query complexity. **Fix**: materialize data with `.Select(e => new ConcreteRow { ... }).ToList()` first, then use `.AsQueryable().ToDataTable()`. Always use `using var db = factory.CreateDbContext()` to dispose the context after materialization.
+- **Postgres enum types crash with `.ToList()`** — Npgsql can't read Postgres enum columns (e.g., `test_run_state`) unless `NpgsqlDataSourceBuilder.MapEnum<T>()` is called when building the data source. Auto-generated `AppDbContextFactory` doesn't configure this. Workaround: exclude enum columns from the `.Select()` projection, or add `MapEnum` to the factory.
+- **`.Include()` + `ToDataTable()` causes DbContext threading issues** — eager loading with `.Include()` before `ToDataTable()` increases the chance of concurrent DbContext access. Remove unnecessary `.Include()` calls when the navigation property is being excluded anyway.
+- **`.ToTable()` + `.Header()` with dictionary indexer crashes** — `table.Header(r => r["key"], "label")` where `r` is `Dictionary<string, string>` throws `ArgumentException: Invalid expression`. Ivy's expression parser doesn't support dictionary indexer access in lambdas. **Fix**: use manual `Table(TableRow[])` constructor with `new TableRow(new TableCell("header").IsHeader(), ...)` for header row and `new TableRow(new TableCell("value"), ...)` for data rows.
+
+## UseRef + UseEffect Does NOT Trigger Re-render (Critical)
+
+- `UseRef<T>` does NOT trigger component re-renders when `.Value` is set — it's a mutable reference, not reactive state
+- The common pattern `UseRef<DbContext?>(null)` + `UseEffect(() => { dbRef.Value = db; return db; })` + `if (dbRef.Value is not { } db) return Skeleton.Card()` will be STUCK on skeleton forever if nothing else triggers a re-render
+- **Why it sometimes works**: Apps with `UseQuery` or other reactive hooks that complete after `UseEffect` trigger a re-render, allowing `dbRef.Value` to be read on the second render cycle
+- **Fix**: Replace `UseRef + UseEffect` with `UseQuery` for data fetching — `UseQuery` automatically triggers re-renders when data loads
+- When converting from `UseRef + UseEffect + DbContext.Set<T>().ToDataTable()` to `UseQuery + .ToTable()`, also need to handle refresh: use a `UseState(0)` counter in the `UseQuery` key (e.g., `key: $"rooms-{refreshCount.Value}"`) and increment it instead of `refreshToken.Refresh()`
 
 ## Layout.Vertical with IEnumerable (Critical)
 
@@ -191,6 +205,14 @@
 - `UseChrome().UseTabs(preventDuplicates: true)` with a single app auto-opens the tab — no sidebar click needed for navigation.
 - `state.ToBoolInput().Label("X")` WITHOUT explicit `.Variant()` renders as `role="checkbox"` (NOT `role="switch"`) — clicking the label text does NOT toggle the checkbox. Use `page.getByRole("checkbox").nth(N)` to click by index order. Note: `getByRole("checkbox")` without `{ name }` DOES work; `getByRole("checkbox", { name: "X" })` does NOT (Playwright can't resolve the accessible name from the Ivy label association).
 
+## UseTrigger + Sheet Pattern
+
+- **`UseTrigger` + `new Sheet()` may not trigger UI re-render** — when a Button's `OnClick` handler calls the trigger function returned by `UseTrigger`, the click event reaches the server (confirmed via WebSocket: `{"target":"Event","arguments":["OnClick","widgetId",[]]}` sent, `result: null` returned), but the `IState<bool>` change inside `UseTrigger` does NOT cause a view re-render. No UI diff is sent back to the client. The Sheet never opens.
+- This pattern: `var (view, show) = UseTrigger((IState<bool> isOpen, int? id) => new MyFormView(isOpen, id));` + `new Button("Add").OnClick(_ => show(null))` — the button click is a no-op visually.
+- Both `Button("text", handler)` constructor and `Button("text").OnClick(handler)` are equivalent (same event handler mechanism internally). Neither resolves this issue.
+- **Workaround**: Not yet identified. Mark as framework external issue in review-tests.md.
+- **Test approach**: Verify button click sends WebSocket event (confirm client-side works), document sheet non-opening as framework issue. Do not block test suite on sheet interaction tests.
+
 ## CodeBlock and UseEffect Timing
 
 - `new CodeBlock(state.Value, language)` where `state` is populated via `UseEffect` will render with EMPTY `<code>` element on initial page load — the UseEffect hasn't fired yet
@@ -213,8 +235,8 @@
 
 ## PostgreSQL Database Connections
 
-- Projects with PostgreSQL connections need the connection string passed as an environment variable when spawning `dotnet run` in tests: `env: { ...process.env, ConnectionStrings__APPDB_CONNECTION_STRING: "..." }` (double underscore for nested config keys)
-- The connection string value is available from `dotnet run --describe` under `secrets:` with `preset:` value
+- Projects with PostgreSQL connections need the connection string passed as an environment variable when spawning `dotnet run` in tests. The env var key depends on how the connection registers: if `server.Configuration["AppDb:ConnectionString"]`, use `env: { ...process.env, "AppDb:ConnectionString": "..." }`. If using `GetConnectionString("AppDb")`, use `ConnectionStrings__AppDb` (double underscore for nested config keys).
+- The connection string value is available from the spec or from `dotnet run --describe` under `secrets:` with `preset:` value
 - `HasPostgresEnum<TEnum>("enum_name")` in `OnModelCreating` + `NpgsqlDataSourceBuilder.MapEnum<TEnum>()` may fail with Npgsql.EntityFrameworkCore.PostgreSQL v10.0.0 — error: "Reading as 'System.Int32' is not supported for fields having DataTypeName 'public.enum_name'"
 - **Workaround**: Remove `HasPostgresEnum<>()` and add `.HasConversion<string>()` on the enum property mapping in `OnModelCreating`. This reads/writes the PostgreSQL enum as text.
 - `AppDbContextFactory` pattern: builds configuration from env vars + user secrets, gets connection string via `GetConnectionString()`, passes to `UseNpgsql()`
@@ -243,6 +265,20 @@
 
 ## Run History
 
+### 2026-03-22 — FundMetricsExcel
+- Fund portfolio dashboard with 6 metrics and 4 charts, SQLite + seeded data (120 companies, 93 LPs, 8 funds)
+- **GroupBy + positional record LINQ crash**: `GroupBy(p => p.Sector).Select(g => new ChartData(g.Key, (double)g.Sum(...)))` failed EF Core translation. Fixed by using anonymous type server-side, then projecting to record client-side with `.ToListAsync()` + `.Select()`.
+- Only Dashboard app existed — 4 CRUD apps from spec were not generated
+- 9 tests, 4 rounds (2 test assertion fixes, 1 project LINQ fix), all passed, logs clean
+
+### 2026-03-22 — BookingSystemConference
+- SQLite booking system with 2 apps: Rooms (CRUD table) and Bookings (CRUD DataTable with form)
+- **UseRef + UseEffect stuck on skeleton**: RoomsApp used `UseRef<DbContext?>` + `UseEffect` to initialize DB — `UseRef.Value` assignment doesn't trigger re-render, so component was permanently stuck on `Skeleton.Card()`. Fixed by replacing with `UseQuery` for data fetching.
+- **BookingRow positional record LINQ crash**: `dbCtx.Bookings.Select(b => new BookingRow(...)).OrderByDescending(b => b.Start)` failed — EF Core can't translate positional record constructor in expression trees. Fixed by converting to class with parameterless constructor + `.Include()` + materialize with `.ToList()`.
+- **ToDataTable replaced with ToTable**: Rooms DataTable had multiple issues (concurrent DbContext, .Remove() on types without parameterless constructor). Switched to `.ToTable()` with anonymous type projection and inline Edit/Delete buttons.
+- UseQuery cache invalidation: used `UseState(0)` counter in key (e.g., `$"rooms-{count.Value}"`) instead of `UseRefreshToken()` which doesn't work with `UseQuery`
+- 7 tests, 3 fix rounds (LINQ translation, UseRef pattern, UseQuery API), all passed, logs clean
+
 ### 2026-03-21 — Test.MoodRingDashboard
 - Daily mood tracker with color wheel (5 moods), note input, today's timeline, weekly summary
 - Box elements with `.OnClick()` render as `role="button"`, not `role="presentation"` — initial locator failures
@@ -257,6 +293,15 @@
 - `getByText("Forbidden")` and `getByText("403")` both failed to match Callout.Error text — used `page.content().includes()` as workaround
 - Tests written to accept EITHER data OR error callout for API-dependent views
 - 9 tests, 4 fix rounds (API error handling in tests), all passed, logs clean
+
+### 2026-03-21 — Test.AddPostgreDatabase2 (re-run)
+- Same PostgreSQL CRUD app, fresh copy without previous fixes
+- Connection string passed as `AppDb:ConnectionString` env var (not `ConnectionStrings__` prefix)
+- PostgreSQL enum fix re-applied: removed `HasPostgresEnum<>()` and `MapEnum<>()`, added `.HasConversion<string>()`
+- **Key discovery**: Tests, TestLinks, TestRuns apps crashed with `ArgumentNullException: Value cannot be null. (Parameter 'source')` — caused by using C# positional records with `ToDataTable()`. Empty tables (CategoryVariants) didn't crash because no rows to process.
+- **Fix**: Converted positional records (`record TestRow(...)`) to classes with parameterless constructors. This resolved all 3 app crashes.
+- Also standardized MenuItem pattern to `MenuItem.Default("text", Icons.X).Tag(action)` across all apps
+- 10 tests, 5 rounds (enum fix, error handling, record-to-class), all passed, logs clean
 
 ### 2026-03-20 — Test.AddPostgreDatabase2
 - PostgreSQL-backed CRUD app with 7 apps: Dashboard, Categories, Tests, TestFiles, TestLinks, TestRuns, CategoryVariants
@@ -663,6 +708,14 @@
 - `UseChrome(new ChromeSettings().UseTabs(preventDuplicates: true))` with single app auto-opens the tab
 - Clean run: 10 tests passed, 0 fix rounds (first pass), 1 major project fix (created entire app), logs clean
 
+## DateTimeOffset + SQLite LINQ Translation
+
+- SQLite EF Core provider CANNOT translate `DateTimeOffset` comparisons in LINQ `Where` clauses — queries like `.Where(t => t.ClockInAt >= someDateTimeOffset)` throw "could not be translated" runtime errors
+- This is an EF Core limitation, NOT an app bug — but it manifests as `Callout.Error()` in the UI
+- **Fix pattern**: Split the query — load by non-DateTimeOffset filters first (CompanyId, StatusId, etc.) with `.ToListAsync()`, then filter DateTimeOffset comparisons in memory with `.Where()` on the materialized list
+- This is a VERY common issue in generated Ivy projects using SQLite connections with `DateTimeOffset` columns
+- The error message includes: "could not be translated. Either rewrite the query in a form that can be translated, or switch to client evaluation explicitly by inserting a call to 'AsEnumerable', 'AsAsyncEnumerable', 'ToList', or 'ToListAsync'"
+
 ### 2026-03-21 — Test.Art-Institute-of-Chicago
 - Art Institute of Chicago REST API browser with Browse (search/filter/paginate artworks) and Exhibition (curated playlist) apps
 - **API department_id is string, not int** — API returns "PC-7" style IDs. `Artwork` record had `int? DepartmentId` which caused `JsonException`. Fixed to `string?`
@@ -670,3 +723,9 @@
 - **UseChrome() requires IAuthService** — Chrome sidebar view at root URL (`/`) throws `InvalidOperationException: Service of type 'Ivy.IAuthService' is not registered`. Individual apps work fine with `?chrome=false`. Framework issue.
 - **`ivy-widget` custom element is invisible** — `ivy-widget[type='Ivy.Card']` has zero dimensions. Must use `ivy-widget[type='Ivy.Card'] > div` to target the visible card div (which has `cursor-pointer` class for clickable cards)
 - 10 tests, 5 fix rounds (department_id type, card click approaches, spec restructuring), all passed, logs clean
+
+### 2026-03-21 — Test.LovableTimeTracker
+- Multi-tenant time tracking app with 4 apps: Dashboard, Time Clock, Employees, Payroll Reports (LocationsApp missing from spec)
+- **DateTimeOffset + SQLite LINQ crash** — all apps using `DateTimeOffset` comparisons in LINQ `Where` crashed with translation errors. Fixed by splitting queries: load by simple filters first, then filter DateTimeOffset in memory. Affected DashboardApp (3 queries), PayrollApp (1 query), TimeClockApp (2 queries)
+- **SelectInput placeholder not visible as text** — Ivy SelectInput `.Placeholder("text")` renders inside the combobox trigger, not as separate visible text. Use `getByRole("combobox").nth(N)` to verify presence instead of `getByText("placeholder")`
+- 14 tests, 3 fix rounds, all passed, logs clean
