@@ -35,3 +35,37 @@ Static hook-helper methods (e.g. `UseProductListRecord(context, record)`) called
 Agent-generated code often uses `new Table<T>(data)` but `Table` is non-generic. The correct API is `data.ToTable()` which returns `TableBuilder<T>`. Use `.Header(x => x.Prop, "Label")` for column labels (not `.Column()`).
 
 **Important**: `.Height()`, `.Width()`, and similar layout methods return `LayoutView`, breaking the `TableBuilder<T>` fluent chain. Always place layout methods (Height, Width, etc.) **after** all `TableBuilder`-specific calls (Header, Align, ColumnWidth, Builder, etc.).
+
+## CS1061: ToDataTable only works on IQueryable
+
+Agent-generated code often uses `list.ToDataTable()` but `ToDataTable` is an extension on `IQueryable<T>` only. For `List<T>` or arrays, use `.ToTable()` instead.
+
+## CS1501: TableBuilder.Header only takes 2 arguments
+
+Agent-generated code often uses `.Header(selector, label, formatter)` with 3 arguments, but `TableBuilder.Header` only accepts `(Expression<Func<TModel, object>> field, string label)`. For custom rendering, use `.Header()` + `.Builder()`:
+
+```csharp
+.Header(e => e.Prop, "Label")
+.Builder(e => e.Prop, b => b.Func((PropType x) => (object)renderResult))
+```
+
+For action columns, repurpose an existing property (e.g., Id) with a dictionary lookup:
+```csharp
+var byId = items.ToDictionary(e => e.Id);
+.Header(e => e.Id, "Actions")
+.Builder(e => e.Id, b => b.Func((int id) => { var e = byId[id]; return (object)...; }))
+.Remove(e => e.UnwantedCol1, e => e.UnwantedCol2)
+.Order(e => e.Col1, e => e.Col2, ...)
+```
+
+## CS1929: Badge has no Color() method
+
+Agent-generated code often uses `new Badge("text").Color(Colors.Green)` but Badge has no `.Color()` method. Use variant methods instead: `.Success()`, `.Destructive()`, `.Secondary()`, `.Outline()`, `.Warning()`, `.Info()`, `.Primary()`.
+
+## CS0103: Toast is not a standalone method
+
+Agent-generated code calls `Toast("message")` directly in Build(), but Toast is an extension method on `IClientProvider`. Must obtain client first: `var client = UseService<IClientProvider>();` then call `client.Toast("message")`.
+
+## BuilderFactory.Func type inference
+
+Agent code uses `b.Func<double>(...)` but the method signature is `Func<TModel, TIn>(Func<TIn, object?> func)`. Use the inline type pattern from samples: `b.Func((double x) => ...)` which lets C# infer both type parameters.

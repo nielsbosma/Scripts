@@ -44,6 +44,8 @@ Write a single plan file to `D:\Repos\_Ivy\.plans\` with the naming convention:
 Queue: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`, `Scripts`, `VsExtension`, `TestManager`, `IvyMcp`, ...
 Every project is executed sequentially in a queue of it's own to avoid build errors and conflicting changes.
 
+**VsExtension note:** VS Code extensions in `D:\Repos\_Personal\Scripts\AF2\.vscode-extensions` are installed via symlinks — no file copying is needed. Plans should instruct to reload VS Code after editing, not copy files.
+
 LEVEL (priority/criticality):
 - **CRITICAL** — Must be fixed immediately, blocks work or causes severe issues
 - **NICETOHAVE** — Improves functionality but not urgent
@@ -176,6 +178,7 @@ This ensures any issues discovered during testing have a tracked resolution path
 - **!CRITICAL: Every MakePlan execution MUST produce at least one plan file. Even if the task is an analysis, review, or investigation — always create a plan with actionable steps. Never just analyze and report back without a plan.**
 - The plan must include all paths and information for an LLM coding agent to execute end-to-end without human intervention
 - Keep the plan short and concise
+- **When referencing local files, folders, or screenshots in plans, always prefix paths with `file:///` (e.g. `file:///D:/Repos/_Ivy/Ivy-Framework/src/Ivy/Widgets/Button.cs`). This allows the user to open files directly in VS Code by clicking the link.**
 - **!IMPORTANT: ONE issue per plan file — if multiple issues, create multiple plan files with separate IDs**
 - **!CRITICAL: This agent is READ-ONLY for all source code. You must NEVER use Edit, Write, or Bash to create, modify, or delete any file outside `D:\Repos\_Ivy\.plans\`. The ONLY writable paths are:**
   - `D:\Repos\_Ivy\.plans\*.md` (plan files)
