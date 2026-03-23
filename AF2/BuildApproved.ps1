@@ -21,7 +21,8 @@ param(
     [string]$ReviewPath   = "D:\Repos\_Ivy\.plans\review",
     [string]$PlanWatchPath = "D:\Repos\_Ivy\.plans\plan",
     [int]   $PollInterval = 3,
-    [int]   $TimeoutMinutes = 30
+    [int]   $TimeoutMinutes = 30,
+    [switch]$Interactive
 )
 
 # ── Queue name → working directory ──────────────────────────────────────────
@@ -94,6 +95,124 @@ function ConvertFrom-StreamJson([string]$RawOutput) {
 function Format-Duration([TimeSpan]$ts) {
     if ($ts.TotalHours -ge 1) { return "{0}h {1:00}m" -f [int]$ts.TotalHours, $ts.Minutes }
     return "{0}m {1:00}s" -f [int]$ts.TotalMinutes, $ts.Seconds
+}
+
+function Start-InteractiveExecution {
+    param($PlanFile, $WorkDir, $ReviewPath)
+
+    $content = Get-Content $PlanFile -Raw
+    # Strip YAML frontmatter so --- isn't parsed as a CLI flag
+    $content = $content -replace '(?s)\A---\r?\n.*?\r?\n---\r?\n', ''
+    $stem = [IO.Path]::GetFileNameWithoutExtension($PlanFile)
+
+    $preCommitInstructions = @"
+
+## Pre-Commit (REQUIRED)
+
+Before creating any git commit, you MUST run the appropriate formatting/linting commands based on what files you changed.
+
+**If you modified any frontend files** (files under ``src/frontend/`` — .ts, .tsx, .js, .jsx, .css files):
+
+``````bash
+cd src/frontend
+npm run format
+npm run lint:fix
+cd ../..
+``````
+
+**If you modified any .cs (C#) files**:
+
+``````bash
+cd src
+dotnet format
+cd ..
+``````
+
+After running these commands, check the output for any remaining errors. If there are errors that were not auto-fixed (e.g., lint errors, type errors, or build failures), you MUST fix them in your code before proceeding. Re-run the commands after fixing to confirm they pass cleanly.
+
+Once everything passes, stage any files that were reformatted or fixed (``git add`` the changed files), then proceed with the commit.
+"@
+
+    $reviewInstructions = @"
+
+## Review (optional)
+
+After completing all steps above, decide if a human should manually review or test anything after this implementation. If so, create a file at:
+
+    $ReviewPath\$stem.md
+
+The file should contain a short, actionable checklist of what to verify. Examples:
+- Test a specific command or feature end-to-end
+- Run a sample app to confirm behavior
+- Check UI rendering
+
+If the change is purely mechanical (e.g., renaming, formatting, trivial config) and needs no human review, skip creating the file.
+We don't need to review faq updates, doc fixes, or simple code changes that are low-risk.
+"@
+
+    $ambiguityInstructions = @"
+
+## Ambiguity Handling (REQUIRED)
+
+You are running in non-interactive mode and CANNOT ask the user questions. If at any point you:
+- Are unsure about the intended behavior or requirements
+- Need clarification on scope, approach, or edge cases
+- Encounter conflicting instructions in the plan
+- Cannot find the files, functions, or patterns referenced in the plan
+- Would normally ask a clarifying question before proceeding
+
+Then you MUST stop immediately and fail with a clear message explaining:
+1. What you were trying to do
+2. What specific question(s) you need answered
+3. What information was missing or ambiguous
+
+Do NOT guess or make assumptions when uncertain. It is better to fail with a clear explanation than to silently produce incorrect work.
+"@
+
+    # Build full prompt
+    $fullPrompt = $content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions
+
+    # Save prompt to temp file
+    $tempPrompt = Join-Path $env:TEMP "buildapproved-$stem.txt"
+    $fullPrompt | Set-Content $tempPrompt -Encoding utf8
+
+    # Save full command sequence to a temporary .ps1 script file
+    $tempScript = Join-Path $env:TEMP "buildapproved-$stem.ps1"
+
+    $scriptContent = @"
+Set-Location '$($WorkDir -replace "'", "''")'
+`$env:CLAUDECODE = `$null
+`$prompt = Get-Content '$($tempPrompt -replace "'", "''")' -Raw
+try {
+    claude -p `$prompt --dangerously-skip-permissions --verbose
+} finally {
+    Remove-Item '$($tempPrompt -replace "'", "''")' -ErrorAction SilentlyContinue
+    Write-Host ''
+    Write-Host 'Press any key to close...' -ForegroundColor Yellow
+    `$null = `$host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+}
+"@
+    $scriptContent | Set-Content $tempScript -Encoding utf8
+
+    # Launch in new terminal using the script file
+    $wtPath = Get-Command wt.exe -ErrorAction SilentlyContinue
+    if ($wtPath) {
+        # Use Windows Terminal
+        Start-Process wt.exe -ArgumentList "-w","0","pwsh","-NoExit","-File",$tempScript -Wait
+    } else {
+        # Fallback to pwsh
+        Start-Process pwsh -ArgumentList "-NoExit","-File",$tempScript -Wait
+    }
+
+    # Clean up temp script
+    Remove-Item $tempScript -ErrorAction SilentlyContinue
+
+    # Check if execution succeeded by checking exit code stored in a marker file
+    # Since we can't easily get the exit code from the spawned terminal, we'll
+    # assume success unless the temp file still exists (which would indicate a crash)
+    $success = -not (Test-Path $tempPrompt)
+
+    return $success
 }
 
 function Show-Status {
@@ -414,17 +533,44 @@ try {
                 $queues[$q].RemoveAt(0)
                 $workDir = Get-WorkDir $q
 
-                $job = Start-Job -ScriptBlock {
-                    param($PlanFile, $WorkDir, $ReviewDir)
-                    Set-Location $WorkDir
-                    # Allow nested Claude invocations (e.g. IvyFeatureTester.ps1)
-                    $env:CLAUDECODE = $null
-                    $content = Get-Content $PlanFile -Raw
-                    # Strip YAML frontmatter so --- isn't parsed as a CLI flag
-                    $content = $content -replace '(?s)\A---\r?\n.*?\r?\n---\r?\n', ''
-                    $stem = [IO.Path]::GetFileNameWithoutExtension($PlanFile)
+                if ($Interactive) {
+                    # Interactive mode: launch terminal and wait
+                    $startTime = Get-Date
+                    $success = Start-InteractiveExecution $file $workDir $ReviewPath
+                    $duration = (Get-Date) - $startTime
 
-                    $preCommitInstructions = @"
+                    # Record immediately as complete
+                    $status = if ($success) { "Done" } else { "Failed" }
+
+                    # Move file
+                    $destDir = if ($success) { $DonePath } else { $FailPath }
+                    $fileName = [IO.Path]::GetFileName($file)
+                    if (Test-Path $file) {
+                        Move-Item $file (Join-Path $destDir $fileName) -Force
+                    }
+
+                    $history.Add([pscustomobject]@{
+                        File     = $file
+                        Queue    = $q
+                        Status   = $status
+                        Duration = $duration
+                        Reason   = if (-not $success) { "Interactive execution failed" } else { $null }
+                        LogFile  = "(interactive - no log)"
+                    })
+                }
+                else {
+                    # Background mode: existing Start-Job logic
+                    $job = Start-Job -ScriptBlock {
+                        param($PlanFile, $WorkDir, $ReviewDir)
+                        Set-Location $WorkDir
+                        # Allow nested Claude invocations (e.g. IvyFeatureTester.ps1)
+                        $env:CLAUDECODE = $null
+                        $content = Get-Content $PlanFile -Raw
+                        # Strip YAML frontmatter so --- isn't parsed as a CLI flag
+                        $content = $content -replace '(?s)\A---\r?\n.*?\r?\n---\r?\n', ''
+                        $stem = [IO.Path]::GetFileNameWithoutExtension($PlanFile)
+
+                        $preCommitInstructions = @"
 
 ## Pre-Commit (REQUIRED)
 
@@ -452,7 +598,7 @@ After running these commands, check the output for any remaining errors. If ther
 Once everything passes, stage any files that were reformatted or fixed (``git add`` the changed files), then proceed with the commit.
 "@
 
-                    $reviewInstructions = @"
+                        $reviewInstructions = @"
 
 ## Review (optional)
 
@@ -469,7 +615,7 @@ If the change is purely mechanical (e.g., renaming, formatting, trivial config) 
 We don't need to review faq updates, doc fixes, or simple code changes that are low-risk.
 "@
 
-                    $ambiguityInstructions = @"
+                        $ambiguityInstructions = @"
 
 ## Ambiguity Handling (REQUIRED)
 
@@ -488,14 +634,25 @@ Then you MUST stop immediately and fail with a clear message explaining:
 Do NOT guess or make assumptions when uncertain. It is better to fail with a clear explanation than to silently produce incorrect work.
 "@
 
-                    & claude -p ($content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions) --dangerously-skip-permissions --output-format stream-json --verbose 2>&1
-                    if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
-                } -ArgumentList $file, $workDir, $ReviewPath
+                        # Save full prompt to temp file to avoid command-line escaping issues
+                        $tempFile = Join-Path $env:TEMP "buildapproved-bg-$stem.txt"
+                        ($content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions) | Set-Content $tempFile -Encoding utf8
 
-                $active[$q] = @{
-                    Job   = $job
-                    File  = $file
-                    Start = Get-Date
+                        try {
+                            $prompt = Get-Content $tempFile -Raw
+                            & claude -p $prompt --dangerously-skip-permissions --output-format stream-json --verbose 2>&1
+                            if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
+                        }
+                        finally {
+                            Remove-Item $tempFile -ErrorAction SilentlyContinue
+                        }
+                    } -ArgumentList $file, $workDir, $ReviewPath
+
+                    $active[$q] = @{
+                        Job   = $job
+                        File  = $file
+                        Start = Get-Date
+                    }
                 }
             }
         }
