@@ -246,18 +246,18 @@ Create the service (note: `--protocol http` is required when using `--public`, a
 
 If user-secrets were found in step 6, append `--secret-env KEY=VALUE` flags for each secret. Use the actual values from `dotnet user-secrets list` — these are the developer's local secrets and should be carried over to the deployment. Dotnet user-secrets use `:` as a section separator (e.g. `OpenAI:ApiKey`) but environment variables use `__` (double underscore). Convert the keys: replace `:` with `__` in the `--secret-env` flag. Example: secret `OpenAI:ApiKey = sk-123` becomes `--secret-env OpenAI__ApiKey=sk-123`.
 
-**KNOWN BUG (API v0.3.1):** The Sliplane API returns HTTP 500 on ALL GitHub repo-based service creation. Try the following approaches in order:
+**KNOWN BUG (API v0.3.1):** The Sliplane API returns HTTP 500 when `dockerfilePath` is included in service creation, and also when `healthcheck` is omitted.
 
-**Approach A: GitHub-based creation with root Dockerfile workaround**
+**Workaround:**
 1. Ensure a temporary Dockerfile exists at the Ivy-Examples repo root, commit and push
-2. Create the service via curl WITHOUT `dockerfilePath`/`dockerContext`:
+2. Create the service via curl WITHOUT `dockerfilePath`/`dockerContext` but WITH `healthcheck`. Use server `server_fgn4nsi1p36w` (ivy-hosting-1) — the demo server is at capacity:
 ```bash
 curl -s -X POST "https://ctrl.sliplane.io/v0/projects/project_c1m7gor0293z/services" \
   -H "Authorization: Bearer $SLIPLANE_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name":"ivy-agent-demos-<name>","serverId":"server_335oeo4g3cbd","deployment":{"url":"https://github.com/Ivy-Interactive/Ivy-Examples","branch":"main","autoDeploy":true},"network":{"public":true,"protocol":"http"}}'
+  -d '{"name":"ivy-agent-demos-<name>","serverId":"server_fgn4nsi1p36w","deployment":{"url":"https://github.com/Ivy-Interactive/Ivy-Examples","branch":"main","autoDeploy":true},"network":{"public":true,"protocol":"http"},"healthcheck":"/"}'
 ```
-3. If that works, PATCH the service to set the correct paths:
+3. PATCH the service to set the correct paths:
 ```bash
 curl -s -X PATCH "https://ctrl.sliplane.io/v0/projects/project_c1m7gor0293z/services/<SERVICE_ID>" \
   -H "Authorization: Bearer $SLIPLANE_API_KEY" \
@@ -266,12 +266,6 @@ curl -s -X PATCH "https://ctrl.sliplane.io/v0/projects/project_c1m7gor0293z/serv
 ```
 4. Remove the temporary root Dockerfile, commit and push (triggers auto-deploy with correct config)
 5. To add secret env vars, include `"env":[{"key":"KEY","value":"VALUE","secret":true}]` in the PATCH body
-
-**Approach B: Docker image placeholder (if Approach A returns 500)**
-If GitHub-based creation fails entirely, create with a Docker image and note that manual configuration is needed:
-1. Create service with Docker image: `"deployment":{"url":"docker.io/library/nginx:latest"}`
-2. Note: PATCH cannot switch deployment types (registry to repo) — user must manually configure GitHub deployment via Sliplane dashboard
-3. Notify Slack that manual configuration is required
 
 If the service already exists (redeployment), trigger a deploy:
 ```bash

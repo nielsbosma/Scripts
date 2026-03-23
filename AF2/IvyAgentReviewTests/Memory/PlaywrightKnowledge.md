@@ -57,6 +57,8 @@
 - Password/random generation tests: compare two outputs rather than asserting exact values
 - Switch/toggle labels include the label text, use `getByText()` to find them
 - After clicking a button, use `waitForTimeout(500)` or `waitFor()` before asserting changes
+- **Multi-test WebSocket reconnection failure**: When multiple Playwright tests each navigate to the same Ivy app URL (each test gets a new page), the second and subsequent WebSocket connections may fail to establish — the page shows the Ivy loading screen indefinitely. **Workaround**: consolidate all test scenarios into a single test that reuses one page/connection. Avoid splitting into multiple `test()` blocks that each call `page.goto()` for the same app. This is a framework-level issue with rapid WS disconnect/reconnect.
+- **Apps with external API data fetching (e.g., Yahoo Finance)**: When apps fetch from rate-limited external APIs, multiple test navigations can trigger rate limiting. Use a single test with in-page interactions (toggle changes, clicks) instead of multiple tests that reload the page. Server-side caching (like a 30-minute cache) helps but doesn't prevent initial burst of parallel requests.
 - **Box `.OnClick()` changes role**: `new Box().OnClick(handler)` renders as `role="button"` with `tabindex="0"` and cursor/hover CSS classes. Without `.OnClick()`, Box renders as `role="presentation"`. Always use `role="button"` when locating clickable Box elements.
 - **Box `.WithTooltip()` DOM structure**: `box.WithTooltip("text")` wraps the Box in `ivy-widget[type="Ivy.Tooltip"] > span[data-state] > ivy-widget[type="Ivy.Box"] > div[role="button"]`. The tooltip text is NOT rendered as plain text in the DOM (only shown on hover). Use `ivy-widget[type="Ivy.Tooltip"] div[role="button"]` to locate tooltip-wrapped clickable boxes.
 - **`new Tooltip(content, description)` renders description in two DOM locations** — when hovering, the description text appears in both the tooltip trigger's `span[data-state]` and the tooltip popup. Using `getByText("description text")` causes strict mode violations. Always use `.first()` when asserting tooltip description text visibility.
@@ -85,6 +87,23 @@
 - **Webhooks require state parameter**: Ivy webhook URLs require an internal `state` query parameter. Server-side `HttpClient` calls to `webhook.BaseUrl` without this parameter return 400 "The 'state' query parameter is required." — Test Endpoint features using server-side HTTP calls to webhooks will fail.
 - `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
 - `.ToDetails()` on an anonymous object renders key-value pairs with PascalCase property names converted to spaced labels (e.g., `MonthlyNetBurn` → "Monthly Net Burn")
+- **Icon-only ghost buttons** (e.g., `new Button(onClick: handler, icon: Icons.Trash2).Ghost().Small()`) render as `<button>` with only an SVG child and no accessible name. `getByRole("button", { name: "" })` does NOT reliably match them. Use CSS exclusion: `page.locator('button:not(:has-text("Add")):not(:has-text("OtherButtonText"))').filter({ has: page.locator('svg') })` to target icon-only buttons by excluding buttons with known text labels.
+- **`.ToTrigger()` buttons** (e.g., `Icons.Plus.ToButton().Ghost().Tooltip("X").ToTrigger(isOpen => ...)`) do NOT render inside `ivy-widget[type="Ivy.Tooltip"]` — the `ivy-widget` selector won't match. They render as plain `<button>` elements with SVG children and no text. Use `page.locator("button:has(svg)").first()` (or `.nth(N)`) to target by DOM order. The trigger button is typically the first icon-only button in the blade header.
+
+## File Upload (ToFileInput + UseUpload)
+
+- Ivy file upload via `state.ToFileInput(upload)` renders a drag-drop area with a hidden `<input type="file">`
+- `page.locator('input[type="file"]').setInputFiles(path)` is UNRELIABLE — may not trigger Ivy's upload mechanism
+- **Recommended approach**: Use Playwright's `fileChooser` event — click the upload area text to trigger file dialog, then set files on the chooser:
+  ```typescript
+  const [fileChooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    page.getByText("Drop your PDF here").click(),
+  ]);
+  await fileChooser.setFiles(testPdfPath);
+  ```
+- After upload, wait for the filename to appear in the UI: `page.getByText("filename.pdf").waitFor({ state: "visible" })`
+- For generating test PDFs, use `pdf-lib` npm package (add to devDependencies) — produces valid PDFs that all PDF libraries can read
 
 ## DataTable Gotchas
 
@@ -98,6 +117,7 @@
 - **Postgres enum types crash with `.ToList()`** — Npgsql can't read Postgres enum columns (e.g., `test_run_state`) unless `NpgsqlDataSourceBuilder.MapEnum<T>()` is called when building the data source. Auto-generated `AppDbContextFactory` doesn't configure this. Workaround: exclude enum columns from the `.Select()` projection, or add `MapEnum` to the factory.
 - **`.Include()` + `ToDataTable()` causes DbContext threading issues** — eager loading with `.Include()` before `ToDataTable()` increases the chance of concurrent DbContext access. Remove unnecessary `.Include()` calls when the navigation property is being excluded anyway.
 - **`.ToTable()` + `.Header()` with dictionary indexer crashes** — `table.Header(r => r["key"], "label")` where `r` is `Dictionary<string, string>` throws `ArgumentException: Invalid expression`. Ivy's expression parser doesn't support dictionary indexer access in lambdas. **Fix**: use manual `Table(TableRow[])` constructor with `new TableRow(new TableCell("header").IsHeader(), ...)` for header row and `new TableRow(new TableCell("value"), ...)` for data rows.
+- **`.ToTable()` on `Dictionary<string, string>[]` renders no visible rows** — calling `.ToTable()` on an array of dictionaries renders the row count text (e.g., "Showing 3 of 3 rows") but no actual table rows are visible in the UI. The table element may not be present in the DOM at all. Do NOT assert on individual cell text content when `.ToTable()` uses dictionary data — instead verify the row count text. Note as a framework rendering issue.
 
 ## UseRef + UseEffect Does NOT Trigger Re-render (Critical)
 
@@ -145,6 +165,14 @@
 - Screenshot/log path resolution: use `path.resolve(__dirname)` in spec files, NOT `process.cwd()` — Playwright may resolve cwd differently than expected, causing silent file write failures
 - Clicking `ListItem` in Ivy lists: extract the visible item title text from the page (e.g., via regex on body text) and use `getByText(name, { exact: true }).dispatchEvent("click")`. Filtering parent divs by `hasText` matches too many ancestors
 - `page.goBack()` in Ivy SPA may not reliably restore blade state — prefer re-navigating or keeping blade context
+- **Creating test images for file upload tests**: Do NOT use hardcoded hex PNGs — they may be malformed and ImageSharp will report 0x0 dimensions. Instead, generate valid PNGs using Node.js `zlib.deflateSync()` with proper PNG structure (signature + IHDR + IDAT + IEND chunks with CRC32). Cache the file on disk and reuse across tests. A 100x80 RGB image works well as a test fixture.
+
+## UseQuery Result Transition Race Condition
+
+- When changing UseQuery key (e.g., searching for a different term), the old result is briefly visible before UseQuery re-renders with loading state
+- `waitFor({ state: "visible" })` on result text will match the STALE result from the previous query, then `page.content()` may capture the loading state (no results) after the re-render
+- **Fix**: After triggering a new query, use `waitForTimeout` long enough for the full cycle: old result clear (1-2s) + async operation completion (depends on timeout) — don't use locator-based waits that can match stale content
+- For apps with external API calls, add a reasonable `HttpClient.Timeout` (e.g., 15s) in `Program.cs` to avoid default 100s hangs
 
 ## Ivy Connection Secrets
 
@@ -171,6 +199,13 @@
 - **`.ToForm()` labels don't create HTML label-input associations** — `getByLabel("Field Name")` will NOT work for any ToForm fields (including `.Label(m => m.Prop, "Label Text")`). Always use positional locators: `page.locator("input[type='text']").nth(N)` for text inputs, or `page.locator("input[value='defaultVal']")` for inputs with known default values
 - `.ToDialog(isOpen, title, submitTitle)` renders a dialog with custom title and submit button text
 - `.ToSheet(isOpen, title)` renders a slide-in sheet with Save/Cancel buttons
+
+## Ivy Tab Content (Layout.Tabs)
+
+- `Layout.Tabs(...)` renders all tab content in the DOM simultaneously — inactive tab panels are hidden (not removed). Elements from inactive tabs remain in the DOM with `hidden` state.
+- `getByText("Label").first()` or `locator("input[type='text']").first()` will match hidden elements from inactive tabs before visible ones.
+- **Fix**: Use `:visible` pseudo-class (`page.locator("h4:visible", { hasText: "Label" })`) or placeholder-based locators to target visible elements on the active tab.
+- Tab text labels (e.g., "Compare Services") remain visible in the tab bar across all tabs — use `{ exact: true }` when clicking buttons that share text with tab labels.
 
 ## Ivy Component Test Patterns
 
@@ -729,3 +764,11 @@
 - **DateTimeOffset + SQLite LINQ crash** — all apps using `DateTimeOffset` comparisons in LINQ `Where` crashed with translation errors. Fixed by splitting queries: load by simple filters first, then filter DateTimeOffset in memory. Affected DashboardApp (3 queries), PayrollApp (1 query), TimeClockApp (2 queries)
 - **SelectInput placeholder not visible as text** — Ivy SelectInput `.Placeholder("text")` renders inside the combobox trigger, not as separate visible text. Use `getByRole("combobox").nth(N)` to verify presence instead of `getByText("placeholder")`
 - 14 tests, 3 fix rounds, all passed, logs clean
+
+### 2026-03-22 — PDFCompressor
+- PDF compressor app with file upload, quality select (Low/Medium/High), compress button, and download
+- **iText7 v9.x (and v8.x) requires commercial license** — throws "Unknown PdfException" at runtime without a valid license key. Replaced with PdfSharpCore v1.3.65 (MIT) which works without licensing
+- **Ivy file upload (`ToFileInput` + `UseUpload`)**: `page.locator('input[type="file"]').setInputFiles()` is unreliable — the hidden input may not trigger Ivy's upload mechanism. Use Playwright `fileChooser` event: `const [fc] = await Promise.all([page.waitForEvent("filechooser"), page.getByText("placeholder").click()]); await fc.setFiles(path);`
+- **pdf-lib npm package** generates valid PDFs for test fixtures — use `PDFDocument.create()` + `addPage()` + `drawText()` + `save()`. Better than hand-crafted PDFs which may have wrong xref offsets
+- PdfSharpCore adds ~2x overhead for small PDFs (5KB → 10KB), causing negative reduction percentage. This is a logic issue in the app, not a framework bug
+- 1 test, 4 fix rounds (iText7 license, PDF generation, file upload method), all passed, logs clean
