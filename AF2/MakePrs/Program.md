@@ -229,9 +229,10 @@ For each PR group above, execute these steps:
 7. Approve the PR: `gh pr review <PR-URL> --approve`
 8. Merge the PR and delete remote branch: `gh pr merge <PR-URL> --merge --delete-branch`
 9. `git checkout <Branch>` (restore original branch)
-10. Open the PR URL in the browser
+10. If `-SkipBrowser` flag is NOT present, open the PR URL in the browser
 11. Drop the cherry-picked commits from `<Branch>`: `git checkout <Branch>` then `git rebase --onto <commit-before-first-cherry-picked> <last-cherry-picked> <Branch>` (or use `git rebase -i` equivalent). This always happens — the commits are "lifted out" of the original branch into the PR branch.
-12. Verify you are back on the original `<Branch>`
+12. `git checkout <Branch>` (ensure you are back on original branch)
+13. Verify you are on the correct branch: `git branch --show-current`
 
 Notes:
 - Sanitize title for branch name: lowercase, replace spaces with hyphens, remove special chars, truncate to ~50 chars
@@ -241,8 +242,11 @@ Notes:
 ## Post-PR Cleanup
 
 After all PRs are created:
-1. Delete all local `pr/*` branches (they're pushed to origin, no longer needed locally)
-2. For repos on `main`: `git reset --hard origin/main` to drop cherry-picked commits
+1. For each repo that had PRs created:
+   - Check current branch: `git branch --show-current`
+   - If not on the original branch (usually `main`), checkout: `git checkout main`
+   - Pull latest changes: `git pull origin main`
+2. Delete all local `pr/*` branches: `git branch | grep 'pr/' | xargs git branch -D`
 3. Verify each repo is clean: no unpushed commits, no uncommitted changes
 ```
 
@@ -300,7 +304,7 @@ Follow the pattern from ReviewCommits.ps1:
    gh pr create --repo [repo-url] --head [branch-name] --base [base-branch] --title "[title]" --body "[body-with-closes-refs]"
    ```
 4. If assignee specified, assign PR: `gh pr edit [pr-url] --add-assignee [assignee]`
-5. **IMPORTANT**: Open PR URL in browser using `Start-Process [pr-url]` (PowerShell) or appropriate browser launch command
+5. **CONDITIONAL**: If `-SkipBrowser` flag is NOT present, open PR URL in browser using `Start-Process [pr-url]` (PowerShell) or appropriate browser launch command
 6. **Auto-approve, merge, and delete branch**:
    - Approve the PR: `gh pr review [pr-url] --approve`
    - Merge the PR: `gh pr merge [pr-url] --merge --delete-branch`
@@ -308,6 +312,8 @@ Follow the pattern from ReviewCommits.ps1:
 7. **Ask user**: "Drop these commits from [original-branch]? (y/n)"
    - If yes, drop commits using rebase: `git rebase --onto [first-hash]^ [last-hash] [original-branch]`
    - If rebase fails, warn user and abort rebase
+8. **IMPORTANT**: Return to original branch: `git checkout [original-branch]`
+9. Verify you are on the correct branch: `git branch --show-current`
 
 #### D. Handle Errors
 - Track which PRs succeeded and which failed
@@ -317,9 +323,12 @@ Follow the pattern from ReviewCommits.ps1:
 ### 6. Post-PR Cleanup
 
 After all PRs are created:
-1. Delete all local `pr/*` branches across all repos (they're pushed to origin)
-2. For each repo that had commits cherry-picked: `git reset --hard origin/main` to drop them from the local branch
-3. Verify each repo is clean: no unpushed commits, no uncommitted changes, on `main`
+1. For each repo that had PRs created:
+   - Check current branch: `git branch --show-current`
+   - If not on the original branch (usually `main`), checkout: `git checkout main`
+   - Pull latest changes: `git pull origin main`
+2. Delete all local `pr/*` branches across all repos: `git branch | grep 'pr/' | xargs git branch -D`
+3. Verify each repo is clean: no unpushed commits, no uncommitted changes
 
 ### 7. Summary
 
@@ -343,8 +352,16 @@ Copy PR list to clipboard in markdown format:
 
 Use PowerShell to copy to clipboard:
 ```powershell
-$prList | Set-Clipboard
+# Build PR list with actual newlines (not escaped)
+$prMarkdown = @()
+foreach ($pr in $createdPrs) {
+    $prMarkdown += "* [$($pr.Title)] $($pr.Url)"
+}
+$prText = $prMarkdown -join "`n"  # Use PowerShell newline escape sequence
+$prText | Set-Clipboard
 ```
+
+Note: Use PowerShell's `` `n `` escape sequence for newlines, not literal `\n` strings, to ensure proper line breaks when pasted.
 
 ## Args Flags
 
@@ -354,6 +371,7 @@ Parse Args for optional flags:
 - `-AutoAssign [user]`: Automatically assign all PRs to the specified user
 - `-SkipUncommitted`: Skip the uncommitted changes check and only work with committed changes
 - `-Repo [name]`: Only process the specified repository (e.g., `-Repo Ivy-Framework`)
+- `-SkipBrowser`: Don't open PR URLs in browser (default: false, PRs are opened)
 
 ## Error Handling
 
