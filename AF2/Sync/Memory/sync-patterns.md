@@ -14,7 +14,7 @@
 ## Known Issues
 
 - **VBCSCompiler file locks**: `dotnet build` frequently fails on first attempt due to VBCSCompiler holding locks on DLLs. Retry usually succeeds. Consider killing VBCSCompiler processes before building.
-- **Process file locks**: Running Ivy.Agent.Server, Ivy.Docs, or other dotnet processes can lock DLLs preventing builds. Kill them before building. Ivy.Docs can spawn many instances (14+).
+- **Process file locks**: Running Ivy.Agent.Server, Ivy.Docs, or other dotnet processes can lock DLLs preventing builds. Kill them before building using PowerShell `Stop-Process` (bash `taskkill` can timeout). Ivy.Docs can spawn many instances (14+).
 - **Microsoft Defender locks**: Defender can temporarily lock DLLs during builds. Retry usually succeeds.
 - **Stale generated docs files**: Ivy-Framework's `Ivy.Docs.Shared/Generated/` can contain stale `.g.cs` files referencing types that no longer exist (e.g., GaugeChart, SignatureInput). Delete the `Generated/` folder before rebuilding to fix. The folder is regenerated during build.
 
