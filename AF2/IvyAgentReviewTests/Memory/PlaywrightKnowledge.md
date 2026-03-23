@@ -29,6 +29,8 @@
 - Use `package.json` with `@playwright/test` dependency
 - `playwright.config.ts` targets Chromium only, single worker, no retries
 - Config does NOT need `baseURL` — use full URLs in `page.goto()` with the dynamic port variable instead, because the port is assigned in `beforeAll` after config is already loaded
+- **Automatic screenshot capture on failure**: `screenshot: 'only-on-failure'` in `use` config captures screenshots automatically when tests fail, even before reaching explicit screenshot calls in test code. This is CRITICAL for debugging early test failures
+- **Trace and video on failure**: `trace: 'retain-on-failure'` and `video: 'retain-on-failure'` in `use` config save traces and videos only for failed tests
 
 ### App Lifecycle in Tests
 - `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
