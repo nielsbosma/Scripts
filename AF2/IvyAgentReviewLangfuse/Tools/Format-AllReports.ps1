@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Generates all formatted markdown reports from langfuse data.
 .PARAMETER LangfuseDir
@@ -18,7 +18,7 @@ $toolsDir = Split-Path $PSCommandPath -Parent
 
 # Helper to run tool and get objects
 function Invoke-Tool($name) {
-    & "$toolsDir\$name.ps1" -LangfuseDir $LangfuseDir
+    @(& "$toolsDir\$name.ps1" -LangfuseDir $LangfuseDir)
 }
 
 # 1. Timeline
@@ -109,7 +109,7 @@ if ($workflows.Count -eq 0) {
     $workflowGroups = $workflows | Where-Object { $_.WorkflowName } | Group-Object WorkflowName
     foreach ($wf in $workflowGroups) {
         $events = $wf.Group
-        $status = if ($events | Where-Object { $_.EventType -eq "Failed" }) { "❌ Failed" } elseif ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) { "✅ Success" } else { "🔄 Running" }
+        $status = if ($events | Where-Object { $_.EventType -eq "Failed" }) { "❌ Failed" } elseif ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) { "✅ Success" } elseif ($events | Where-Object { $_.EventType -eq "State" -and $_.StateName -eq "Finished" }) { "✅ Success" } else { "🔄 Running" }
 
         $md += "## $($wf.Name)`n`n"
         $md += "**Status**: $status`n"
@@ -130,7 +130,7 @@ if ($workflows.Count -eq 0) {
     $md += "|----------|--------|-------------|`n"
     foreach ($wf in $workflowGroups) {
         $events = $wf.Group
-        $status = if ($events | Where-Object { $_.EventType -eq "Failed" }) { "❌" } elseif ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) { "✅" } else { "🔄" }
+        $status = if ($events | Where-Object { $_.EventType -eq "Failed" }) { "❌" } elseif ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) { "✅" } elseif ($events | Where-Object { $_.EventType -eq "State" -and $_.StateName -eq "Finished" }) { "✅" } else { "🔄" }
         $transCount = ($events | Where-Object { $_.EventType -eq "Transition" }).Count
         $md += "| $($wf.Name) | $status | $transCount |`n"
     }
@@ -145,10 +145,10 @@ if ($refs.Count -eq 0) {
     $md += "No reference connections used.`n"
 } else {
     $md += "## Connections Used`n`n"
-    $md += "| Connection | Local Path |`n"
-    $md += "|------------|------------|`n"
-    foreach ($ref in $refs | Select-Object -Unique Connection, LocalPath) {
-        $md += "| $($ref.Connection) | ``$($ref.LocalPath)`` |`n"
+    $md += "| Connection | Size |`n"
+    $md += "|------------|------|`n"
+    foreach ($ref in $refs | Select-Object -Property ReferenceName, ContentChars -Unique) {
+        $md += "| $($ref.ReferenceName) | $($ref.ContentChars) chars |`n"
     }
 }
 $md | Out-File "$OutputDir\langfuse-reference-connections.md" -Encoding utf8
@@ -171,8 +171,8 @@ if ($docs.Count -eq 0) {
         $num++
     }
 
-    $successful = ($docs | Where-Object Success).Count
-    $failed = ($docs | Where-Object { -not $_.Success }).Count
+    $successful = @($docs | Where-Object Success).Count
+    $failed = @($docs | Where-Object { -not $_.Success }).Count
     $totalChars = ($docs | Where-Object Success | Measure-Object -Property ContentLength -Sum).Sum
 
     $md += "`n## Summary`n`n"

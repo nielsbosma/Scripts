@@ -55,6 +55,13 @@
 - Config uses `process.env.APP_PORT` for base URL
 - **Viewport configuration**: Use `{ width: 1920, height: 1920 }` for square screenshots that capture sufficient page content without being excessively tall. Must be set in BOTH `use` and `projects[0].use` to override device preset defaults (e.g., `...devices['Desktop Chrome']` sets 1280x720 which is too short)
 
+### Video Recording
+- Enable via `video: { mode: 'on', dir: './videos' }` in both `use` and `projects[0].use` config
+- Videos are saved as `.webm` files in the configured directory
+- Use `test.afterEach` to rename videos with descriptive names matching test titles
+- Access video path via `page.video()?.path()` — only available after the page context closes
+- Videos add ~1-2 seconds overhead per test but provide invaluable debugging evidence
+
 ### App Lifecycle in Tests
 - `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
 - `afterAll`: kill the spawned process
@@ -96,6 +103,7 @@
 - `state.ToSliderInput()` renders as a Radix UI slider with `role="slider"`, NOT a native `<input type="range">` — use `page.getByRole("slider")` and keyboard interaction (ArrowRight/ArrowLeft to increment/decrement by step, Home/End for min/max)
 - `UseChrome()` renders a hidden sidebar search `<input type="search" data-testid="sidebar-search">` that is the first `input` in the DOM but outside the viewport — `page.locator("input").first()` will target it instead of app inputs. Use `input[type='text']` or label-based locators to target app inputs
 - **Single-app Chrome auto-selection**: When `UseChrome().UseTabs()` is enabled and there's only ONE app registered, Chrome automatically opens that app's tab on page load — no need to click the sidebar nav item. Clicking it may cause a re-navigation that times out.
+- **Chrome URL routing**: When `UseChrome()` is active, direct URL navigation (e.g., `/basic-app` or `/basic-app?chrome=false`) shows "App Not Found". Apps must be accessed by navigating to `/` first, then clicking sidebar items. In Playwright tests, always navigate to `http://localhost:PORT/` and use sidebar clicks.
 - **SelectInput trigger displays all option labels**: `SelectInput<T>` with many options renders ALL option display names concatenated in the trigger button (combobox). This makes `getByText("OptionName")` ambiguous — it matches both the trigger and the dropdown item. To click a dropdown option reliably: open the dropdown, then use `page.evaluate` to find the option element by text content + bounding rect (y > trigger height), and click by coordinates. The dropdown container has `role="listbox"`.
 - **SelectInput dropdown structure**: Ivy SelectInput dropdown uses Radix-like components. The trigger is a `<button role="combobox">`. The dropdown panel is `<div role="listbox">`. Items inside have NO `role="option"` — they are plain `<div>` elements with text content. Use `page.evaluate` + coordinate clicking for reliable selection when text-based locators are ambiguous.
 - **Sidebar nav button name conflicts**: Chrome sidebar renders app names as `role="button"` elements. A button with text "C" will conflict with "Calculator" sidebar button when using `getByRole("button", { name: "C" })` — always use `{ exact: true }` for single-character button names
@@ -109,6 +117,7 @@
 - **Webhooks require state parameter**: Ivy webhook URLs require an internal `state` query parameter. Server-side `HttpClient` calls to `webhook.BaseUrl` without this parameter return 400 "The 'state' query parameter is required." — Test Endpoint features using server-side HTTP calls to webhooks will fail.
 - `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
 - `.ToDetails()` on an anonymous object renders key-value pairs with PascalCase property names converted to spaced labels (e.g., `MonthlyNetBurn` → "Monthly Net Burn")
+- **Kanban column headers render as `<h3>` headings** with card counts (e.g., "To Do (2)"). Use `getByRole('heading', { name: /To Do/ })` to locate them. If the app also has instruction text containing the same words, `getByText()` will cause strict mode violations — always use heading role selectors for Kanban column headers.
 
 ## DataTable Gotchas
 
@@ -154,6 +163,14 @@
 - Clicking `ListItem` in Ivy lists: extract the visible item title text from the page (e.g., via regex on body text) and use `getByText(name, { exact: true }).dispatchEvent("click")`. Filtering parent divs by `hasText` matches too many ancestors
 - `page.goBack()` in Ivy SPA may not reliably restore blade state — prefer re-navigating or keeping blade context
 
+## VideoPlayer Widget
+
+- `<track>` elements inside `<video>` are NOT accessible via Playwright locators (`page.locator('video track')` returns 0 results). Use `page.evaluate()` to query track elements: `document.querySelectorAll('video')[N].querySelectorAll('track')`
+- When subtitles are configured, the frontend sets `crossOrigin="anonymous"` on the video element. This means the video source URL MUST support CORS headers, otherwise the video will error out and show an error div instead
+- Non-CORS video sources (e.g., w3schools) will fail when subtitles are present. Use CORS-compatible sources like `https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4`
+- Track elements have `kind="subtitles"`, `src`, `label`, and `default` (first track is default)
+- The `textTracks` API on the video element can also be used to detect subtitle tracks
+
 ## Ivy App Construction
 
 - `ViewBase.Build()` is `public override`, NOT `protected override` — using `protected` causes CS0507
@@ -198,6 +215,22 @@
       return Layout.Vertical() | ...;
   }
   ```
+
+## Kanban Widget
+
+- Kanban column headers include card counts, e.g., "Todo (2)", "In Progress (3)", "Done (1)" — `getByText("Todo", { exact: true })` won't match. Use regex patterns like `/^Todo/` or `/Todo.*\(\d+\)/`
+- `ToKanban()` builder groups items by a selector and renders cards in columns
+- Cards are rendered inside individual column containers
+- The `group:` parameter (not `path:`) is used in the `[App]` attribute for nav grouping
+
+## Calendar Widget
+
+- Calendar renders using react-big-calendar with toolbar (Today, <, >, Month/Week/Day/Agenda)
+- Events display on correct dates with color support (string colors like "Blue", "Green", "Red", "Purple")
+- All-day events span across multiple date cells
+- `OnEventClick` handler receives the event ID — verify via event log text
+- Calendar display modes: `CalendarDisplayMode.Month`, `.Week`, `.Day`, `.Agenda`
+- `.ShowToolbar(false)` hides the navigation toolbar
 
 ## Card Component
 

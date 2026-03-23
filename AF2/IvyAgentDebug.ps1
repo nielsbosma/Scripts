@@ -10,7 +10,7 @@ $programFolder = GetProgramFolder $PSCommandPath
 $workDir = (Get-Location).Path
 
 # --- Test Run detection: look for test.yaml in parent folder ---
-$testManagerExe = "D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Test.Manager\bin\Debug\net10.0\ivy-agent-test-manager.exe"
+$testManagerExe = "D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Test.Manager\bin\Debug\net10.0\tm.exe"
 $testYamlPath = Join-Path (Split-Path $workDir -Parent) "test.yaml"
 $testRunId = $null
 $taskDescription = ""

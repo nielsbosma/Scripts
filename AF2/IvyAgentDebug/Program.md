@@ -133,7 +133,7 @@ NOTES:
 #### Test Failures & UX Issues
 - If `review-tests.md` shows external issues, document them as plans
 - If `review-ux.md` has recommendations, assess if they point to framework widget gaps - anything we can improve in the agent?
-- When creating plans from `review-ux.md` findings, list the screenshots referenced in `review-ux.md` in the plan's `## Evidence` section. Screenshots are stored at `{WorkDir}/.ivy/tests/screenshots/`. Include the full absolute path for each relevant screenshot (e.g., `D:\Temp\IvyAgentTestManager\2026-03-17\00257-Campaign-Dashboard\Test.Campaign-Dashboard\.ivy\tests\screenshots\01-initial-load.png`). The `review-ux.md` file uses `### [filename.png]` headings — parse these filenames and construct the full path using `{WorkDir}/.ivy/tests/screenshots/{filename}`. Only include screenshots relevant to the specific issue being planned.
+- When creating plans from `review-ux.md` findings, list the screenshots referenced in `review-ux.md` in the plan's `## Evidence` section. Screenshots are stored at `{WorkDir}/.ivy/tests/screenshots/` and videos at `{WorkDir}/.ivy/tests/videos/`. Include the full absolute path for each relevant screenshot (e.g., `D:\Temp\IvyAgentTestManager\2026-03-17\00257-Campaign-Dashboard\Test.Campaign-Dashboard\.ivy\tests\screenshots\01-initial-load.png`). The `review-ux.md` file uses `### [filename.png]` headings — parse these filenames and construct the full path using `{WorkDir}/.ivy/tests/screenshots/{filename}`. Include relevant video paths in the `## Evidence` section when the issue involves interactions or animations. Only include screenshots and videos relevant to the specific issue being planned.
 
 #### Hallucinations (DIRECT EDIT — no plans)
 
@@ -164,13 +164,52 @@ Steps for each hallucination:
   - Check the analyser source in `D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent\Agents\Analysers\` for prompt quality
   - Consider if the analyser threshold is too low (firing too early) or too high (firing too late)
 
+#### IvyMcp Issues (GitHub Issues — no local plans)
+
+When a finding belongs to the **IvyMcp** queue (issues related to IvyDoc, IvyQuestion, hallucinations originating from IvyMcp knowledge base, or any Ivy-Mcp service behavior), **create a GitHub issue** in `Ivy-Interactive/Ivy-Mcp` instead of a local plan file. Never create local plan files for IvyMcp issues.
+
+Steps:
+1. Determine if the finding is IvyMcp-related by checking:
+   - `langfuse-questions.md` — wrong or incomplete IvyQuestion answers
+   - `langfuse-docs.md` — IvyDoc 404s or missing documentation served by MCP
+   - `langfuse-hallucinations.md` — hallucinations where the source is IvyMcp (check raw IvyQuestion JSON per Memory/IvyMcpHallucinationSource.md)
+   - Any issue where the root cause is in the Ivy-Mcp service code or knowledge base
+
+2. Create a GitHub issue using:
+   ```bash
+   gh issue create --repo Ivy-Interactive/Ivy-Mcp \
+     --title "<concise title>" \
+     --body "$(cat <<'EOF'
+   ## Problem
+
+   <description with evidence from review files>
+
+   ## Evidence
+
+   - Session: <session-id>
+   - Source: <which review file identified this>
+
+   ## Suggested Fix
+
+   <concrete steps if known>
+   EOF
+   )"
+   ```
+
+3. Record the created issue URL in `{WorkDir}/.ivy/plans.md` alongside any local plans, using the format:
+   ```markdown
+   - https://github.com/Ivy-Interactive/Ivy-Mcp/issues/<number> (IvyMcp: <title>)
+   ```
+
+4. Use labels if applicable: `--label "bug"` for broken behavior, `--label "knowledge-base"` for wrong answers/hallucinations from MCP.
+
 ### 4. Create Plan Files
 
 For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
 
 - Read the counter from `.counter` (default 200 if missing), allocate IDs, increment
 - Format: `<ID>-<RepositoryName>-<LEVEL>-<Title>.md`
-- Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`
+- Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General` (note: `IvyMcp` issues go to GitHub — see IvyMcp section above)
 - LEVEL (priority/criticality):
   - **CRITICAL** — Must be fixed immediately, blocks work or causes severe issues (build failures, crashes, data loss)
   - **NICETOHAVE** — Improves functionality but not urgent (hallucinations, missing docs, workflow improvements)
@@ -241,6 +280,8 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 - Plans must include all paths and information for an LLM coding agent to execute end-to-end
 - Keep plans short and concise
 - Do NOT modify any source code directly — only read files and create plan files. **Exception**: `Hallucinations.md` may be edited directly.
+- **When referencing local files, folders, or screenshots in plans, always prefix paths with `file:///` (e.g. `file:///D:/Repos/_Ivy/Ivy-Framework/src/Ivy/Widgets/Button.cs`). This allows the user to open files directly in VS Code by clicking the link.**
+- **IvyMcp findings must be created as GitHub issues in `Ivy-Interactive/Ivy-Mcp`** — never as local plan files. This includes IvyDoc issues, IvyQuestion wrong answers, and hallucinations originating from the MCP knowledge base.
 - Missing review files are not failures — analyze what's available
 - When annotating review files in `.plans\review\`, preserve the original content — only prepend notes at the top
 - If a review file's checklist is fully verified (all items proven), move it to `.plans\review\verified\`

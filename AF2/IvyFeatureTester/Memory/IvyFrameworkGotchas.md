@@ -120,6 +120,11 @@ await server.RunAsync();
 ❌ **`state.Pipe()` doesn't exist** on `IState<T>`
 ✅ **Workaround**: Use inline expressions or extract to local variable before passing to layout
 
+### App Attribute: `group` not `path`
+- AGENTS.md documentation says `path:` but the actual parameter is `group:`
+- `[App(path: new[] { "Tests" })]` causes CS1739
+- `[App(group: new[] { "Tests" })]` is correct
+
 ### AppBase vs ViewBase
 ❌ **Don't use `AppBase`** for test apps
 ✅ **Use `ViewBase`** - it's the correct base class for Ivy views
@@ -189,6 +194,20 @@ Add the analyser to test projects immediately. It catches issues at compile-time
 
 ### 5. Hook Rules Are Strict
 The hook ordering rule (all hooks first) is non-negotiable. The analyser will catch violations, but understanding why helps write better code from the start.
+
+## Chrome (UseChrome) Behavior
+
+### Direct URL Routing Not Available With Chrome
+- When `UseChrome()` is active, navigating to `/app-id` directly shows "App Not Found"
+- Chrome handles routing internally — apps must be accessed via sidebar navigation clicks
+- This affects Playwright tests: navigate to `/` first, then click sidebar items to open apps
+- `?chrome=false` on direct URLs also shows "App Not Found" for the same reason
+
+### TryUseService Requires Context Prefix
+- `TryUseService<T>()` is defined on `ViewContext`, NOT on `ViewBase`
+- Calling bare `TryUseService<T>(out var x)` from a `ViewBase` subclass causes CS0103
+- Correct: `Context.TryUseService<T>(out var x)`
+- Note: `UseService<T>()` IS available directly on `ViewBase` (without `Context.`)
 
 ## Serialization / CamelCase Issues
 

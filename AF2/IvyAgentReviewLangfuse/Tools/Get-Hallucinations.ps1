@@ -35,15 +35,30 @@ foreach ($traceFolder in $traceFolders) {
         try {
             $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
             $input = $json.input
-            if (-not $input) { continue }
 
             $time = Format-Time $json.startTime
             $obsName = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
-            $toolName = $input.toolName
 
-            # IvyQuestion request
-            if ($toolName -eq 'IvyQuestion' -and $input.request) {
-                $q = $input.request.question
+            # Tool events - check both input (old) and metadata (new)
+            $toolName = $null
+            $toolRequest = $null
+            $toolResponse = $null
+            $toolFeedback = $null
+            if ($input -and $input.toolName) {
+                $toolName = $input.toolName
+                $toolRequest = $input.request
+                $toolResponse = $input.response
+                $toolFeedback = $input.feedback
+            } elseif ($json.metadata -and $json.metadata.toolName) {
+                $toolName = $json.metadata.toolName
+                $toolRequest = $json.metadata.request
+                $toolResponse = $json.metadata.response
+                $toolFeedback = $json.metadata.feedback
+            }
+
+            # IvyQuestion request (via toolName)
+            if ($toolName -eq 'IvyQuestion' -and $toolRequest) {
+                $q = $toolRequest.question
                 $results += [PSCustomObject]@{
                     TraceName = $traceFolder.Name
                     ObservationFile = $obsName
@@ -55,11 +70,27 @@ foreach ($traceFolder in $traceFolders) {
                 continue
             }
 
+            # IvyQuestion request (direct event with question field, no toolName)
+            $directQuestion = $null
+            if ($input -and $input.question) { $directQuestion = $input.question }
+            elseif ($json.metadata -and $json.metadata.question) { $directQuestion = $json.metadata.question }
+            if ($directQuestion -and -not $toolName) {
+                $results += [PSCustomObject]@{
+                    TraceName = $traceFolder.Name
+                    ObservationFile = $obsName
+                    Time = $time
+                    EventType = "IvyQuestion-Q"
+                    Detail = "Q: $(Truncate $directQuestion 120)"
+                    IsError = $false
+                }
+                continue
+            }
+
             # IvyQuestion response
-            if ($toolName -eq 'IvyQuestion' -and $input.response) {
-                $success = $input.response.success -eq $true
-                $answerLen = $input.response.answerLength
-                $error = $input.response.error
+            if ($toolName -eq 'IvyQuestion' -and $toolResponse) {
+                $success = $toolResponse.success -eq $true
+                $answerLen = $toolResponse.answerLength
+                $error = $toolResponse.error
                 $detail = if ($success) { "A: ok ($answerLen chars)" } else { "A: FAIL $(Truncate $error 80)" }
                 $results += [PSCustomObject]@{
                     TraceName = $traceFolder.Name
@@ -73,13 +104,13 @@ foreach ($traceFolder in $traceFolders) {
             }
 
             # ToolFeedback (direct format)
-            if ($toolName -and $input.feedback) {
+            if ($toolName -and $toolFeedback) {
                 $results += [PSCustomObject]@{
                     TraceName = $traceFolder.Name
                     ObservationFile = $obsName
                     Time = $time
                     EventType = "ToolFeedback"
-                    Detail = "${toolName}: $(Truncate $input.feedback 100)"
+                    Detail = "${toolName}: $(Truncate $toolFeedback 100)"
                     IsError = $true
                 }
                 continue
@@ -87,7 +118,7 @@ foreach ($traceFolder in $traceFolders) {
 
             # Message-based events - check both input.message (old) and metadata.message (new)
             $message = $null
-            if ($input.message -and $input.message.'$type') {
+            if ($input -and $input.message -and $input.message.'$type') {
                 $message = $input.message
             } elseif ($json.metadata -and $json.metadata.message -and $json.metadata.message.'$type') {
                 $message = $json.metadata.message

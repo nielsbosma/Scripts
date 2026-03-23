@@ -103,11 +103,11 @@ Each app must:
 
 ### 7. Create Playwright Tests
 
-Create `.ivy/tests/` directory with:
+Create `.ivy/tests/`, `.ivy/tests/screenshots/`, and `.ivy/tests/videos/` directories with:
 
 **package.json** — minimal, with `@playwright/test` dependency
 
-**playwright.config.ts** — Chromium only, single worker, no retries, viewport `{ width: 1920, height: 1920 }` (square format, must be set in both `use` and `projects[0].use` to override device presets), uses `process.env.APP_PORT`
+**playwright.config.ts** — Chromium only, single worker, no retries, viewport `{ width: 1920, height: 1920 }` (square format, must be set in both `use` and `projects[0].use` to override device presets), uses `process.env.APP_PORT`, video recording enabled: `video: { mode: 'on', dir: './videos' }` in both `use` and `projects[0].use`
 
 **One `.spec.ts` per app:**
 - `beforeAll`: find free port, spawn `dotnet run -- --port <port>`, wait for HTTP 200
@@ -118,6 +118,24 @@ Create `.ivy/tests/` directory with:
 - Capture browser console logs → `.ivy/tests/console.log`
 - Capture backend stdout/stderr → `.ivy/tests/backend.log`
 
+**Videos:**
+- Playwright records a video per test automatically via `video: { mode: 'on', dir: './videos' }` in the config
+- Videos are saved to `.ivy/tests/videos/`
+- After each test, save the video with a descriptive name matching the test:
+  ```typescript
+  test.afterEach(async ({ page }, testInfo) => {
+    const video = page.video();
+    if (video) {
+      const videoPath = await video.path();
+      const targetName = testInfo.title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+      const targetPath = path.join(__dirname, 'videos', `${targetName}.webm`);
+      await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
+      await fs.promises.copyFile(videoPath, targetPath);
+    }
+  });
+  ```
+- Videos provide evidence for interaction flows, animations, and timing-dependent behaviors
+
 **Test coverage must verify:**
 1. Feature renders correctly (visual via screenshots)
 2. All props produce expected visual output
@@ -126,6 +144,7 @@ Create `.ivy/tests/` directory with:
 5. No console errors or warnings
 6. No backend errors or exceptions
 7. No visual error indicators (error toasts, callouts, blank areas)
+8. Video captures show smooth interactions without glitches
 
 **Code patterns (from PlaywrightKnowledge.md):**
 - Use `getByText()`, `getByRole()` locators

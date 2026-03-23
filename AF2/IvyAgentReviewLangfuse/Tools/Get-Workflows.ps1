@@ -19,6 +19,8 @@ $traceFolders = Get-ChildItem -Path $LangfuseDir -Directory | Sort-Object Name
 $results = @()
 
 foreach ($traceFolder in $traceFolders) {
+    $workflowStack = [System.Collections.Generic.Stack[string]]::new()
+    $currentWorkflowName = $null
     $obsFiles = Get-ChildItem -Path $traceFolder.FullName -Filter "*.json" |
         Where-Object { $_.Name -ne "trace.json" } | Sort-Object Name
 
@@ -43,6 +45,8 @@ foreach ($traceFolder in $traceFolders) {
 
             switch ($msgType) {
                 'WorkflowStartMessage' {
+                    if ($currentWorkflowName) { $workflowStack.Push($currentWorkflowName) }
+                    $currentWorkflowName = $msg.workflowName
                     $results += [PSCustomObject]@{
                         TraceName = $traceFolder.Name
                         ObservationFile = $obsName
@@ -58,6 +62,11 @@ foreach ($traceFolder in $traceFolders) {
                     }
                 }
                 'WorkflowTransitionMessage' {
+                    # Sub-workflows start via transition with a new workflowName
+                    if ($msg.workflowName -and $msg.workflowName -ne $currentWorkflowName) {
+                        if ($currentWorkflowName) { $workflowStack.Push($currentWorkflowName) }
+                        $currentWorkflowName = $msg.workflowName
+                    }
                     $results += [PSCustomObject]@{
                         TraceName = $traceFolder.Name
                         ObservationFile = $obsName
@@ -78,13 +87,17 @@ foreach ($traceFolder in $traceFolders) {
                         ObservationFile = $obsName
                         Time = $time
                         EventType = "State"
-                        WorkflowName = $null
+                        WorkflowName = $currentWorkflowName
                         StateName = $msg.stateName
                         ReferenceName = $null
                         ReferenceContent = $null
                         ReferenceChars = $null
                         Success = $null
                         Error = $null
+                    }
+                    # A "Finished" state in a sub-workflow means it completed — pop back to parent
+                    if ($msg.stateName -eq "Finished" -and $workflowStack.Count -gt 0) {
+                        $currentWorkflowName = $workflowStack.Pop()
                     }
                 }
                 'WorkflowReferenceMessage' {
@@ -120,12 +133,14 @@ foreach ($traceFolder in $traceFolders) {
                     }
                 }
                 'WorkflowFinishedMessage' {
+                    $finishedName = $currentWorkflowName
+                    if ($workflowStack.Count -gt 0) { $currentWorkflowName = $workflowStack.Pop() } else { $currentWorkflowName = $null }
                     $results += [PSCustomObject]@{
                         TraceName = $traceFolder.Name
                         ObservationFile = $obsName
                         Time = $time
                         EventType = "Finished"
-                        WorkflowName = $null
+                        WorkflowName = $finishedName
                         StateName = $null
                         ReferenceName = $null
                         ReferenceContent = $null
@@ -135,12 +150,14 @@ foreach ($traceFolder in $traceFolders) {
                     }
                 }
                 'WorkflowFailedMessage' {
+                    $failedName = $currentWorkflowName
+                    if ($workflowStack.Count -gt 0) { $currentWorkflowName = $workflowStack.Pop() } else { $currentWorkflowName = $null }
                     $results += [PSCustomObject]@{
                         TraceName = $traceFolder.Name
                         ObservationFile = $obsName
                         Time = $time
                         EventType = "Failed"
-                        WorkflowName = $null
+                        WorkflowName = $failedName
                         StateName = $null
                         ReferenceName = $null
                         ReferenceContent = $null
