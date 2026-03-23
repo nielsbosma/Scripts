@@ -3,8 +3,8 @@
 ## Ivy Framework Basics
 
 - Ivy apps are .NET web apps started with `dotnet run -- --port <port>`
-- The frontend client is in `src/frontend/` and built with `npm run build` into `src/frontend/dist/`. These assets are embedded into the Ivy.dll via `<EmbeddedResource>`. If testing a commit that changed frontend `.ts` files, you MUST rebuild the frontend (`cd src/frontend && npm run build`) before running the dotnet project, otherwise the old bundled JS is served.
-- If `npm run build` fails due to pre-existing TS errors in unrelated files, run vite directly: `node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build` — this skips tsc and still produces a working bundle.
+- The frontend client is in `src/frontend/` and built with `vp build` into `src/frontend/dist/`. These assets are embedded into the Ivy.dll via `<EmbeddedResource>`. If testing a commit that changed frontend `.ts` files, you MUST rebuild the frontend (`cd src/frontend && vp build`) before running the dotnet project, otherwise the old bundled JS is served.
+- If `vp build` fails due to pre-existing TS errors in unrelated files, run vite directly: `node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build` — this skips tsc and still produces a working bundle.
 - The server prints `Ivy is running on http://localhost:<port>` when ready
 - Apps are decorated with `[App(icon: Icons.X, path: ["Apps"])]` and inherit `ViewBase`
 - The `Build()` method returns the UI tree
@@ -325,7 +325,7 @@
 When an Ivy app displays "Unknown component type: Ivy.WidgetName" instead of rendering a widget:
 
 1. **Check frontend build status**: The widget may have TypeScript compilation errors preventing the frontend bundle from building
-2. **Rebuild frontend**: Run `cd D:\Repos\_Ivy\Ivy-Framework\src\frontend && npm run build` to see compilation errors
+2. **Rebuild frontend**: Run `cd D:\Repos\_Ivy\Ivy-Framework\src\frontend && vp build` to see compilation errors
 3. **Common causes**:
    - Unused variables in the TypeScript widget implementation
    - Type mismatches (e.g., XAxisProps[] not compatible with expected interface)
@@ -369,7 +369,7 @@ In headless mode with File System Access API disabled, the save dialog uses `<a 
 
 ### 2026-03-13 — CameraInput Widget
 - Camera input widget with idle/active/captured states, upload via MemoryStreamUploadHandler
-- MUST rebuild frontend (`cd src/frontend && npm run build`) when testing commits with new frontend widgets — otherwise shows "Unknown component type: Ivy.CameraInput"
+- MUST rebuild frontend (`cd src/frontend && vp build`) when testing commits with new frontend widgets — otherwise shows "Unknown component type: Ivy.CameraInput"
 - `TextBuilder` does NOT support `.TestId()` — use `Badge` or `Card` wrapper for testable text
 - `Icons.AlertTriangle` renamed to `Icons.TriangleAlert` in Lucide
 - Fake camera in headless Chromium produces 0x0 video — upload tests must verify UI state machine instead of backend state
@@ -722,7 +722,7 @@ In headless mode with File System Access API disabled, the save dialog uses `<a 
 
 ### 2026-03-13 — Test.ScatterChart
 - **Frontend TypeScript errors block widget rendering**: ScatterChart widget compiles in C# but displays "Unknown component type: Ivy.ScatterChart" due to TypeScript compilation errors in ScatterChartWidget.tsx (4 errors: unused variables, type mismatch on XAxisProps[])
-- **Frontend build verification is critical**: Always verify `cd src/frontend && npm run build` succeeds before testing widgets, especially newly added ones
+- **Frontend build verification is critical**: Always verify `cd src/frontend && vp build` succeeds before testing widgets, especially newly added ones
 - **"Unknown component type" diagnostic approach**: When seeing this error, check frontend compilation first before investigating test code or backend API
 - **BadgeVariant has no Default value**: Use `BadgeVariant.Primary` instead (values: Primary, Destructive, Outline, Secondary, Success, Warning, Info)
 - **Card has no Variant prop**: Card only has `HoverVariant` of type `CardHoverVariant`, not a general `Variant` property
@@ -752,7 +752,7 @@ In headless mode with File System Access API disabled, the save dialog uses `<a 
 - **Testing Ivy Docs features**: The Ivy.Docs project at `src/Ivy.Docs/` runs the docs server. Use it directly rather than creating a standalone test project. The Ivy.Docs.Shared library contains the Article widget, MarkdownMiddleware, and generated docs.
 - **Docs page URL structure**: Pages are at paths like `/onboarding/getting-started/introduction` (derived from app namespace). NOT `/onboarding` (that's not a valid app path).
 - **PathToAppIdMiddleware rewrites ALL non-static paths**: Any URL path that doesn't match `staticFileExtensions` in `routing-constants.json` gets rewritten from `/path` to `/?appId=path`. Custom middleware (UseWebApplication) runs AFTER this rewrite. If your middleware needs to intercept specific file extensions (like `.md`), ensure the extension is in `staticFileExtensions`.
-- **Vite build runs prettier on source files**: Running `npx vite build` may reformat source files via prettier. After building, check `git diff` and revert formatting-only changes before committing.
+- **Vite build runs prettier on source files**: Running `vp build` may reformat source files via prettier. After building, check `git diff` and revert formatting-only changes before committing.
 - **Copy Page button location**: Inside ArticleSidebar, only visible on `lg` breakpoint screens (1024px+). Requires `showToc=true` (default for docs pages). Use 1920x1920 viewport.
 - **Clipboard testing**: Use `context.grantPermissions(["clipboard-read", "clipboard-write"])` and `page.evaluate(() => navigator.clipboard.readText())` to verify clipboard content.
 

@@ -158,9 +158,9 @@ Create `.ivy/tests/`, `.ivy/tests/screenshots/`, and `.ivy/tests/videos/` direct
 
 ```bash
 cd .ivy/tests
-npm install
-npx playwright install chromium  # if needed
-npx playwright test
+vp install
+npx playwright install chromium  # if needed — vp doesn't manage browser binaries
+vp run test
 ```
 
 ### 9. Fix Loop #1 (up to 10 rounds)

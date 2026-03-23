@@ -155,17 +155,17 @@ try {
 
     Push-Location $TestsDir
 
-    # Use Continue for npm/npx - they write to stderr even on success
+    # Use Continue for vp/npx - they write to stderr even on success
     $prevPref = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
 
     if (-not (Test-Path "node_modules")) {
         Write-Host "  Installing dependencies..." -ForegroundColor Gray
-        npm install --silent 2>&1 | Out-Null
+        vp install 2>&1 | Out-Null
         npx playwright install chromium --with-deps 2>&1 | Out-Null
     }
 
-    $playwrightOutput = npx playwright test --reporter=list 2>&1 | Out-String
+    $playwrightOutput = vp run test -- --reporter=list 2>&1 | Out-String
     $playwrightOutput | Out-File -FilePath "$TestsDir\playwright.log" -Encoding UTF8
 
     $ErrorActionPreference = $prevPref

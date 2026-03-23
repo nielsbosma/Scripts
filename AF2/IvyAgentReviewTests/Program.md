@@ -131,7 +131,7 @@ If Args contains additional instructions, apply them to the test generation.
 
 ```powershell
 cd .ivy/tests
-npm install
+vp install
 ```
 
 If Playwright browsers aren't installed, run `npx playwright install chromium`.
@@ -139,7 +139,7 @@ If Playwright browsers aren't installed, run `npx playwright install chromium`.
 ### 9. Run Tests and Fix Loop
 
 - Clean previous screenshots and logs before running
-- Run: `cd .ivy/tests && npx playwright test`
+- Run: `cd .ivy/tests && vp run test`
 - If tests pass AND logs are clean, proceed to step 10
 - If tests fail, logs contain errors/warnings, or screenshots show runtime errors:
   1. Analyze the errors — test failures, console errors, backend exceptions, visual errors in screenshots
