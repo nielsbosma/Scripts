@@ -226,10 +226,12 @@ For each PR group above, execute these steps:
 4. `git cherry-pick <commit1> <commit2> ...` (all commits listed in the group, in order)
 5. `git push -u origin pr/<first-commit-short-hash>-<sanitized-title>`
 6. `gh pr create --head pr/<first-commit-short-hash>-<sanitized-title> --base main --title "<PR title>" --body "<Summary from commits, with Closes #N for issue-based PRs>"`
-7. `git checkout <Branch>` (restore original branch)
-8. Open the PR URL in the browser
-9. Drop the cherry-picked commits from `<Branch>`: `git checkout <Branch>` then `git rebase --onto <commit-before-first-cherry-picked> <last-cherry-picked> <Branch>` (or use `git rebase -i` equivalent). This always happens — the commits are "lifted out" of the original branch into the PR branch.
-10. Verify you are back on the original `<Branch>`
+7. Approve the PR: `gh pr review <PR-URL> --approve`
+8. Merge the PR and delete remote branch: `gh pr merge <PR-URL> --merge --delete-branch`
+9. `git checkout <Branch>` (restore original branch)
+10. Open the PR URL in the browser
+11. Drop the cherry-picked commits from `<Branch>`: `git checkout <Branch>` then `git rebase --onto <commit-before-first-cherry-picked> <last-cherry-picked> <Branch>` (or use `git rebase -i` equivalent). This always happens — the commits are "lifted out" of the original branch into the PR branch.
+12. Verify you are back on the original `<Branch>`
 
 Notes:
 - Sanitize title for branch name: lowercase, replace spaces with hyphens, remove special chars, truncate to ~50 chars
@@ -299,7 +301,11 @@ Follow the pattern from ReviewCommits.ps1:
    ```
 4. If assignee specified, assign PR: `gh pr edit [pr-url] --add-assignee [assignee]`
 5. **IMPORTANT**: Open PR URL in browser using `Start-Process [pr-url]` (PowerShell) or appropriate browser launch command
-6. **Ask user**: "Drop these commits from [original-branch]? (y/n)"
+6. **Auto-approve, merge, and delete branch**:
+   - Approve the PR: `gh pr review [pr-url] --approve`
+   - Merge the PR: `gh pr merge [pr-url] --merge --delete-branch`
+   - This will merge the PR and automatically delete the remote branch
+7. **Ask user**: "Drop these commits from [original-branch]? (y/n)"
    - If yes, drop commits using rebase: `git rebase --onto [first-hash]^ [last-hash] [original-branch]`
    - If rebase fails, warn user and abort rebase
 
@@ -326,6 +332,18 @@ Display final summary:
 
 ✗ Failed to create 1 PR
   - [repo-name] [branch-name]: [error message]
+```
+
+Copy PR list to clipboard in markdown format:
+```
+* [PR Title 1] [url1]
+* [PR Title 2] [url2]
+* [PR Title 3] [url3]
+```
+
+Use PowerShell to copy to clipboard:
+```powershell
+$prList | Set-Clipboard
 ```
 
 ## Args Flags
