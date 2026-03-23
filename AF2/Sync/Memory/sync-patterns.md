@@ -2,10 +2,9 @@
 
 ## Repository Build Notes
 
-- **Ivy**: The `Ivy.Studio/Widgets/frontend` directory requires `npm run build` before `dotnet build` will succeed. The dist files are gitignored.
+- **Ivy**: The `Ivy.Studio/Widgets/frontend` directory requires `npm install` and `npm run build` before `dotnet build` will succeed. The dist files and node_modules are gitignored.
 - **Ivy (connections.slnx)**: Auto-generated Vercel client has lowercase type names triggering CS8981. Suppressed in csproj NoWarn as of run 00009.
 - **Scripts**: No .slnx files to build. Only needs git sync.
-- **Ivy-Agent-Test-Data**: No .slnx files to build. Only needs git sync.
 
 ## Cross-Repo Namespace Migration
 
@@ -13,6 +12,10 @@
 
 ## Known Issues
 
+- **Missing Ivy.Billing packages**: Both Ivy-Agent and Ivy depend on private Billing packages not accessible on this machine (as of run 00015):
+  - `Ivy.Billing.Client` (nuget.org) - used by Ivy-Agent.Server and Ivy.Agent.Test - causes NU1101 error
+  - `Ivy.Billing.Console.Client` (GitHub Packages) - used by Ivy.Console - causes NU1301 with 401 Unauthorized
+  - Requires NuGet source authentication configuration or package publication
 - **VBCSCompiler file locks**: `dotnet build` frequently fails on first attempt due to VBCSCompiler holding locks on DLLs. Retry usually succeeds. Consider killing VBCSCompiler processes before building.
 - **Process file locks**: Running Ivy.Agent.Server, Ivy.Docs, or other dotnet processes can lock DLLs preventing builds. Kill them before building using PowerShell `Stop-Process` (bash `taskkill` can timeout). Ivy.Docs can spawn many instances (14+).
 - **Microsoft Defender locks**: Defender can temporarily lock DLLs during builds. Retry usually succeeds.
