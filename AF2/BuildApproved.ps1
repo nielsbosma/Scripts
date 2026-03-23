@@ -104,6 +104,7 @@ function Start-InteractiveExecution {
     # Strip YAML frontmatter so --- isn't parsed as a CLI flag
     $content = $content -replace '(?s)\A---\r?\n.*?\r?\n---\r?\n', ''
     $stem = [IO.Path]::GetFileNameWithoutExtension($PlanFile)
+    $startTime = Get-Date
 
     $preCommitInstructions = @"
 
@@ -184,7 +185,7 @@ Set-Location '$($WorkDir -replace "'", "''")'
 `$env:CLAUDECODE = `$null
 `$prompt = Get-Content '$($tempPrompt -replace "'", "''")' -Raw
 try {
-    claude -p `$prompt --dangerously-skip-permissions --verbose
+    & claude --dangerously-skip-permissions -- `$prompt
 } finally {
     Remove-Item '$($tempPrompt -replace "'", "''")' -ErrorAction SilentlyContinue
     Write-Host ''
@@ -194,25 +195,23 @@ try {
 "@
     $scriptContent | Set-Content $tempScript -Encoding utf8
 
-    # Launch in new terminal using the script file
+    # Launch in new terminal using the script file (non-blocking)
     $wtPath = Get-Command wt.exe -ErrorAction SilentlyContinue
     if ($wtPath) {
-        # Use Windows Terminal
-        Start-Process wt.exe -ArgumentList "-w","0","pwsh","-NoExit","-File",$tempScript -Wait
+        # Use Windows Terminal - open in current window as new tab
+        Start-Process wt.exe -ArgumentList "-w","0","pwsh","-NoExit","-File",$tempScript
     } else {
         # Fallback to pwsh
-        Start-Process pwsh -ArgumentList "-NoExit","-File",$tempScript -Wait
+        Start-Process pwsh -ArgumentList "-NoExit","-File",$tempScript
     }
 
-    # Clean up temp script
-    Remove-Item $tempScript -ErrorAction SilentlyContinue
-
-    # Check if execution succeeded by checking exit code stored in a marker file
-    # Since we can't easily get the exit code from the spawned terminal, we'll
-    # assume success unless the temp file still exists (which would indicate a crash)
-    $success = -not (Test-Path $tempPrompt)
-
-    return $success
+    # Return session info to track in main loop
+    return @{
+        File        = $PlanFile
+        TempPrompt  = $tempPrompt
+        TempScript  = $tempScript
+        Start       = $startTime
+    }
 }
 
 function Show-Status {
@@ -354,10 +353,45 @@ try {
             }
         }
 
-        # 2. Check completed jobs
+        # 2. Check completed jobs and interactive sessions
         foreach ($q in @($active.Keys)) {
             $info = $active[$q]
-            if ($info.Job.State -in @('Completed', 'Failed', 'Stopped')) {
+
+            # Check if this is an interactive session or a background job
+            if ($info.ContainsKey('Interactive') -and $info.Interactive) {
+                # Interactive session - check if temp prompt file still exists
+                $tempPromptExists = Test-Path $info.TempPrompt
+                if (-not $tempPromptExists) {
+                    # Session completed (temp file deleted by finally block)
+                    $success  = $true
+                    $duration = (Get-Date) - $info.Start
+
+                    # Clean up temp script
+                    if ($info.TempScript -and (Test-Path $info.TempScript)) {
+                        Remove-Item $info.TempScript -ErrorAction SilentlyContinue
+                    }
+
+                    # Move plan file
+                    $destDir  = if ($success) { $DonePath } else { $FailPath }
+                    $fileName = [IO.Path]::GetFileName($info.File)
+                    if (Test-Path $info.File) {
+                        Move-Item $info.File (Join-Path $destDir $fileName) -Force
+                    }
+
+                    $status = "Done"
+                    $history.Add([pscustomobject]@{
+                        File     = $info.File
+                        Queue    = $q
+                        Status   = $status
+                        Duration = $duration
+                        Reason   = $null
+                        LogFile  = "(interactive - no log)"
+                    })
+
+                    $active.Remove($q)
+                }
+            }
+            elseif ($info.ContainsKey('Job') -and $info.Job -and $info.Job.State -in @('Completed', 'Failed', 'Stopped')) {
                 $output   = Receive-Job $info.Job 2>&1
                 $success  = $info.Job.State -eq 'Completed'
                 $duration = (Get-Date) - $info.Start
@@ -409,45 +443,71 @@ try {
             }
         }
 
-        # 2c. Check for timed-out jobs
+        # 2c. Check for timed-out jobs and interactive sessions
         foreach ($q in @($active.Keys)) {
             $info = $active[$q]
             $elapsed = (Get-Date) - $info.Start
             if ($elapsed.TotalMinutes -ge $TimeoutMinutes) {
-                # Force stop the hung job
-                Stop-Job $info.Job -ErrorAction SilentlyContinue
-                $output = Receive-Job $info.Job 2>&1
-                Remove-Job $info.Job -Force
+                if ($info.ContainsKey('Interactive') -and $info.Interactive) {
+                    # Interactive session timed out - clean up temp files
+                    Remove-Item $info.TempPrompt -ErrorAction SilentlyContinue
+                    Remove-Item $info.TempScript -ErrorAction SilentlyContinue
 
-                # Write log (parse stream-json to readable text)
-                $stem    = [IO.Path]::GetFileNameWithoutExtension($info.File)
-                $logFile = Join-Path $LogPath "$stem.log"
-                $rawStr = ($output | Out-String)
-                $outputStr = (ConvertFrom-StreamJson $rawStr) + "`n`n--- TIMED OUT after $TimeoutMinutes minutes ---"
-                $outputStr | Set-Content $logFile -Encoding utf8
+                    # Move to failed
+                    $fileName = [IO.Path]::GetFileName($info.File)
+                    if (Test-Path $info.File) {
+                        $timeoutNote = "`n`n## Failed`n`nTimed out after $TimeoutMinutes minutes (interactive session).`n"
+                        Add-Content -Path $info.File -Value $timeoutNote -Encoding utf8
+                        Move-Item $info.File (Join-Path $FailPath $fileName) -Force
+                    }
 
-                # Append timeout note to plan file
-                $timeoutNote = "`n`n## Failed`n`nTimed out after $TimeoutMinutes minutes.`n"
-                if (Test-Path $info.File) {
-                    Add-Content -Path $info.File -Value $timeoutNote -Encoding utf8
+                    $history.Add([pscustomobject]@{
+                        File     = $info.File
+                        Queue    = $q
+                        Status   = "Failed"
+                        Duration = $elapsed
+                        Reason   = "Timed out after $TimeoutMinutes minutes (interactive)"
+                        LogFile  = "(interactive - no log)"
+                    })
+
+                    $active.Remove($q)
                 }
+                else {
+                    # Force stop the hung job
+                    Stop-Job $info.Job -ErrorAction SilentlyContinue
+                    $output = Receive-Job $info.Job 2>&1
+                    Remove-Job $info.Job -Force
 
-                # Move to failed
-                $fileName = [IO.Path]::GetFileName($info.File)
-                if (Test-Path $info.File) {
-                    Move-Item $info.File (Join-Path $FailPath $fileName) -Force
+                    # Write log (parse stream-json to readable text)
+                    $stem    = [IO.Path]::GetFileNameWithoutExtension($info.File)
+                    $logFile = Join-Path $LogPath "$stem.log"
+                    $rawStr = ($output | Out-String)
+                    $outputStr = (ConvertFrom-StreamJson $rawStr) + "`n`n--- TIMED OUT after $TimeoutMinutes minutes ---"
+                    $outputStr | Set-Content $logFile -Encoding utf8
+
+                    # Append timeout note to plan file
+                    $timeoutNote = "`n`n## Failed`n`nTimed out after $TimeoutMinutes minutes.`n"
+                    if (Test-Path $info.File) {
+                        Add-Content -Path $info.File -Value $timeoutNote -Encoding utf8
+                    }
+
+                    # Move to failed
+                    $fileName = [IO.Path]::GetFileName($info.File)
+                    if (Test-Path $info.File) {
+                        Move-Item $info.File (Join-Path $FailPath $fileName) -Force
+                    }
+
+                    $history.Add([pscustomobject]@{
+                        File     = $info.File
+                        Queue    = $q
+                        Status   = "Failed"
+                        Duration = $elapsed
+                        Reason   = "Timed out after $TimeoutMinutes minutes"
+                        LogFile  = $logFile
+                    })
+
+                    $active.Remove($q)
                 }
-
-                $history.Add([pscustomobject]@{
-                    File     = $info.File
-                    Queue    = $q
-                    Status   = "Failed"
-                    Duration = $elapsed
-                    Reason   = "Timed out after $TimeoutMinutes minutes"
-                    LogFile  = $logFile
-                })
-
-                $active.Remove($q)
             }
         }
 
@@ -534,29 +594,17 @@ try {
                 $workDir = Get-WorkDir $q
 
                 if ($Interactive) {
-                    # Interactive mode: launch terminal and wait
-                    $startTime = Get-Date
-                    $success = Start-InteractiveExecution $file $workDir $ReviewPath
-                    $duration = (Get-Date) - $startTime
+                    # Interactive mode: launch terminal (non-blocking)
+                    $sessionInfo = Start-InteractiveExecution $file $workDir $ReviewPath
 
-                    # Record immediately as complete
-                    $status = if ($success) { "Done" } else { "Failed" }
-
-                    # Move file
-                    $destDir = if ($success) { $DonePath } else { $FailPath }
-                    $fileName = [IO.Path]::GetFileName($file)
-                    if (Test-Path $file) {
-                        Move-Item $file (Join-Path $destDir $fileName) -Force
+                    # Track in active sessions (similar to jobs, but with temp file monitoring)
+                    $active[$q] = @{
+                        File        = $file
+                        Start       = $sessionInfo.Start
+                        TempPrompt  = $sessionInfo.TempPrompt
+                        TempScript  = $sessionInfo.TempScript
+                        Interactive = $true
                     }
-
-                    $history.Add([pscustomobject]@{
-                        File     = $file
-                        Queue    = $q
-                        Status   = $status
-                        Duration = $duration
-                        Reason   = if (-not $success) { "Interactive execution failed" } else { $null }
-                        LogFile  = "(interactive - no log)"
-                    })
                 }
                 else {
                     # Background mode: existing Start-Job logic
@@ -685,13 +733,21 @@ Do NOT guess or make assumptions when uncertain. It is better to fail with a cle
 finally {
     [Console]::CursorVisible = $true
     foreach ($q in @($active.Keys)) {
-        Stop-Job  $active[$q].Job -ErrorAction SilentlyContinue
-        Remove-Job $active[$q].Job -Force -ErrorAction SilentlyContinue
+        $info = $active[$q]
+        if ($info.ContainsKey('Job') -and $info.Job) {
+            Stop-Job  $info.Job -ErrorAction SilentlyContinue
+            Remove-Job $info.Job -Force -ErrorAction SilentlyContinue
+        }
+        # Clean up interactive session temp files
+        if ($info.ContainsKey('Interactive') -and $info.Interactive) {
+            Remove-Item $info.TempPrompt -ErrorAction SilentlyContinue
+            Remove-Item $info.TempScript -ErrorAction SilentlyContinue
+        }
     }
     if ($activePlan) {
         Stop-Job  $activePlan.Job -ErrorAction SilentlyContinue
         Remove-Job $activePlan.Job -Force -ErrorAction SilentlyContinue
     }
     $cleanedUp = $active.Count + $(if ($activePlan) { 1 } else { 0 })
-    Write-Host "`nStopped. Cleaned up $cleanedUp active job(s)." -ForegroundColor Yellow
+    Write-Host "`nStopped. Cleaned up $cleanedUp active job(s) and session(s)." -ForegroundColor Yellow
 }
