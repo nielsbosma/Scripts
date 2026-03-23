@@ -83,6 +83,7 @@
 - `new Card(content, header: Text.H3("Title"))` — the card header text (e.g., "Monthly Revenue") will match `getByText()` along with any content containing the same substring (e.g., "Total Monthly Revenue:"), causing strict mode violations. Always use `getByRole("heading", { name: "Title" })` for card headers
 - `new Card(content).Title("X")` — Card `.Title()` does NOT render as an HTML heading element (`<h1>`-`<h6>`), so `getByRole("heading", { name: "X" })` will fail. Use `getByText("X", { exact: true }).first()` instead. Only explicit `Text.H2()`/`Text.H3()` passed as card header render as headings.
 - **NumberInput** (`state.ToNumberInput()`) renders as a regular text `<input>` in the DOM, NOT `<input type="number">`. `page.locator('input[type="number"]')` will find nothing. Additionally, `.WithLabel()` doesn't create proper HTML label associations, so `getByLabel()` won't work. **Recommended approach**: Use `page.locator('input[value="9"]')` to locate by current/default value when tests start fresh, or use `.nth(N)` to target by position relative to other inputs in the form.
+- **CodeInput renders as Monaco editor** — `state.ToCodeInput()` renders as a Monaco code editor with `[contenteditable="true"]`, NOT a `<textarea>` element. To interact with CodeInput: use `page.locator('[contenteditable="true"]').first()`, call `.click()` to focus, then `.fill(code)`. Do NOT use `page.locator("textarea")` — it won't match.
 - **CodeInput copy buttons**: `.ShowCopyButton()` and code editors add `aria-label="Copy to clipboard"` icon buttons. Combined with explicit "Copy" `Button` widgets, `getByRole("button", { name: "Copy" })` may match multiple elements — always use `{ exact: true }` for the explicit Copy button.
 - **Webhooks require state parameter**: Ivy webhook URLs require an internal `state` query parameter. Server-side `HttpClient` calls to `webhook.BaseUrl` without this parameter return 400 "The 'state' query parameter is required." — Test Endpoint features using server-side HTTP calls to webhooks will fail.
 - `state.ToMoneyInput().Currency("USD").Precision(0)` renders as a text input with formatted currency (e.g., "$850,000") — values are displayed with `$` prefix and comma separators
@@ -93,12 +94,12 @@
 ## File Upload (ToFileInput + UseUpload)
 
 - Ivy file upload via `state.ToFileInput(upload)` renders a drag-drop area with a hidden `<input type="file">`
-- `page.locator('input[type="file"]').setInputFiles(path)` is UNRELIABLE — may not trigger Ivy's upload mechanism
-- **Recommended approach**: Use Playwright's `fileChooser` event — click the upload area text to trigger file dialog, then set files on the chooser:
+- **Recommended approach**: Use `page.locator('input[type="file"]').setInputFiles(path)` — this works reliably despite earlier concerns. The `fileChooser` event approach (clicking drop zone text) is unreliable because the click on "Drag and drop your file here or click to select" text may not trigger the native file dialog.
+- If `setInputFiles` doesn't work, try `fileChooser` as fallback:
   ```typescript
   const [fileChooser] = await Promise.all([
-    page.waitForEvent("filechooser"),
-    page.getByText("Drop your PDF here").click(),
+    page.waitForEvent("filechooser", { timeout: 5000 }),
+    page.getByText("click to select").first().click(),
   ]);
   await fileChooser.setFiles(testPdfPath);
   ```
@@ -176,8 +177,8 @@
 
 ## Ivy Connection Secrets
 
-- **Ivy server blocks startup when secrets are missing** — projects with `IConnection` + `IHaveSecrets` (e.g., OpenAI) fail with "Missing secrets detected. The Ivy server cannot start." before binding any port. Tests must configure user secrets BEFORE spawning the server: `dotnet user-secrets set "SecretKey" "value"` from the project directory. Check the spec for API keys/tokens to use.
-- Secret keys and presets are discoverable via `dotnet run --describe` (listed under `secrets:`)
+- **Ivy server blocks startup when secrets are missing** — projects with `IConnection` + `IHaveSecrets` (e.g., OpenAI) fail with "Missing secrets detected. The Ivy server cannot start." before binding any port. Tests must create `appsettings.json` in the project root with the required configuration (e.g., `{ "OpenAI": { "ApiKey": "...", "Endpoint": "..." } }`). Secret keys and presets are discoverable via `dotnet run --describe` (listed under `secrets:`). Note: `secrets.json` does NOT work — Ivy requires `appsettings.json` for configuration in .csproj projects.
+- Check the spec for API keys/tokens to use
 
 ## Ivy App Construction
 
@@ -772,3 +773,32 @@
 - **pdf-lib npm package** generates valid PDFs for test fixtures — use `PDFDocument.create()` + `addPage()` + `drawText()` + `save()`. Better than hand-crafted PDFs which may have wrong xref offsets
 - PdfSharpCore adds ~2x overhead for small PDFs (5KB → 10KB), causing negative reduction percentage. This is a logic issue in the app, not a framework bug
 - 1 test, 4 fix rounds (iText7 license, PDF generation, file upload method), all passed, logs clean
+
+### 2026-03-23 — AIErrorMessageExplainerV3
+- Single-app AI error explainer using `Chat` widget with OpenAI-compatible API (llmproxy.ivy.app), streaming responses
+- **Chat widget strict mode violations**: In chat interfaces, the same text appears in both user messages and AI responses (e.g., when AI quotes the user's error message). `getByText("SyntaxError: Unexpected token")` matches multiple elements. Always use `getByText(text, { exact: true }).first()` for chat message assertions
+- **Chat widget DOM structure**: User messages render as `<span>` elements with green background, assistant messages have bug icon. Don't rely on `[class*="message"]` selectors — they don't exist in Ivy Chat widget
+- **OpenAI connection secrets**: When `IHaveSecrets` is implemented, ALL secrets must be set via `dotnet user-secrets set` before server starts, even if code has fallback defaults. Server blocks startup on missing secrets
+- `new Chat(messages, onSend, onCancel).Placeholder("text")` renders a textarea input at the bottom with send button
+- Streaming AI responses via `chatClient.GetStreamingResponseAsync()` work correctly with incremental message updates
+- 8 tests, 2 fix rounds (test-only: strict mode + DOM selector), all passed, logs clean
+
+### 2026-03-23 — SQLQueryExplainerV3
+- Single-app SQL query explainer using OpenAI-compatible API (llmproxy.ivy.app), CodeMirror SQL editor, streaming markdown explanations
+- `sqlQuery.ToCodeInput(language: Languages.Sql)` renders CodeMirror editor with SQL syntax highlighting, line numbers, and copy button
+- **ES module __dirname**: In ES module context (`"type": "module"` in package.json), `__dirname` is not defined. Use `const __dirname = path.dirname(fileURLToPath(import.meta.url))` with `import { fileURLToPath } from 'url'`
+- **Clipboard write in headless**: `navigator.clipboard.writeText()` via `page.evaluate()` fails with "Write permission denied" in headless Chromium (confirmed again). Use `keyboard.type()` for text input instead
+- **Fast streaming response timing**: LLM streaming via llmproxy can complete in 1-3 seconds. Tests asserting on transient loading states (e.g., button disabled during streaming) may fail because the state changes before the assertion runs. Focus on end results (explanation appears) rather than intermediate states
+- `new Markdown(text)` renders AI-generated markdown explanations correctly with headers and formatting
+- `Button.Disabled(condition)` with reactive state (`isStreaming.Value || string.IsNullOrWhiteSpace(sqlQuery.Value)`) correctly toggles button enabled/disabled state
+- 8 tests, 3 fix rounds (all test-only: __dirname ES module, clipboard permission, streaming timing), all passed, logs clean
+
+### 2026-03-23 — AIChatAppV3
+- AI chat app using OpenAI-compatible API (llmproxy.ivy.app), streaming responses with `UseStream<TextRun>`, conversation history
+- **Chat widget send button selector**: `new Chat(messages, OnSend, OnCancel)` renders a send button with accessible name "Send Message". Use `page.getByRole('button', { name: 'Send Message' })` to target it specifically. Do NOT use `page.getByRole('button').filter({ has: page.locator('svg') }).first()` — this can match other buttons like the "MADE WITH" footer button
+- Chat widget renders user messages on right (green bubbles with user icon) and assistant messages on left (with sparkle icon)
+- Streaming responses update in real-time via `UseStream<TextRun>` and `RichTextMarkdownParser`
+- `new Chat().Placeholder("text")` sets the textarea placeholder correctly
+- Chat conversation history maintained via `ImmutableArray<ChatMessage>` and `ImmutableArray<OpenAIChatMessage>` states
+- Empty message sends are handled gracefully (no-op, no crash)
+- 8 tests, 1 fix round (test-only: button selector), all passed, logs clean
