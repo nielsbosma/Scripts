@@ -291,45 +291,6 @@ function activate(context) {
         })
     );
 
-    // Execute Plan - runs claude in TUI mode to implement the plan
-    context.subscriptions.push(
-        vscode.commands.registerCommand('ivy.executePlan', async (uri) => {
-            if (!uri && vscode.window.activeTextEditor) {
-                uri = vscode.window.activeTextEditor.document.uri;
-            }
-            if (!uri) return;
-            await saveAndClose(uri);
-
-            const filePath = uri.fsPath;
-            const fileName = path.basename(filePath);
-            const os = require('os');
-            const crypto = require('crypto');
-
-            const prompt = [
-                `Implement this plan: ${filePath}`,
-                '',
-                '1. Read the plan',
-                '2. Move the plan to D:\\Repos\\_Ivy\\.plans\\executing\\',
-                '3. Implement the plan',
-                '4. When finished:',
-                '   A) If successful: Move plan to D:\\Repos\\_Ivy\\.plans\\completed\\',
-                '   B) If failed: Move plan to D:\\Repos\\_Ivy\\.plans\\failed\\ and append an explanation'
-            ].join('\n');
-
-            // Write prompt to a temp file to avoid shell escaping issues with newlines
-            const tmpPath = path.join(os.tmpdir(), `execute-plan-${crypto.randomUUID()}.txt`);
-            fs.writeFileSync(tmpPath, prompt, 'utf8');
-
-            const terminal = vscode.window.createTerminal({
-                name: `Execute: ${fileName}`,
-                cwd: 'D:\\Repos',
-                shellPath: 'pwsh'
-            });
-            terminal.show();
-            terminal.sendText(`claude --dangerously-skip-permissions (Get-Content -Raw "${tmpPath}")`);
-        })
-    );
-
     // Make Plan - opens temp .md file in VSCode, then passes content to MakePlan.ps1
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.makePlan', async () => {

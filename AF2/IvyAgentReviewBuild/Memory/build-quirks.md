@@ -1,5 +1,11 @@
 # Build Quirks
 
+## NETSDK1005: Stale assets file after dotnet clean
+
+`dotnet clean` can leave a stale `obj/project.assets.json` that doesn't target the current framework (e.g. net10.0), causing NETSDK1005 on the next build. `dotnet restore` with the stale file reports "All projects are up-to-date" and does nothing.
+
+**Fix**: Delete `obj/project.assets.json` and re-run `dotnet restore`. The subsequent build will succeed.
+
 ## dotnet clean + build race condition
 
 After `dotnet clean`, the first `dotnet build` may fail with MSB3030 errors for Ivy.Agent.Filter outputs (dll, pdb, xml). This is because MSBuild's clean removes the dependency outputs, and the subsequent build has a race condition where Ivy.csproj tries to copy files before Ivy.Agent.Filter finishes rebuilding them.
