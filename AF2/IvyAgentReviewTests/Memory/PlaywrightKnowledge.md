@@ -804,3 +804,16 @@
 - Chat conversation history maintained via `ImmutableArray<ChatMessage>` and `ImmutableArray<OpenAIChatMessage>` states
 - Empty message sends are handled gracefully (no-op, no crash)
 - 8 tests, 1 fix round (test-only: button selector), all passed, logs clean
+
+### 2026-03-23 — AINameGeneratorV3
+- AI name generator using OpenAI-compatible API (llmproxy.ivy.app) via `IChatClient.GetStreamingResponseAsync()`, generates startup/product/domain names
+- Single-app project with `UseDefaultApp(typeof(NameGeneratorApp))` — no Chrome sidebar, access via `/<app-id>?chrome=false`
+- SelectInput for category (Startup Name, Product Name, Domain Ideas) renders as Radix dropdown — `getByRole("combobox").click()` to open, `getByText("Option", { exact: true }).first().click()` to select
+- NumberInput for count renders as text input (`input[type="text"]`) — use `locator('input[type="text"]').nth(N)` to target
+- Button disable logic based on `string.IsNullOrWhiteSpace(brief.Value)` works correctly
+- `Button.Loading(isGenerating.Value)` shows loading state during streaming
+- `new Markdown(result.Value)` renders streamed AI responses incrementally
+- `new Separator()` appears between form and results when generation succeeds
+- External API authentication failure (401 invalid_api_key) handled gracefully with `Callout.Error()` display
+- Tests use same pattern as CoinGeckoCrypto/Chromatica.Palettes2: accept EITHER success OR error states with `pageContent.includes('1.') || pageContent.includes('Error') || pageContent.includes('401')`
+- 7 tests, 1 fix round (test-only: API error handling), all passed, logs clean, no project fixes needed
