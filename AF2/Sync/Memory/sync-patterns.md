@@ -11,11 +11,6 @@
 - **Ivy.Shared → Ivy**: Types in `Ivy-Framework/src/Ivy/Shared/` are being migrated from `namespace Ivy.Shared` to `namespace Ivy` (with `// ReSharper disable once CheckNamespace`). This affects downstream repos (Ivy-Mcp, Ivy) that `using Ivy.Shared`. When syncing, check for CS0234 errors referencing `Ivy.Shared` and update to `using Ivy`.
 
 ## Known Issues
-
-- **Missing Ivy.Billing packages**: Both Ivy-Agent and Ivy depend on private Billing packages not accessible on this machine (as of run 00015):
-  - `Ivy.Billing.Client` (nuget.org) - used by Ivy-Agent.Server and Ivy.Agent.Test - causes NU1101 error
-  - `Ivy.Billing.Console.Client` (GitHub Packages) - used by Ivy.Console - causes NU1301 with 401 Unauthorized
-  - Requires NuGet source authentication configuration or package publication
 - **VBCSCompiler file locks**: `dotnet build` frequently fails on first attempt due to VBCSCompiler holding locks on DLLs. Retry usually succeeds. Consider killing VBCSCompiler processes before building.
 - **Process file locks**: Running Ivy.Agent.Server, Ivy.Docs, or other dotnet processes can lock DLLs preventing builds. Kill them before building using PowerShell `Stop-Process` (bash `taskkill` can timeout). Ivy.Docs can spawn many instances (14+).
 - **Microsoft Defender locks**: Defender can temporarily lock DLLs during builds. Retry usually succeeds.
