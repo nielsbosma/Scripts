@@ -21,7 +21,8 @@ param(
     [string]$ReviewPath   = "D:\Repos\_Ivy\.plans\review",
     [string]$PlanWatchPath = "D:\Repos\_Ivy\.plans\plan",
     [int]   $PollInterval = 3,
-    [int]   $TimeoutMinutes = 30
+    [int]   $TimeoutMinutes = 30,
+    [switch]$Interactive
 )
 
 # ── Queue name → working directory ──────────────────────────────────────────
@@ -94,6 +95,123 @@ function ConvertFrom-StreamJson([string]$RawOutput) {
 function Format-Duration([TimeSpan]$ts) {
     if ($ts.TotalHours -ge 1) { return "{0}h {1:00}m" -f [int]$ts.TotalHours, $ts.Minutes }
     return "{0}m {1:00}s" -f [int]$ts.TotalMinutes, $ts.Seconds
+}
+
+function Start-InteractiveExecution {
+    param($PlanFile, $WorkDir, $ReviewPath)
+
+    $content = Get-Content $PlanFile -Raw
+    # Strip YAML frontmatter so --- isn't parsed as a CLI flag
+    $content = $content -replace '(?s)\A---\r?\n.*?\r?\n---\r?\n', ''
+    $stem = [IO.Path]::GetFileNameWithoutExtension($PlanFile)
+    $startTime = Get-Date
+
+    $preCommitInstructions = @"
+
+## Pre-Commit (REQUIRED)
+
+Before creating any git commit, you MUST run the appropriate formatting/linting commands based on what files you changed.
+
+**If you modified any frontend files** (files under ``src/frontend/`` — .ts, .tsx, .js, .jsx, .css files):
+
+``````bash
+cd src/frontend
+npm run format
+npm run lint:fix
+cd ../..
+``````
+
+**If you modified any .cs (C#) files**:
+
+``````bash
+cd src
+dotnet format
+cd ..
+``````
+
+After running these commands, check the output for any remaining errors. If there are errors that were not auto-fixed (e.g., lint errors, type errors, or build failures), you MUST fix them in your code before proceeding. Re-run the commands after fixing to confirm they pass cleanly.
+
+Once everything passes, stage any files that were reformatted or fixed (``git add`` the changed files), then proceed with the commit.
+"@
+
+    $reviewInstructions = @"
+
+## Review (optional)
+
+After completing all steps above, decide if a human should manually review or test anything after this implementation. If so, create a file at:
+
+    $ReviewPath\$stem.md
+
+The file should contain a short, actionable checklist of what to verify. Examples:
+- Test a specific command or feature end-to-end
+- Run a sample app to confirm behavior
+- Check UI rendering
+
+If the change is purely mechanical (e.g., renaming, formatting, trivial config) and needs no human review, skip creating the file.
+We don't need to review faq updates, doc fixes, or simple code changes that are low-risk.
+"@
+
+    $ambiguityInstructions = @"
+
+## Ambiguity Handling (REQUIRED)
+
+You are running in non-interactive mode and CANNOT ask the user questions. If at any point you:
+- Are unsure about the intended behavior or requirements
+- Need clarification on scope, approach, or edge cases
+- Encounter conflicting instructions in the plan
+- Cannot find the files, functions, or patterns referenced in the plan
+- Would normally ask a clarifying question before proceeding
+
+Then you MUST stop immediately and fail with a clear message explaining:
+1. What you were trying to do
+2. What specific question(s) you need answered
+3. What information was missing or ambiguous
+
+Do NOT guess or make assumptions when uncertain. It is better to fail with a clear explanation than to silently produce incorrect work.
+"@
+
+    # Build full prompt
+    $fullPrompt = $content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions
+
+    # Save prompt to temp file
+    $tempPrompt = Join-Path $env:TEMP "buildapproved-$stem.txt"
+    $fullPrompt | Set-Content $tempPrompt -Encoding utf8
+
+    # Save full command sequence to a temporary .ps1 script file
+    $tempScript = Join-Path $env:TEMP "buildapproved-$stem.ps1"
+
+    $scriptContent = @"
+Set-Location '$($WorkDir -replace "'", "''")'
+`$env:CLAUDECODE = `$null
+`$prompt = Get-Content '$($tempPrompt -replace "'", "''")' -Raw
+try {
+    & claude --dangerously-skip-permissions -- `$prompt
+} finally {
+    Remove-Item '$($tempPrompt -replace "'", "''")' -ErrorAction SilentlyContinue
+    Write-Host ''
+    Write-Host 'Press any key to close...' -ForegroundColor Yellow
+    `$null = `$host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+}
+"@
+    $scriptContent | Set-Content $tempScript -Encoding utf8
+
+    # Launch in new terminal using the script file (non-blocking)
+    $wtPath = Get-Command wt.exe -ErrorAction SilentlyContinue
+    if ($wtPath) {
+        # Use Windows Terminal - open in current window as new tab
+        Start-Process wt.exe -ArgumentList "-w","0","pwsh","-NoExit","-File",$tempScript
+    } else {
+        # Fallback to pwsh
+        Start-Process pwsh -ArgumentList "-NoExit","-File",$tempScript
+    }
+
+    # Return session info to track in main loop
+    return @{
+        File        = $PlanFile
+        TempPrompt  = $tempPrompt
+        TempScript  = $tempScript
+        Start       = $startTime
+    }
 }
 
 function Show-Status {
@@ -235,10 +353,45 @@ try {
             }
         }
 
-        # 2. Check completed jobs
+        # 2. Check completed jobs and interactive sessions
         foreach ($q in @($active.Keys)) {
             $info = $active[$q]
-            if ($info.Job.State -in @('Completed', 'Failed', 'Stopped')) {
+
+            # Check if this is an interactive session or a background job
+            if ($info.ContainsKey('Interactive') -and $info.Interactive) {
+                # Interactive session - check if temp prompt file still exists
+                $tempPromptExists = Test-Path $info.TempPrompt
+                if (-not $tempPromptExists) {
+                    # Session completed (temp file deleted by finally block)
+                    $success  = $true
+                    $duration = (Get-Date) - $info.Start
+
+                    # Clean up temp script
+                    if ($info.TempScript -and (Test-Path $info.TempScript)) {
+                        Remove-Item $info.TempScript -ErrorAction SilentlyContinue
+                    }
+
+                    # Move plan file
+                    $destDir  = if ($success) { $DonePath } else { $FailPath }
+                    $fileName = [IO.Path]::GetFileName($info.File)
+                    if (Test-Path $info.File) {
+                        Move-Item $info.File (Join-Path $destDir $fileName) -Force
+                    }
+
+                    $status = "Done"
+                    $history.Add([pscustomobject]@{
+                        File     = $info.File
+                        Queue    = $q
+                        Status   = $status
+                        Duration = $duration
+                        Reason   = $null
+                        LogFile  = "(interactive - no log)"
+                    })
+
+                    $active.Remove($q)
+                }
+            }
+            elseif ($info.ContainsKey('Job') -and $info.Job -and $info.Job.State -in @('Completed', 'Failed', 'Stopped')) {
                 $output   = Receive-Job $info.Job 2>&1
                 $success  = $info.Job.State -eq 'Completed'
                 $duration = (Get-Date) - $info.Start
@@ -290,45 +443,71 @@ try {
             }
         }
 
-        # 2c. Check for timed-out jobs
+        # 2c. Check for timed-out jobs and interactive sessions
         foreach ($q in @($active.Keys)) {
             $info = $active[$q]
             $elapsed = (Get-Date) - $info.Start
             if ($elapsed.TotalMinutes -ge $TimeoutMinutes) {
-                # Force stop the hung job
-                Stop-Job $info.Job -ErrorAction SilentlyContinue
-                $output = Receive-Job $info.Job 2>&1
-                Remove-Job $info.Job -Force
+                if ($info.ContainsKey('Interactive') -and $info.Interactive) {
+                    # Interactive session timed out - clean up temp files
+                    Remove-Item $info.TempPrompt -ErrorAction SilentlyContinue
+                    Remove-Item $info.TempScript -ErrorAction SilentlyContinue
 
-                # Write log (parse stream-json to readable text)
-                $stem    = [IO.Path]::GetFileNameWithoutExtension($info.File)
-                $logFile = Join-Path $LogPath "$stem.log"
-                $rawStr = ($output | Out-String)
-                $outputStr = (ConvertFrom-StreamJson $rawStr) + "`n`n--- TIMED OUT after $TimeoutMinutes minutes ---"
-                $outputStr | Set-Content $logFile -Encoding utf8
+                    # Move to failed
+                    $fileName = [IO.Path]::GetFileName($info.File)
+                    if (Test-Path $info.File) {
+                        $timeoutNote = "`n`n## Failed`n`nTimed out after $TimeoutMinutes minutes (interactive session).`n"
+                        Add-Content -Path $info.File -Value $timeoutNote -Encoding utf8
+                        Move-Item $info.File (Join-Path $FailPath $fileName) -Force
+                    }
 
-                # Append timeout note to plan file
-                $timeoutNote = "`n`n## Failed`n`nTimed out after $TimeoutMinutes minutes.`n"
-                if (Test-Path $info.File) {
-                    Add-Content -Path $info.File -Value $timeoutNote -Encoding utf8
+                    $history.Add([pscustomobject]@{
+                        File     = $info.File
+                        Queue    = $q
+                        Status   = "Failed"
+                        Duration = $elapsed
+                        Reason   = "Timed out after $TimeoutMinutes minutes (interactive)"
+                        LogFile  = "(interactive - no log)"
+                    })
+
+                    $active.Remove($q)
                 }
+                else {
+                    # Force stop the hung job
+                    Stop-Job $info.Job -ErrorAction SilentlyContinue
+                    $output = Receive-Job $info.Job 2>&1
+                    Remove-Job $info.Job -Force
 
-                # Move to failed
-                $fileName = [IO.Path]::GetFileName($info.File)
-                if (Test-Path $info.File) {
-                    Move-Item $info.File (Join-Path $FailPath $fileName) -Force
+                    # Write log (parse stream-json to readable text)
+                    $stem    = [IO.Path]::GetFileNameWithoutExtension($info.File)
+                    $logFile = Join-Path $LogPath "$stem.log"
+                    $rawStr = ($output | Out-String)
+                    $outputStr = (ConvertFrom-StreamJson $rawStr) + "`n`n--- TIMED OUT after $TimeoutMinutes minutes ---"
+                    $outputStr | Set-Content $logFile -Encoding utf8
+
+                    # Append timeout note to plan file
+                    $timeoutNote = "`n`n## Failed`n`nTimed out after $TimeoutMinutes minutes.`n"
+                    if (Test-Path $info.File) {
+                        Add-Content -Path $info.File -Value $timeoutNote -Encoding utf8
+                    }
+
+                    # Move to failed
+                    $fileName = [IO.Path]::GetFileName($info.File)
+                    if (Test-Path $info.File) {
+                        Move-Item $info.File (Join-Path $FailPath $fileName) -Force
+                    }
+
+                    $history.Add([pscustomobject]@{
+                        File     = $info.File
+                        Queue    = $q
+                        Status   = "Failed"
+                        Duration = $elapsed
+                        Reason   = "Timed out after $TimeoutMinutes minutes"
+                        LogFile  = $logFile
+                    })
+
+                    $active.Remove($q)
                 }
-
-                $history.Add([pscustomobject]@{
-                    File     = $info.File
-                    Queue    = $q
-                    Status   = "Failed"
-                    Duration = $elapsed
-                    Reason   = "Timed out after $TimeoutMinutes minutes"
-                    LogFile  = $logFile
-                })
-
-                $active.Remove($q)
             }
         }
 
@@ -414,17 +593,32 @@ try {
                 $queues[$q].RemoveAt(0)
                 $workDir = Get-WorkDir $q
 
-                $job = Start-Job -ScriptBlock {
-                    param($PlanFile, $WorkDir, $ReviewDir)
-                    Set-Location $WorkDir
-                    # Allow nested Claude invocations (e.g. IvyFeatureTester.ps1)
-                    $env:CLAUDECODE = $null
-                    $content = Get-Content $PlanFile -Raw
-                    # Strip YAML frontmatter so --- isn't parsed as a CLI flag
-                    $content = $content -replace '(?s)\A---\r?\n.*?\r?\n---\r?\n', ''
-                    $stem = [IO.Path]::GetFileNameWithoutExtension($PlanFile)
+                if ($Interactive) {
+                    # Interactive mode: launch terminal (non-blocking)
+                    $sessionInfo = Start-InteractiveExecution $file $workDir $ReviewPath
 
-                    $preCommitInstructions = @"
+                    # Track in active sessions (similar to jobs, but with temp file monitoring)
+                    $active[$q] = @{
+                        File        = $file
+                        Start       = $sessionInfo.Start
+                        TempPrompt  = $sessionInfo.TempPrompt
+                        TempScript  = $sessionInfo.TempScript
+                        Interactive = $true
+                    }
+                }
+                else {
+                    # Background mode: existing Start-Job logic
+                    $job = Start-Job -ScriptBlock {
+                        param($PlanFile, $WorkDir, $ReviewDir)
+                        Set-Location $WorkDir
+                        # Allow nested Claude invocations (e.g. IvyFeatureTester.ps1)
+                        $env:CLAUDECODE = $null
+                        $content = Get-Content $PlanFile -Raw
+                        # Strip YAML frontmatter so --- isn't parsed as a CLI flag
+                        $content = $content -replace '(?s)\A---\r?\n.*?\r?\n---\r?\n', ''
+                        $stem = [IO.Path]::GetFileNameWithoutExtension($PlanFile)
+
+                        $preCommitInstructions = @"
 
 ## Pre-Commit (REQUIRED)
 
@@ -452,7 +646,7 @@ After running these commands, check the output for any remaining errors. If ther
 Once everything passes, stage any files that were reformatted or fixed (``git add`` the changed files), then proceed with the commit.
 "@
 
-                    $reviewInstructions = @"
+                        $reviewInstructions = @"
 
 ## Review (optional)
 
@@ -469,7 +663,7 @@ If the change is purely mechanical (e.g., renaming, formatting, trivial config) 
 We don't need to review faq updates, doc fixes, or simple code changes that are low-risk.
 "@
 
-                    $ambiguityInstructions = @"
+                        $ambiguityInstructions = @"
 
 ## Ambiguity Handling (REQUIRED)
 
@@ -488,14 +682,25 @@ Then you MUST stop immediately and fail with a clear message explaining:
 Do NOT guess or make assumptions when uncertain. It is better to fail with a clear explanation than to silently produce incorrect work.
 "@
 
-                    & claude -p ($content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions) --dangerously-skip-permissions --output-format stream-json --verbose 2>&1
-                    if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
-                } -ArgumentList $file, $workDir, $ReviewPath
+                        # Save full prompt to temp file to avoid command-line escaping issues
+                        $tempFile = Join-Path $env:TEMP "buildapproved-bg-$stem.txt"
+                        ($content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions) | Set-Content $tempFile -Encoding utf8
 
-                $active[$q] = @{
-                    Job   = $job
-                    File  = $file
-                    Start = Get-Date
+                        try {
+                            $prompt = Get-Content $tempFile -Raw
+                            & claude -p $prompt --dangerously-skip-permissions --output-format stream-json --verbose 2>&1
+                            if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
+                        }
+                        finally {
+                            Remove-Item $tempFile -ErrorAction SilentlyContinue
+                        }
+                    } -ArgumentList $file, $workDir, $ReviewPath
+
+                    $active[$q] = @{
+                        Job   = $job
+                        File  = $file
+                        Start = Get-Date
+                    }
                 }
             }
         }
@@ -528,13 +733,21 @@ Do NOT guess or make assumptions when uncertain. It is better to fail with a cle
 finally {
     [Console]::CursorVisible = $true
     foreach ($q in @($active.Keys)) {
-        Stop-Job  $active[$q].Job -ErrorAction SilentlyContinue
-        Remove-Job $active[$q].Job -Force -ErrorAction SilentlyContinue
+        $info = $active[$q]
+        if ($info.ContainsKey('Job') -and $info.Job) {
+            Stop-Job  $info.Job -ErrorAction SilentlyContinue
+            Remove-Job $info.Job -Force -ErrorAction SilentlyContinue
+        }
+        # Clean up interactive session temp files
+        if ($info.ContainsKey('Interactive') -and $info.Interactive) {
+            Remove-Item $info.TempPrompt -ErrorAction SilentlyContinue
+            Remove-Item $info.TempScript -ErrorAction SilentlyContinue
+        }
     }
     if ($activePlan) {
         Stop-Job  $activePlan.Job -ErrorAction SilentlyContinue
         Remove-Job $activePlan.Job -Force -ErrorAction SilentlyContinue
     }
     $cleanedUp = $active.Count + $(if ($activePlan) { 1 } else { 0 })
-    Write-Host "`nStopped. Cleaned up $cleanedUp active job(s)." -ForegroundColor Yellow
+    Write-Host "`nStopped. Cleaned up $cleanedUp active job(s) and session(s)." -ForegroundColor Yellow
 }
