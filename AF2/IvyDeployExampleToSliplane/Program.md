@@ -246,20 +246,39 @@ Create the service (note: `--protocol http` is required when using `--public`, a
 
 If user-secrets were found in step 6, append `--secret-env KEY=VALUE` flags for each secret. Use the actual values from `dotnet user-secrets list` — these are the developer's local secrets and should be carried over to the deployment. Dotnet user-secrets use `:` as a section separator (e.g. `OpenAI:ApiKey`) but environment variables use `__` (double underscore). Convert the keys: replace `:` with `__` in the `--secret-env` flag. Example: secret `OpenAI:ApiKey = sk-123` becomes `--secret-env OpenAI__ApiKey=sk-123`.
 
-```powershell
-dotnet run --project D:/Repos/_Personal/Sliplane.Console/src -- services create `
-  --project-id project_c1m7gor0293z `
-  --name ivy-agent-demos-<name> `
-  --server-id server_335oeo4g3cbd `
-  --repo https://github.com/Ivy-Interactive/Ivy-Examples `
-  --branch main `
-  --dockerfile agent-demos/<name>/Dockerfile `
-  --docker-context agent-demos/<name> `
-  --public `
-  --protocol http `
-  --auto-deploy `
-  --secret-env KEY1=VALUE1 `
-  --secret-env KEY2=VALUE2
+**KNOWN BUG (API v0.3.1):** The Sliplane API returns HTTP 500 on ALL GitHub repo-based service creation. Try the following approaches in order:
+
+**Approach A: GitHub-based creation with root Dockerfile workaround**
+1. Ensure a temporary Dockerfile exists at the Ivy-Examples repo root, commit and push
+2. Create the service via curl WITHOUT `dockerfilePath`/`dockerContext`:
+```bash
+curl -s -X POST "https://ctrl.sliplane.io/v0/projects/project_c1m7gor0293z/services" \
+  -H "Authorization: Bearer $SLIPLANE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"ivy-agent-demos-<name>","serverId":"server_335oeo4g3cbd","deployment":{"url":"https://github.com/Ivy-Interactive/Ivy-Examples","branch":"main","autoDeploy":true},"network":{"public":true,"protocol":"http"}}'
+```
+3. If that works, PATCH the service to set the correct paths:
+```bash
+curl -s -X PATCH "https://ctrl.sliplane.io/v0/projects/project_c1m7gor0293z/services/<SERVICE_ID>" \
+  -H "Authorization: Bearer $SLIPLANE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"deployment":{"url":"https://github.com/Ivy-Interactive/Ivy-Examples","branch":"main","dockerfilePath":"agent-demos/<name>/Dockerfile","dockerContext":"agent-demos/<name>","autoDeploy":true}}'
+```
+4. Remove the temporary root Dockerfile, commit and push (triggers auto-deploy with correct config)
+5. To add secret env vars, include `"env":[{"key":"KEY","value":"VALUE","secret":true}]` in the PATCH body
+
+**Approach B: Docker image placeholder (if Approach A returns 500)**
+If GitHub-based creation fails entirely, create with a Docker image and note that manual configuration is needed:
+1. Create service with Docker image: `"deployment":{"url":"docker.io/library/nginx:latest"}`
+2. Note: PATCH cannot switch deployment types (registry to repo) — user must manually configure GitHub deployment via Sliplane dashboard
+3. Notify Slack that manual configuration is required
+
+If the service already exists (redeployment), trigger a deploy:
+```bash
+curl -s -X POST "https://ctrl.sliplane.io/v0/projects/project_c1m7gor0293z/services/<SERVICE_ID>/deploy" \
+  -H "Authorization: Bearer $SLIPLANE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
 
 If the service already exists (redeployment), trigger a deploy instead:
@@ -309,7 +328,7 @@ git push origin main
 Post a message to Slack about the deployed app:
 
 ```powershell
-cd D:/Repos/_Personal/Notify.Console/src && dotnet run -- slack state-of-ivy-agent --message "Deployed <name>: https://ivy-agent-demos-<name>.sliplane.app"
+cd D:/Repos/_Personal/Notify.Console/src && dotnet run -- slack state-of-ivy-agent --message "Deployed <name>: https://ivy-agent-demos-<name>.sliplane.app | GitHub: https://github.com/Ivy-Interactive/Ivy-Examples/tree/main/agent-demos/<name>"
 ```
 
-Include the app name and deployed URL in the message.
+Include the app name, deployed URL, and GitHub README link in the message.
