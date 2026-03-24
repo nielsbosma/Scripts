@@ -103,7 +103,7 @@
 - `state.ToSliderInput()` renders as a Radix UI slider with `role="slider"`, NOT a native `<input type="range">` — use `page.getByRole("slider")` and keyboard interaction (ArrowRight/ArrowLeft to increment/decrement by step, Home/End for min/max)
 - `UseChrome()` renders a hidden sidebar search `<input type="search" data-testid="sidebar-search">` that is the first `input` in the DOM but outside the viewport — `page.locator("input").first()` will target it instead of app inputs. Use `input[type='text']` or label-based locators to target app inputs
 - **Single-app Chrome auto-selection**: When `UseChrome().UseTabs()` is enabled and there's only ONE app registered, Chrome automatically opens that app's tab on page load — no need to click the sidebar nav item. Clicking it may cause a re-navigation that times out.
-- **Chrome URL routing**: When `UseChrome()` is active, direct URL navigation (e.g., `/basic-app` or `/basic-app?chrome=false`) shows "App Not Found". Apps must be accessed by navigating to `/` first, then clicking sidebar items. In Playwright tests, always navigate to `http://localhost:PORT/` and use sidebar clicks.
+- **Chrome URL routing**: When `UseChrome()` is active, direct URL navigation (e.g., `/basic-app` or `/basic-app?shell=false`) shows "App Not Found". Apps must be accessed by navigating to `/` first, then clicking sidebar items. In Playwright tests, always navigate to `http://localhost:PORT/` and use sidebar clicks.
 - **SelectInput trigger displays all option labels**: `SelectInput<T>` with many options renders ALL option display names concatenated in the trigger button (combobox). This makes `getByText("OptionName")` ambiguous — it matches both the trigger and the dropdown item. To click a dropdown option reliably: open the dropdown, then use `page.evaluate` to find the option element by text content + bounding rect (y > trigger height), and click by coordinates. The dropdown container has `role="listbox"`.
 - **SelectInput dropdown structure**: Ivy SelectInput dropdown uses Radix-like components. The trigger is a `<button role="combobox">`. The dropdown panel is `<div role="listbox">`. Items inside have NO `role="option"` — they are plain `<div>` elements with text content. Use `page.evaluate` + coordinate clicking for reliable selection when text-based locators are ambiguous.
 - **Sidebar nav button name conflicts**: Chrome sidebar renders app names as `role="button"` elements. A button with text "C" will conflict with "Calculator" sidebar button when using `getByRole("button", { name: "C" })` — always use `{ exact: true }` for single-character button names
@@ -387,7 +387,7 @@ In headless mode with File System Access API disabled, the save dialog uses `<a 
 - 2-step flow: birth date input → life visualization with stats and weeks grid
 - `Layout.Grid(3)` renders "3" as text and produces single-column layout instead of 3-column grid
 - `new Html(gridHtml)` with CSS grid + inline styles is completely invisible — only `<span>` text content visible (confirmed known Html limitation)
-- `UseDefaultApp()` means no Chrome sidebar — navigate directly to `/<app-id>?chrome=false`
+- `UseDefaultApp()` means no Chrome sidebar — navigate directly to `/<app-id>?shell=false`
 - "Weeks lived" text appears in both stat label and Html grid legend — use `.first()` for strict mode
 - 7 tests, 1 fix round (strict mode violation), all passed, logs clean
 
@@ -664,7 +664,7 @@ In headless mode with File System Access API disabled, the save dialog uses `<a 
 - When Toggle row field options overlap with dropdown option names (e.g., "Quantity" appears in both row field toggles AND value field dropdown), `getByText("Quantity").first()` matches the TOGGLE button, not the dropdown option. Use `getByRole("option", { name: "Quantity", exact: true })` to select dropdown items when a popover/dropdown is open — this contradicts the UUIDGenerator2 finding that `getByRole("option")` doesn't work. It DOES work when the dropdown renders proper `role="option"` elements (varies by Ivy component)
 - `FileUpload<string>` with `MemoryStreamUploadHandler.Create(fileState)` and `.Accept(".csv")` — file content is available as `fileState.Value.Content` (string), not byte array
 - `.ToTable().Header(r => r.Prop, "Label").Totals(r => r.Prop)` renders a standard HTML table with a totals footer row — totals value may not be findable by exact number text (use regex pattern like `/7[,.]?850/`)
-- `UseDefaultApp(typeof(App))` with single app — no Chrome, access via `/<app-id>?chrome=false`
+- `UseDefaultApp(typeof(App))` with single app — no Chrome, access via `/<app-id>?shell=false`
 - Clean run: 12 tests passed after 2 test-only fix rounds, no project fixes, no runtime errors, logs clean
 
 ### 2026-03-12 — Test.WebhookTester
@@ -708,7 +708,7 @@ In headless mode with File System Access API disabled, the save dialog uses `<a 
 
 ### 2026-03-13 — AspectRatio (WidgetBase property)
 - **`data-testid` on Box/Card widgets is NOT reliably found by `[data-testid="..."]` selectors** in Playwright. Use text-based locators (`getByText`, `getByRole`) and `page.evaluate()` with DOM tree walking to inspect computed CSS properties instead
-- **`baseURL` in `playwright.config.ts` is evaluated at import time**, before `beforeAll` runs. When using dynamic ports, use full URLs in `page.goto()` calls: `page.goto(\`http://localhost:${port}/app?chrome=false\`)` instead of relative paths
+- **`baseURL` in `playwright.config.ts` is evaluated at import time**, before `beforeAll` runs. When using dynamic ports, use full URLs in `page.goto()` calls: `page.goto(\`http://localhost:${port}/app?shell=false\`)` instead of relative paths
 - **Verifying CSS properties via `page.evaluate()`**: Walk the DOM tree from text content upward to find elements with specific computed styles (e.g., `window.getComputedStyle(el).aspectRatio`). This is more reliable than data-testid selectors for layout/style verification
 - **Flex stretch overrides `aspect-ratio`**: In `Layout.Horizontal()`, flex `align-items: stretch` causes all children to share the tallest height, partially overriding the visual aspect ratio. This is standard CSS behavior. In non-flex contexts, aspect-ratio works perfectly
 - 6 tests passed after 2 fix rounds (test fixes only: URL pattern + frontend rebuild), no project fixes needed

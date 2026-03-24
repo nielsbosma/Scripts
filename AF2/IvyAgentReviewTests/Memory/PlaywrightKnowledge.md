@@ -67,7 +67,7 @@
 - Badges with strength/status text may appear multiple times; use `.first()`
 - `state.ToSelectInput().Variant(SelectInputVariants.Toggle)` renders as radio buttons — use `getByRole("radio", { name: "OptionName" })` to click them, NOT `getByText()` (the option text may appear in headings/descriptions too)
 - `IClientProvider.Toast()` renders both a visible `<div>` and an `aria-live` status `<span>` — use `getByText("message", { exact: true })` to avoid strict mode violations
-- **`Html` component inline styles don't render as expected** — `new Html(...)` with inline CSS properties like `background-color`, `border`, `color`, `width`, `height` are NOT applied to the actual DOM. Do NOT use `page.locator('div[style*="..."]')` selectors to target Html content. Instead use text-based assertions (`page.content().includes(...)`) or `getByText()` locators. Also do NOT check for hex color codes in `page.content()` — they won't appear in the rendered HTML.
+- **`Html` component inline styles with CSS custom properties don't work** — `new Html(...)` with CSS custom properties like `var(--foreground)` or `var(--background)` will not render correctly (the variables resolve to nothing, making content invisible). **However, direct color values DO work**: inline styles with `background-color: rgb(255,0,0)`, `color: #ffffff`, `border: 1px solid rgba(...)` etc. render correctly. Complex CSS like `display: grid` may also fail. **Recommendation**: Use direct color values (rgb/hex/rgba) for colors, avoid CSS variables. Use text-based assertions (`page.content().includes(...)`) rather than style attribute selectors when possible.
 - **UseChrome() crashes without IAuthService** — `UseChrome()` requires `Ivy.IAuthService` to be registered. Without it, navigating to root URL (`/`) throws `InvalidOperationException`. Always test apps with `?chrome=false` to bypass Chrome. The framework should handle this gracefully.
 - **Card.OnClick() + Sheet may render blank** — when `Build()` returns `new object[] { mainContent, new Sheet(...) }`, clicking a Card to set state can cause the page to render blank (only FAB visible). The Sheet never appears. All click methods fail (`.click()`, `dispatchEvent`, `evaluate`, `mouse.click`). If testing Card click → Sheet interactions, be prepared for this failure mode and mark it as a framework issue.
 - **Stale server processes**: The `taskkill` in `afterAll` may not reliably kill all dotnet processes. After multiple test runs, stale `Test.*.exe` processes can lock the EXE and prevent rebuilding. Use `execSync('taskkill /im <name>.exe /f')` (with `execSync` from `child_process`, not `spawn`) to ensure cleanup completes before afterAll exits. Also kill by name as fallback, not just by PID.
@@ -817,3 +817,13 @@
 - External API authentication failure (401 invalid_api_key) handled gracefully with `Callout.Error()` display
 - Tests use same pattern as CoinGeckoCrypto/Chromatica.Palettes2: accept EITHER success OR error states with `pageContent.includes('1.') || pageContent.includes('Error') || pageContent.includes('401')`
 - 7 tests, 1 fix round (test-only: API error handling), all passed, logs clean, no project fixes needed
+
+### 2026-03-24 — HeatmapGenerator
+- CSV matrix heatmap visualization with color interpolation and multiple palettes
+- **Enum `.ToOptions()` display names**: `ColorPalette` enum renders as PascalCase without spaces (e.g., "BlueToRed", "GreenYellowRed", "PurpleToOrange") — tests must use exact PascalCase strings when selecting from dropdown
+- **Strict mode violations with substring matching**: `getByText('C1')` matched both "C1" and "C10" column headers — use `getByRole('columnheader', { name: 'C1', exact: true })` for table headers
+- **Html component with direct color values WORKS**: `new Html(...)` with inline styles like `background-color: rgb(255,0,0)` and `color: #ffffff` renders correctly (contradicts earlier note about Html inline styles not working) — the issue is specifically with CSS custom properties like `var(--foreground)`, not direct color values
+- File upload via `.setInputFiles()` works reliably for CSV parsing
+- SelectInput for enum values renders as Radix dropdown with `role="combobox"` — enum display names are PascalCase by default
+- Heatmap legend displays min/max values with gradient bar using `linear-gradient(to right, ...)` in Html
+- 7 tests, 1 fix round (test-only: strict mode + enum display names), all passed, logs clean, no project fixes needed
