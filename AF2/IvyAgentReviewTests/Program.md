@@ -85,7 +85,7 @@ Write the following files directly to `.ivy/tests/`:
 
 **`<app-name>.spec.ts`** — one spec file per app found in the spec and source code:
 - `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
-- `afterAll`: kill process
+- `afterAll`: kill process tree (use `execSync('taskkill /F /T /PID ' + pid)` on Windows, `serverProcess.kill()` on Unix — see Windows Process Cleanup in Memory/PlaywrightPatterns.md)
 - `beforeEach`: navigate to root
 - Tests should cover:
   - All UI elements specified in the spec are visible
@@ -132,40 +132,6 @@ Write the following files directly to `.ivy/tests/`:
 - Use `waitForTimeout(500)` after interactions before asserting
 - On Windows use `shell: true` in spawn options
 - Resolve project root: `process.cwd().replace(/[/\\]\.ivy[/\\]tests$/, "")`
-
-**Button Locators in Multi-Group Layouts:**
-
-When an app has multiple button groups (e.g., form buttons + list item buttons), **avoid using positional selectors** (`.nth(index)`). Instead:
-
-- **Preferred approach — scope locators to a specific context:**
-  ```typescript
-  // BAD - index changes if form buttons are added/removed
-  await page.getByRole('button').nth(5).click();
-
-  // BETTER - locate within a specific container
-  const firstStep = page.locator('.step-item').first();
-  await firstStep.getByRole('button', { name: /up/i }).click();
-
-  // ALTERNATIVE - use unique button properties
-  await page.getByRole('button', { name: 'Move up' }).first().click();
-  ```
-
-- **When positional selectors are unavoidable:**
-  - Count ALL buttons on the page, not just buttons in the target group
-  - Document the button index calculation in a comment
-  - Example:
-    ```typescript
-    // Button indices: 0=Add Step, 1=Load Sample, 2=Color Scheme, 3=First Step Up, 4=First Step Down, 5=First Step Delete
-    await page.getByRole('button').nth(3).click(); // First step up button
-    ```
-
-- **For icon-only buttons (no text):**
-  - Use aria-label matching if available: `getByRole('button', { name: 'Move up' })`
-  - If no aria-label, count indices carefully across the ENTIRE page and add a comment explaining the calculation
-
-- When clicking buttons in lists or tables, try to scope the locator to the specific row/item first, then find the button within that context
-- If using `.nth()`, always add a comment explaining the index calculation
-- Prefer named locators over positional selectors when possible
 
 **Ivy-specific locator patterns:**
 - **NumberInput**: `state.ToNumberInput()` renders as `input[type="text"]`, NOT `input[type="number"]`.
