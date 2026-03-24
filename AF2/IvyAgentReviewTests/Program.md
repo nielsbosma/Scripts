@@ -85,7 +85,7 @@ Write the following files directly to `.ivy/tests/`:
 
 **`<app-name>.spec.ts`** — one spec file per app found in the spec and source code:
 - `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
-- `afterAll`: kill process
+- `afterAll`: kill process tree (use `execSync('taskkill /F /T /PID ' + pid)` on Windows, `serverProcess.kill()` on Unix — see Windows Process Cleanup in Memory/PlaywrightPatterns.md)
 - `beforeEach`: navigate to root
 - Tests should cover:
   - All UI elements specified in the spec are visible

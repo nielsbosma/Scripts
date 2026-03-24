@@ -10,6 +10,8 @@ This document contains common patterns and solutions for generating robust Playw
 4. [External API Error Handling](#external-api-error-handling)
 5. [Test Structure Best Practices](#test-structure-best-practices)
 6. [CodeBlock Content Assertions](#codeblock-content-assertions)
+7. [Button Index Pitfalls](#button-index-pitfalls)
+8. [Windows Process Cleanup](#windows-process-cleanup)
 
 ---
 
@@ -461,7 +463,7 @@ Playwright config is evaluated once at startup. Environment variables set dynami
 
 ```typescript
 import { test, expect } from '@playwright/test';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execSync, ChildProcess } from 'child_process';
 import net from 'net';
 import http from 'http';
 import { fileURLToPath } from 'url';
@@ -531,7 +533,12 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   if (serverProcess) {
-    serverProcess.kill();
+    if (process.platform === 'win32') {
+      // Windows: kill entire process tree to prevent zombie dotnet.exe processes
+      try { execSync(`taskkill /F /T /PID ${serverProcess.pid}`, { stdio: 'ignore' }); } catch {}
+    } else {
+      serverProcess.kill();
+    }
   }
 });
 
@@ -572,6 +579,7 @@ test('feature test', async ({ page }) => {
 ### Key Points
 - Use ES module `__dirname` polyfill
 - Use `shell: true` in spawn options on Windows
+- **Use `taskkill /F /T /PID` on Windows** to kill the entire process tree in `afterAll` (see [Windows Process Cleanup](#windows-process-cleanup))
 - Wait for HTTP 200 before running tests
 - Capture both stdout and stderr logs
 - Use `?chrome=false` for single-app testing
@@ -601,6 +609,73 @@ test('feature test', async ({ page }) => {
 
 ---
 
+## Button Index Pitfalls
+
+### Problem
+When using `.nth()` for button selection in pages with multiple button groups (e.g., form action buttons + list item buttons), tests often select the wrong button by counting from 0 within a subgroup instead of counting all matching elements on the page.
+
+### Solution
+Prefer scoped locators over positional selectors:
+
+```typescript
+// ❌ Don't count from 0 within a subgroup (e.g., "first button in step list = 0")
+await page.getByRole('button').nth(0).click(); // Hits "Add Step", not first step's up button
+
+// ✅ Count all matching elements on the page from the top
+// Button indices: 0=Add Step, 1=Load Sample, 2=Color Scheme, 3=First Step Up, 4=First Step Down, 5=First Step Delete
+await page.getByRole('button').nth(3).click(); // First step up button
+
+// ✅ Better: Use scoped locators to avoid index math entirely
+const firstStep = page.locator('.step-item').first();
+await firstStep.getByRole('button', { name: /up/i }).click();
+```
+
+### Key Points
+- When using `.nth()`, count ALL matching elements on the page, not just those in the target group
+- Always add a comment explaining the index calculation when using positional selectors
+- Prefer scoped locators: find the parent container first, then locate the button within it
+- For icon-only buttons, use `aria-label` matching if available before falling back to positional selectors
+
+---
+
+## Windows Process Cleanup
+
+### Problem
+`serverProcess.kill()` in `afterAll` only terminates the parent Node.js-spawned process on Windows, not the entire process tree. When `shell: true` is used (required on Windows), the spawned `cmd.exe` creates child `dotnet.exe` processes that survive after the parent is killed. This leaves zombie processes that lock DLL files, causing subsequent `dotnet build` to fail with file-in-use errors. Observed with 13-31+ zombie processes across multiple test sessions.
+
+### Solution
+Use `taskkill /F /T /PID` on Windows to kill the entire process tree:
+
+```typescript
+import { spawn, execSync, ChildProcess } from 'child_process';
+
+test.afterAll(async () => {
+  if (serverProcess) {
+    if (process.platform === 'win32') {
+      // Windows: kill entire process tree to prevent zombie dotnet.exe processes
+      try { execSync(`taskkill /F /T /PID ${serverProcess.pid}`, { stdio: 'ignore' }); } catch {}
+    } else {
+      serverProcess.kill();
+    }
+  }
+});
+```
+
+### Why
+- On Windows with `shell: true`, `spawn('dotnet', [...])` creates: `cmd.exe` → `dotnet.exe` → app process
+- `serverProcess.kill()` only kills `cmd.exe`, leaving `dotnet.exe` and child processes running
+- `taskkill /F /T /PID` forcefully (`/F`) terminates the entire process tree (`/T`) rooted at the given PID
+- The `try/catch` handles the case where the process has already exited
+- On Unix/Linux, `serverProcess.kill()` works correctly as it sends SIGTERM to the process group
+
+### Key Points
+- **ALWAYS** use this pattern in `afterAll` — it is critical for Windows reliability
+- Import `execSync` from `child_process` alongside `spawn`
+- The `try/catch` is necessary because `taskkill` throws if the process already exited
+- `stdio: 'ignore'` suppresses taskkill output/error messages
+
+---
+
 ## Common Test Adjustments Needed
 
 If tests fail on first run, check these common issues:
@@ -617,6 +692,8 @@ If tests fail on first run, check these common issues:
 10. **CodeBlock content assertion fails** → Split expected strings into fragments; syntax highlighting `<span>` elements break exact matches
 11. **Select dropdown option click timeout** → Use `getByRole('option', { name: /Text/ })` instead of `getByText()` to avoid Radix UI popper/backdrop interception
 12. **FileInput with custom preview** → Use `.first()` for filename selectors to avoid strict mode violations from duplicate text
+13. **Button index wrong in multi-group layout** → Count ALL buttons on the page, not just within the target group; prefer scoped locators over `.nth()`
+14. **Zombie dotnet.exe processes on Windows** → Use `taskkill /F /T /PID` in `afterAll` instead of `serverProcess.kill()` (see [Windows Process Cleanup](#windows-process-cleanup))
 
 ---
 
@@ -650,3 +727,4 @@ This pattern ensures tests:
 2026-03-24 - Added CodeBlock content assertion pattern for syntax highlighting spans (HTMLEntitiesEncoder test review)
 2026-03-24 - Added Radix UI role-based selector pattern for Select dropdown click interception (GraphQL Countries test review)
 2026-03-24 - Added FileInput pattern with custom preview disambiguation for strict mode violations (ImageToPDFConverter test review)
+2026-03-24 - Added Windows Process Cleanup pattern to fix zombie dotnet.exe processes from afterAll hook (multiple sessions: PDFMerger, OTPGenerator)
