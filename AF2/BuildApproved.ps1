@@ -172,6 +172,7 @@ Do NOT guess or make assumptions when uncertain. It is better to fail with a cle
 
     # Build full prompt
     $fullPrompt = $content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions
+    $useIvy = $content -match '\[UseIvy\]'
 
     # Save prompt to temp file
     $tempPrompt = Join-Path $env:TEMP "buildapproved-$stem.txt"
@@ -180,7 +181,26 @@ Do NOT guess or make assumptions when uncertain. It is better to fail with a cle
     # Save full command sequence to a temporary .ps1 script file
     $tempScript = Join-Path $env:TEMP "buildapproved-$stem.ps1"
 
-    $scriptContent = @"
+    if ($useIvy) {
+        $ivyCmd = Get-Command ivy-local -ErrorAction SilentlyContinue
+        if (-not $ivyCmd) {
+            Write-Host "Error: Plan requires Ivy Agent but 'ivy-local' not found in PATH" -ForegroundColor Red
+            return $null
+        }
+        $scriptContent = @"
+Set-Location '$($WorkDir -replace "'", "''")'
+try {
+    & ivy-local code --staging --prompt-file '$($tempPrompt -replace "'", "''")' --local-source --exit-on-complete
+} finally {
+    Remove-Item '$($tempPrompt -replace "'", "''")' -ErrorAction SilentlyContinue
+    Write-Host ''
+    Write-Host 'Press any key to close...' -ForegroundColor Yellow
+    `$null = `$host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+}
+"@
+    }
+    else {
+        $scriptContent = @"
 Set-Location '$($WorkDir -replace "'", "''")'
 `$env:CLAUDECODE = `$null
 `$prompt = Get-Content '$($tempPrompt -replace "'", "''")' -Raw
@@ -193,6 +213,7 @@ try {
     `$null = `$host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }
 "@
+    }
     $scriptContent | Set-Content $tempScript -Encoding utf8
 
     # Launch in new terminal using the script file (non-blocking)
@@ -597,6 +618,23 @@ try {
                     # Interactive mode: launch terminal (non-blocking)
                     $sessionInfo = Start-InteractiveExecution $file $workDir $ReviewPath
 
+                    if (-not $sessionInfo) {
+                        # Failed to start (e.g., ivy-local not found) - move to failed
+                        $fileName = [IO.Path]::GetFileName($file)
+                        $failureNote = "`n`n## Failed`n`nPlan requires Ivy Agent but 'ivy-local' not found in PATH.`n"
+                        Add-Content -Path $file -Value $failureNote -Encoding utf8
+                        Move-Item $file (Join-Path $FailPath $fileName) -Force
+                        $history.Add([pscustomobject]@{
+                            File     = $file
+                            Queue    = $q
+                            Status   = "Failed"
+                            Duration = [TimeSpan]::Zero
+                            Reason   = "ivy-local not found in PATH"
+                            LogFile  = "(no log)"
+                        })
+                        continue
+                    }
+
                     # Track in active sessions (similar to jobs, but with temp file monitoring)
                     $active[$q] = @{
                         File        = $file
@@ -683,13 +721,23 @@ Do NOT guess or make assumptions when uncertain. It is better to fail with a cle
 "@
 
                         # Save full prompt to temp file to avoid command-line escaping issues
+                        $fullPrompt = $content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions
+                        $useIvy = $content -match '\[UseIvy\]'
                         $tempFile = Join-Path $env:TEMP "buildapproved-bg-$stem.txt"
-                        ($content + $preCommitInstructions + $reviewInstructions + $ambiguityInstructions) | Set-Content $tempFile -Encoding utf8
+                        $fullPrompt | Set-Content $tempFile -Encoding utf8
 
                         try {
-                            $prompt = Get-Content $tempFile -Raw
-                            & claude -p $prompt --dangerously-skip-permissions --output-format stream-json --verbose 2>&1
-                            if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
+                            if ($useIvy) {
+                                $ivyCmd = Get-Command ivy-local -ErrorAction SilentlyContinue
+                                if (-not $ivyCmd) { throw "Plan requires Ivy Agent but 'ivy-local' not found in PATH" }
+                                & ivy-local code --non-interactive --staging --prompt-file $tempFile --local-source --exit-on-complete 2>&1
+                                if ($LASTEXITCODE -ne 0) { throw "ivy-local exited with code $LASTEXITCODE" }
+                            }
+                            else {
+                                $prompt = Get-Content $tempFile -Raw
+                                & claude -p $prompt --dangerously-skip-permissions --output-format stream-json --verbose 2>&1
+                                if ($LASTEXITCODE -ne 0) { throw "claude exited with code $LASTEXITCODE" }
+                            }
                         }
                         finally {
                             Remove-Item $tempFile -ErrorAction SilentlyContinue
