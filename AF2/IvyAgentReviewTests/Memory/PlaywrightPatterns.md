@@ -296,6 +296,46 @@ await page.getByRole('button', { name: 'C', exact: true }).click();
 
 ---
 
+### FileInput
+
+#### Pattern
+```typescript
+// Basic file upload
+const fileInput = page.locator('input[type="file"]');
+await fileInput.setInputFiles('path/to/file.png');
+
+// Wait for upload to complete
+await page.waitForTimeout(1000);
+```
+
+#### Custom Preview Disambiguation
+
+When FileInput is used with custom preview UI (e.g., image cards showing thumbnails and filenames), uploaded filenames appear in multiple DOM locations. This causes strict mode violations when selecting by text.
+
+**Problem:**
+```typescript
+// ❌ Fails with "strict mode violation" (matches filename in preview card AND FileInput list)
+await page.getByText('test-image-1.png').click();
+```
+
+**Solution:**
+```typescript
+// ✅ Use .first() to select the first matching element
+await page.getByText('test-image-1.png').first().click();
+
+// ✅ Or use more specific structural selectors
+await page.locator('.card:has-text("test-image-1.png")').click();
+await page.locator('button:has-text("Remove")').first().click();
+```
+
+#### Key Points
+- FileInput with custom previews creates duplicate text in the DOM
+- Use `.first()` to disambiguate when selecting by filename
+- Prefer structural selectors (role, test IDs) over text matching when possible
+- For Remove buttons in preview cards, use position or structural locators
+
+---
+
 ## Callout Component Rendering
 
 ### Problem
@@ -555,6 +595,7 @@ test('feature test', async ({ page }) => {
 | Button (icon) | `page.locator('button:has(svg)').first()` | No accessible name |
 | CodeBlock | Split into fragments, use `.includes()` | Syntax highlighting spans break exact matches |
 | SelectInput (Radix option) | `page.getByRole('option', { name: /Text/ })` | Use when `getByText()` is intercepted by Radix popper |
+| FileInput | `page.locator('input[type="file"]')` | With custom previews, use `.first()` for text selectors |
 | Error Callout | `page.content().includes('Error text')` | More reliable than `getByText()` |
 | Heading | `page.getByRole('heading', { name: 'Text', exact: true })` | Avoids matching heading text in body content |
 
@@ -575,6 +616,7 @@ If tests fail on first run, check these common issues:
 9. **SelectInput Toggle not found as combobox** → Use `getByRole('radio')`, not `getByRole('combobox')` for `Variant(SelectInputVariant.Toggle)`
 10. **CodeBlock content assertion fails** → Split expected strings into fragments; syntax highlighting `<span>` elements break exact matches
 11. **Select dropdown option click timeout** → Use `getByRole('option', { name: /Text/ })` instead of `getByText()` to avoid Radix UI popper/backdrop interception
+12. **FileInput with custom preview** → Use `.first()` for filename selectors to avoid strict mode violations from duplicate text
 
 ---
 
@@ -607,3 +649,4 @@ This pattern ensures tests:
 2026-03-24 - Added dynamic port configuration pattern to prevent baseURL errors (BulkFileRenamer test review)
 2026-03-24 - Added CodeBlock content assertion pattern for syntax highlighting spans (HTMLEntitiesEncoder test review)
 2026-03-24 - Added Radix UI role-based selector pattern for Select dropdown click interception (GraphQL Countries test review)
+2026-03-24 - Added FileInput pattern with custom preview disambiguation for strict mode violations (ImageToPDFConverter test review)
