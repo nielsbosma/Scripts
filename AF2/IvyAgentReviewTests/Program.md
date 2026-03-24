@@ -94,6 +94,7 @@ Write the following files directly to `.ivy/tests/`:
   - Edge cases specific to the app's logic
   - Generated/computed output appears correctly
   - Features listed in the spec are functional
+  - **For apps with external API calls**: Tests should verify EITHER successful data OR error handling (see External API Error Handling below)
 
 **Screenshots:**
 - Save to `.ivy/tests/screenshots/`
@@ -119,11 +120,84 @@ Write the following files directly to `.ivy/tests/`:
 
 **Code style:**
 - TypeScript, clean imports
+- **ES module support (CRITICAL)**: All test files MUST include this boilerplate at the top:
+  ```typescript
+  import { fileURLToPath } from 'url';
+  import path from 'path';
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  ```
+  This prevents `ReferenceError: __dirname is not defined in ES module scope` errors
 - Use `getByText()`, `getByRole()` locators (accessibility-friendly)
 - Use `.first()` when multiple matches possible
 - Use `waitForTimeout(500)` after interactions before asserting
 - On Windows use `shell: true` in spawn options
 - Resolve project root: `process.cwd().replace(/[/\\]\.ivy[/\\]tests$/, "")`
+
+**Button Locators in Multi-Group Layouts:**
+
+When an app has multiple button groups (e.g., form buttons + list item buttons), **avoid using positional selectors** (`.nth(index)`). Instead:
+
+- **Preferred approach — scope locators to a specific context:**
+  ```typescript
+  // BAD - index changes if form buttons are added/removed
+  await page.getByRole('button').nth(5).click();
+
+  // BETTER - locate within a specific container
+  const firstStep = page.locator('.step-item').first();
+  await firstStep.getByRole('button', { name: /up/i }).click();
+
+  // ALTERNATIVE - use unique button properties
+  await page.getByRole('button', { name: 'Move up' }).first().click();
+  ```
+
+- **When positional selectors are unavoidable:**
+  - Count ALL buttons on the page, not just buttons in the target group
+  - Document the button index calculation in a comment
+  - Example:
+    ```typescript
+    // Button indices: 0=Add Step, 1=Load Sample, 2=Color Scheme, 3=First Step Up, 4=First Step Down, 5=First Step Delete
+    await page.getByRole('button').nth(3).click(); // First step up button
+    ```
+
+- **For icon-only buttons (no text):**
+  - Use aria-label matching if available: `getByRole('button', { name: 'Move up' })`
+  - If no aria-label, count indices carefully across the ENTIRE page and add a comment explaining the calculation
+
+- When clicking buttons in lists or tables, try to scope the locator to the specific row/item first, then find the button within that context
+- If using `.nth()`, always add a comment explaining the index calculation
+- Prefer named locators over positional selectors when possible
+
+**Ivy-specific locator patterns:**
+- **NumberInput**: `state.ToNumberInput()` renders as `input[type="text"]`, NOT `input[type="number"]`.
+  - Use `page.locator('input[type="text"]').nth(N)` to target by position
+  - After `.clear()` or `.fill()`, DO NOT use `input[value="X"]` selectors — the value attribute may not update immediately
+  - Prefer structural locators (position-based) over value-based selectors for number inputs
+- **SelectInput**: Use `getByRole("combobox")` for the trigger, `getByText("Option", { exact: true }).first()` for options
+- **Switch/Toggle**: Use `getByText()` to find the label (labels include the text content)
+- **Slider**: Use `getByRole("slider")` and keyboard interactions (ArrowRight/ArrowLeft, Home/End)
+
+**CodeBlock Output Verification:**
+- When testing apps that display content in a `CodeBlock` widget (look for `new CodeBlock(...)` or `.ToCodeBlock()` in the app source):
+  - CodeBlock uses syntax highlighting which wraps content in `<span>` elements
+  - Exact string matching will fail for multi-character sequences
+  - Use flexible assertions:
+    - Split expected content into individual words/tokens and check each separately
+    - Use `.includes()` with OR logic for alternative forms (encoded/decoded, formatted/raw)
+    - Check for key fragments rather than exact strings
+  - Example: `expect(output?.includes('keyword1') && output.includes('keyword2')).toBeTruthy();`
+
+**External API Error Handling:**
+- When apps make external API calls (OpenAI, CoinGecko, etc.), tests should handle BOTH success AND error states
+- External APIs may return 401/403/rate limits due to invalid keys, network issues, or test environment configuration
+- **Pattern**: Use `page.content().includes()` to detect EITHER success indicators OR error messages:
+  ```typescript
+  const content = await page.content();
+  const hasSuccess = content.includes('expected output text') || content.includes('1.');
+  const hasError = content.includes('Error') || content.includes('401') || content.includes('Forbidden');
+  expect(hasSuccess || hasError).toBeTruthy();
+  ```
+- This makes tests resilient to external API availability while still verifying the app handles both scenarios correctly
+- Error callouts render complex HTML — `page.content().includes()` is more reliable than `getByText()` for error text
 
 If Args contains additional instructions, apply them to the test generation.
 

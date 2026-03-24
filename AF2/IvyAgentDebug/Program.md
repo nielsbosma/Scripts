@@ -7,7 +7,7 @@ Analyze review data from an Ivy Agent session and generate actionable improvemen
 By the time you run, these review scripts have already completed and produced files in `{WorkDir}/.ivy/`:
 
 - **ReviewBuild** → `review-build.md`
-- **ReviewLangfuse** → `langfuse-timeline.md`, `langfuse-build-errors.md`, `langfuse-docs.md`, `langfuse-hallucinations.md`, `langfuse-questions.md`, `langfuse-reference-connections.md`, `langfuse-workflows.md`, `langfuse-system-reminders.md`
+- **ReviewLangfuse** → `langfuse-session-status.md`, `langfuse-timeline.md`, `langfuse-build-errors.md`, `langfuse-docs.md`, `langfuse-hallucinations.md`, `langfuse-questions.md`, `langfuse-reference-connections.md`, `langfuse-workflows.md`, `langfuse-system-reminders.md`
 - **ReviewSpec** → `review-spec.md`
 - **ReviewTests** → `review-tests.md`, `review-ux.md`
 
@@ -28,6 +28,7 @@ Read every review file in `{WorkDir}/.ivy/`:
 - `.ivy/review-spec.md` — spec compliance review
 - `.ivy/review-tests.md` — test results, project fixes applied, external issues
 - `.ivy/review-ux.md` — UX/screenshot review
+- `.ivy/langfuse-session-status.md` — session completion status (Complete/Failed/PrematureStop) and diagnosis
 - `.ivy/langfuse-timeline.md` — session timeline
 - `.ivy/langfuse-build-errors.md` — all build errors
 - `.ivy/langfuse-docs.md` — docs read by the agent (and 404s)
@@ -210,10 +211,40 @@ For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
 - Read the counter from `.counter` (default 200 if missing), allocate IDs, increment
 - Format: `<ID>-<RepositoryName>-<LEVEL>-<Title>.md`
 - Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General` (note: `IvyMcp` issues go to GitHub — see IvyMcp section above)
+
+#### Queue Selection Guidelines
+
+Use the pattern `{ProjectName}{SubsystemType}` for granular queues instead of generic project names.
+
+**For agent-related issues**, use these specific queues:
+- **IvyAgentCore**: Agent server, orchestration, core agent logic
+- **IvyAgentBibe**: Internal tooling apps (Ivy.Agent.Bibe apps like PlanReviewer)
+- **IvyAgentPersona**: Persona prompts and instructions
+- **IvyAgentWorkflows**: Workflow definitions in Ivy.Internals\Workflows
+- **IvyAgentAnalyzers**: Analyzer implementations (ResearchPhaseAnalyser, InfrastructureErrorAnalyser, etc.)
+- **IvyAgentTools**: Tool implementations (IvyQuestion, IvyDoc, GetTypeInfo, etc.)
+- **TestManager**: Test framework
+- **IvyAgentShared**: Message definitions
+- **IvyAgent**: Fallback for cross-cutting changes or when uncertain
+
+**Decision tree**:
+1. Does the issue affect a specific subsystem listed above? Use `{ProjectName}{SubsystemType}`.
+2. Does the issue span multiple subsystems? Use base project name (e.g., `IvyAgent`).
+3. Uncertain? Use base project name.
+
+**Examples from reviews**:
+- System reminder analyser firing excessively → `IvyAgentAnalyzers`
+- Agent ignores persona instruction → `IvyAgentPersona`
+- Workflow state transition bug → `IvyAgentWorkflows`
+- IvyQuestion compound questions → `IvyAgentTools`
+- Bibe PlanReviewer UI issue → `IvyAgentBibe`
+- Token usage optimization across agent → `IvyAgent` (cross-cutting)
+
 - LEVEL (priority/criticality):
   - **CRITICAL** — Must be fixed immediately, blocks work or causes severe issues (build failures, crashes, data loss)
   - **NICETOHAVE** — Improves functionality but not urgent (hallucinations, missing docs, workflow improvements)
   - **NITPICK** — Minor polish, cosmetic fixes, or low-priority refinements (cosmetic issues, minor doc tweaks, formatting)
+- **Check skipped plans before creating**: Read all files in `D:\Repos\_Ivy\.plans\skipped\` and compare the proposed plan against skipped plans. If a similar plan already exists (same problem domain, similar title, or overlapping solution), **DO NOT create the plan**. The user has already decided not to implement these changes. Log the skipped check in your analysis.
 - Before creating a plan, search existing plans to avoid duplicates — update existing plans if they partially cover the finding
 - Read `{WorkDir}/.ivy/plans.md` if it exists — this lists plans created in previous runs of this script. Skip creating plans already listed there
 - After creating new plans, append their paths to `{WorkDir}/.ivy/plans.md` (create the file if it doesn't exist) using this format:

@@ -44,6 +44,48 @@ Write a single plan file to `D:\Repos\_Ivy\.plans\` with the naming convention:
 Queue: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General`, `Scripts`, `VsExtension`, `TestManager`, `IvyMcp`, ...
 Every project is executed sequentially in a queue of it's own to avoid build errors and conflicting changes.
 
+#### Queue Selection Guidelines
+
+Use the pattern `{ProjectName}{SubsystemType}` to create granular queues for independent subsystems.
+
+**For agent-related plans**:
+- **IvyAgentCore**: Agent server, orchestration, core agent logic (`Ivy.Agent.Server`, `Ivy.Agent` core files)
+- **IvyAgentBibe**: Internal tooling apps (`Ivy.Agent.Bibe` apps like PlanReviewer)
+- **IvyAgentPersona**: Persona prompts and instructions (`Ivy.Agent\Agents\Personas\Prompts\*.md`)
+- **IvyAgentWorkflows**: Workflow definitions (`Ivy.Internals\Workflows\*.workflow`)
+- **IvyAgentAnalyzers**: Analyzer implementations (`Ivy.Agent\Agents\Analysers\*.cs`)
+- **IvyAgentTools**: Tool implementations (`Ivy.Agent\Tools\*`)
+- **TestManager**: Test framework (`Ivy.Agent.Test.Manager`)
+- **IvyAgentShared**: Message definitions (`Ivy.Agent.Shared\Messages`)
+- **IvyAgent**: Fallback for cross-cutting agent changes or when uncertain
+
+**For framework plans**:
+- **IvyFrameworkWidgets**: Widget implementations
+- **IvyFrameworkCore**: Core framework logic
+- **IvyFramework**: Cross-cutting framework changes
+
+**For other projects**:
+- **ScriptsTools**: Script utilities and tools
+- **ScriptsAgents**: Agentic applications (MakePlan, IvyAgentDebug, etc.)
+- **IvyConsole**: Console/TUI client
+- **VsExtension**: VS Code extensions
+
+**Queue Selection Process**:
+1. Identify the primary project/component affected
+2. Determine if the change is isolated to a specific subsystem
+3. If isolated, use `{ProjectName}{SubsystemType}` pattern
+4. If cross-cutting, use the base project name
+5. If uncertain, default to base project name
+
+**Examples**:
+- Fix Bibe Plan Reviewer layout → `IvyAgentBibe`
+- Improve persona token usage → `IvyAgentPersona`
+- Add new analyser → `IvyAgentAnalyzers`
+- Fix infrastructure error detection → `IvyAgentAnalyzers`
+- Update CreateApp workflow → `IvyAgentWorkflows`
+- Add new framework widget → `IvyFrameworkWidgets`
+- Create new MakePlan tool → `ScriptsAgents`
+
 **VsExtension note:** VS Code extensions in `D:\Repos\_Personal\Scripts\AF2\.vscode-extensions` are installed via symlinks — no file copying is needed. Plans should instruct to reload VS Code after editing, not copy files.
 
 LEVEL (priority/criticality):
