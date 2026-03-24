@@ -74,7 +74,7 @@ await page.getByRole('combobox').click();
 await page.getByText('Option Name', { exact: true }).first().click();
 ```
 
-#### Click Interception Workaround
+#### Click Interception Workaround (Keyboard Navigation)
 ```typescript
 // If clicking an option times out due to element interception
 // (e.g., Badge elements with same text block the click)
@@ -84,6 +84,23 @@ await page.keyboard.press('ArrowDown');  // Navigate to option
 await page.keyboard.press('ArrowDown');  // Repeat as needed
 await page.keyboard.press('Enter');      // Select
 ```
+
+#### Click Interception Workaround (Role-Based Selectors)
+```typescript
+// If clicking an option times out due to Radix UI backdrop/popper element interception,
+// use role-based selectors instead of text-based selectors:
+
+// ❌ Problematic: text-based selector intercepted by Radix UI popper elements
+await page.getByText('Option Name').first().click();
+
+// ✅ Correct: role-based selector targets ARIA option elements directly
+await page.getByRole('option', { name: /Option Name/ }).click();
+```
+
+**When to use role-based selectors over keyboard navigation**:
+- When the Select component renders options with `role="option"` (e.g., Radix UI Select used by Ivy's SelectInput in some configurations)
+- When you need to select a specific option by name without counting arrow key presses
+- Prefer `getByRole('option')` first; fall back to keyboard navigation if options lack ARIA roles
 
 #### Toggle Variant Pattern
 ```typescript
@@ -537,6 +554,7 @@ test('feature test', async ({ page }) => {
 | Button (text) | `page.getByRole('button', { name: 'Text' })` | Use `exact: true` for single chars |
 | Button (icon) | `page.locator('button:has(svg)').first()` | No accessible name |
 | CodeBlock | Split into fragments, use `.includes()` | Syntax highlighting spans break exact matches |
+| SelectInput (Radix option) | `page.getByRole('option', { name: /Text/ })` | Use when `getByText()` is intercepted by Radix popper |
 | Error Callout | `page.content().includes('Error text')` | More reliable than `getByText()` |
 | Heading | `page.getByRole('heading', { name: 'Text', exact: true })` | Avoids matching heading text in body content |
 
@@ -556,6 +574,7 @@ If tests fail on first run, check these common issues:
 8. **Heading text matching body content** → Use `getByRole('heading', { name: 'Text', exact: true })` instead of `getByText('Text')`
 9. **SelectInput Toggle not found as combobox** → Use `getByRole('radio')`, not `getByRole('combobox')` for `Variant(SelectInputVariant.Toggle)`
 10. **CodeBlock content assertion fails** → Split expected strings into fragments; syntax highlighting `<span>` elements break exact matches
+11. **Select dropdown option click timeout** → Use `getByRole('option', { name: /Text/ })` instead of `getByText()` to avoid Radix UI popper/backdrop interception
 
 ---
 
@@ -587,3 +606,4 @@ This pattern ensures tests:
 2026-03-24 - Added CodeInput pattern from MarkdownPreview test session
 2026-03-24 - Added dynamic port configuration pattern to prevent baseURL errors (BulkFileRenamer test review)
 2026-03-24 - Added CodeBlock content assertion pattern for syntax highlighting spans (HTMLEntitiesEncoder test review)
+2026-03-24 - Added Radix UI role-based selector pattern for Select dropdown click interception (GraphQL Countries test review)
