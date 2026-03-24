@@ -24,8 +24,9 @@ if (-not (Test-Path $langfuseDir)) {
     }
     & $ivyAgent langfuse session get $sessionId -d $workDir
     if (-not (Test-Path $langfuseDir)) {
-        Write-Host "Error: Download completed but no langfuse data was created." -ForegroundColor Red
-        exit 1
+        # Create empty langfuse dir so the agent can still generate session-status report
+        Write-Host "Warning: Download completed but no langfuse data was created. Creating empty dir for partial analysis." -ForegroundColor Yellow
+        New-Item -ItemType Directory -Path $langfuseDir -Force | Out-Null
     }
 }
 

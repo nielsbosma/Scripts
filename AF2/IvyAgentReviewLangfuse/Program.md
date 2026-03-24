@@ -39,12 +39,48 @@ Each observation JSON has a structure like:
 - Confirm `LangfuseDir` exists and contains trace folders
 - Confirm `WorkDir` exists
 - Run `Expand-EmbeddedObservations.ps1 -LangfuseDir` to extract any observations embedded in trace.json into separate files (required by all other tools)
+- Run `Get-SessionStatus.ps1 -LangfuseDir` to determine session completeness
+- If session status is `PrematureStop` or `Failed`, set `$incomplete = true` — you will add a banner to each generated report
 
 ### 2. Run Tools & Generate Reports
 
 Use the PowerShell tools in `/Tools/` to query the langfuse data. Each tool takes `-LangfuseDir` as parameter.
 
+**Incomplete session handling:** If `$incomplete` is true, add the following banner at the top of EVERY generated report file (right after the H1 heading):
+
+```markdown
+> **Warning: Session ended prematurely** — data may be incomplete. Status: {status}, Reason: {stopReason}
+```
+
+If a tool returns empty or minimal data for an incomplete session, still generate the report file with the banner and a note: "No data available — session ended before this data was generated." This ensures downstream tools (IvyAgentDebug) always have report files to work with.
+
 Generate these files in `{WorkDir}/.ivy/`:
+
+#### `langfuse-session-status.md`
+
+Session status report. Always generated first, using `Get-SessionStatus.ps1`.
+
+```markdown
+# Session Status: {SessionId}
+
+**Status**: Complete / Failed / PrematureStop
+**Stop Reason**: {reason from Get-SessionStatus}
+**Last Observation**: {time} — {preview}
+**Last Workflow State**: {state}
+**Generations**: {count}
+**Tokens**: {input} in / {output} out
+
+## Workflows
+| Workflow | Status |
+|----------|--------|
+| {name} | Finished / Active (unfinished) / Failed |
+
+## Diagnosis (PrematureStop/Failed only)
+
+{If incomplete, analyze the last few observations to determine what the agent was doing when it stopped.
+Look at the last observation preview, the last workflow state, and any error indicators.
+Provide a brief analysis of the likely cause.}
+```
 
 #### `langfuse-timeline.md`
 
@@ -297,6 +333,7 @@ CSharp refactoring rules applied during the session. Use `Get-CSharpRefactorings
 
 Present the user with:
 - Session ID
+- **Session status** (Complete / Failed / PrematureStop) and stop reason
 - Number of traces
 - Timeline highlights (total generations, token usage)
 - Build error count
