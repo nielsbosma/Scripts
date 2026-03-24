@@ -211,6 +211,35 @@ For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
 - Read the counter from `.counter` (default 200 if missing), allocate IDs, increment
 - Format: `<ID>-<RepositoryName>-<LEVEL>-<Title>.md`
 - Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General` (note: `IvyMcp` issues go to GitHub — see IvyMcp section above)
+
+#### Queue Selection Guidelines
+
+Use the pattern `{ProjectName}{SubsystemType}` for granular queues instead of generic project names.
+
+**For agent-related issues**, use these specific queues:
+- **IvyAgentCore**: Agent server, orchestration, core agent logic
+- **IvyAgentBibe**: Internal tooling apps (Ivy.Agent.Bibe apps like PlanReviewer)
+- **IvyAgentPersona**: Persona prompts and instructions
+- **IvyAgentWorkflows**: Workflow definitions in Ivy.Internals\Workflows
+- **IvyAgentAnalyzers**: Analyzer implementations (ResearchPhaseAnalyser, InfrastructureErrorAnalyser, etc.)
+- **IvyAgentTools**: Tool implementations (IvyQuestion, IvyDoc, GetTypeInfo, etc.)
+- **TestManager**: Test framework
+- **IvyAgentShared**: Message definitions
+- **IvyAgent**: Fallback for cross-cutting changes or when uncertain
+
+**Decision tree**:
+1. Does the issue affect a specific subsystem listed above? Use `{ProjectName}{SubsystemType}`.
+2. Does the issue span multiple subsystems? Use base project name (e.g., `IvyAgent`).
+3. Uncertain? Use base project name.
+
+**Examples from reviews**:
+- System reminder analyser firing excessively → `IvyAgentAnalyzers`
+- Agent ignores persona instruction → `IvyAgentPersona`
+- Workflow state transition bug → `IvyAgentWorkflows`
+- IvyQuestion compound questions → `IvyAgentTools`
+- Bibe PlanReviewer UI issue → `IvyAgentBibe`
+- Token usage optimization across agent → `IvyAgent` (cross-cutting)
+
 - LEVEL (priority/criticality):
   - **CRITICAL** — Must be fixed immediately, blocks work or causes severe issues (build failures, crashes, data loss)
   - **NICETOHAVE** — Improves functionality but not urgent (hallucinations, missing docs, workflow improvements)
