@@ -132,6 +132,8 @@ The tool returns a `Source` field: `IvyQuestion` (local doc lookup) or `AnswerAg
 
 **Important**: Only label errors as "ToolFeedback" when an actual `EVENT_ToolFeedback` observation exists (with `input.feedback`). AnswerAgent failures are NOT ToolFeedback — they are LLM processing errors. Use the tool's `Success`/`Error` fields to determine status; do not infer status from other events in the timeline.
 
+**Status mapping**: A question is successful ONLY when the tool returns `Success=true` AND has answer content. ALL other cases — `Success=false`, no response, empty answer, error, timeout — are **failed**. Use only two statuses: `✅ Success` or `❌ Failed`. Do not use any other status (e.g., do not use "❓ No response").
+
 ```markdown
 # IvyQuestion Log: {SessionId}
 
@@ -142,9 +144,18 @@ The tool returns a `Source` field: `IvyQuestion` (local doc lookup) or `AnswerAg
 **Source**: IvyQuestion / AnswerAgent
 **Status**: ✅ Success / ❌ Failed
 **Answer length**: N chars
-**Error**: {if failed}
+**Error**: {if failed, include error message; for no response use "No answer returned"}
 
 ### Q2: ...
+
+## Summary
+
+| Metric | Count |
+|--------|-------|
+| Total IvyQuestions | {total} |
+| Successful | {count where Status = ✅ Success} |
+| Failed | {count where Status = ❌ Failed} |
+| Total answer chars | {sum of answer lengths from successful questions} |
 ```
 
 #### `langfuse-workflows.md`
