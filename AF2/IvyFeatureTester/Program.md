@@ -73,7 +73,6 @@ using System.Reflection;
 
 var server = new Server();
 server.AddAppsFromAssembly(Assembly.GetExecutingAssembly());
-server.UseChrome();
 await server.RunAsync();
 ```
 
@@ -112,7 +111,7 @@ Create `.ivy/tests/`, `.ivy/tests/screenshots/`, and `.ivy/tests/videos/` direct
 **One `.spec.ts` per app:**
 - `beforeAll`: find free port, spawn `dotnet run -- --port <port>`, wait for HTTP 200
 - `afterAll`: kill process
-- Test each app at `http://localhost:<port>/<app-id>?chrome=false`
+- Test each app at `http://localhost:<port>/<app-id>?shell=false`
 - Take screenshots at every key step → `.ivy/tests/screenshots/`
 - Use global screenshot counter with descriptive names
 - Capture browser console logs → `.ivy/tests/console.log`

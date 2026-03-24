@@ -24,6 +24,12 @@ The Ivy analyzer enforces that all hooks (UseState, UseEffect, UseUpload, UseDow
 
 **Fix**: Order hooks as: UseState → UseEffect → UseUpload/UseDownload → non-hook code.
 
+## IVYHOOK007: Hook called inline in expression
+
+Hooks like `UseUpload`, `UseDownload` cannot be called inline in a method chain (e.g., `UseUpload(...).Accept(...)`). The analyzer requires hooks to be assigned to a local variable first.
+
+**Fix**: Extract hook to variable: `var upload = UseUpload(...); var configured = upload.Accept(...);`
+
 ## IVYHOOK001B: Hooks inside lambdas
 
 When a hook like UseDownload is called inside a lambda or helper method called from Build(), it triggers IVYHOOK001B. This commonly happens when rendering dynamic collections (e.g., a card per sheet with its own download).
@@ -75,3 +81,29 @@ Agent-generated code calls `Toast("message")` directly in Build(), but Toast is 
 ## BuilderFactory.Func type inference
 
 Agent code uses `b.Func<double>(...)` but the method signature is `Func<TModel, TIn>(Func<TIn, object?> func)`. Use the inline type pattern from samples: `b.Func((double x) => ...)` which lets C# infer both type parameters.
+
+## CS1929: Builder types don't have WithLabel
+
+`DetailsBuilder<T>` and `TableBuilder<T>` don't have `.WithLabel()` - it's an extension on `IWidget`. Cast the builder to `IWidget` before calling `WithLabel`:
+```csharp
+var builder = data.ToDetails().Label(...);
+content |= ((IWidget)builder).WithLabel("Section Label");
+```
+Requires `using Ivy.Core;` for `IWidget`.
+
+## CS1503: Button icon parameter error
+
+Agent code uses `new Button("text", Icons.Download)` but Button constructor doesn't accept an icon parameter. Use the fluent API: `new Button("text").Icon(Icons.Download)`.
+
+## CS1660 / CS0104: ExternalWidget event handler pattern
+
+Agent-generated ExternalWidget classes often incorrectly define event properties as `Func<Event<TWidget, TValue>, ValueTask>?`. This causes CS1660 "Cannot convert lambda expression to type 'Event<...>' because it is not a delegate type".
+
+**Fix**: Event properties must use `Ivy.EventHandler<Event<TWidget, TValue>>?` (fully qualified to avoid ambiguity with System.EventHandler). Extension methods that accept Action<> handlers must wrap the lambda with `new(...)`:
+
+```csharp
+[Event] public Ivy.EventHandler<Event<MyWidget, string>>? OnMyEvent { get; set; }
+
+public static MyWidget OnMyEvent(this MyWidget widget, Action<string> handler) =>
+    widget with { OnMyEvent = new(e => { handler(e.Value); return ValueTask.CompletedTask; }) };
+```
