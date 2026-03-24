@@ -142,6 +142,16 @@ Write the following files directly to `.ivy/tests/`:
 - **Switch/Toggle**: Use `getByText()` to find the label (labels include the text content)
 - **Slider**: Use `getByRole("slider")` and keyboard interactions (ArrowRight/ArrowLeft, Home/End)
 
+**CodeBlock Output Verification:**
+- When testing apps that display content in a `CodeBlock` widget (look for `new CodeBlock(...)` or `.ToCodeBlock()` in the app source):
+  - CodeBlock uses syntax highlighting which wraps content in `<span>` elements
+  - Exact string matching will fail for multi-character sequences
+  - Use flexible assertions:
+    - Split expected content into individual words/tokens and check each separately
+    - Use `.includes()` with OR logic for alternative forms (encoded/decoded, formatted/raw)
+    - Check for key fragments rather than exact strings
+  - Example: `expect(output?.includes('keyword1') && output.includes('keyword2')).toBeTruthy();`
+
 **External API Error Handling:**
 - When apps make external API calls (OpenAI, CoinGecko, etc.), tests should handle BOTH success AND error states
 - External APIs may return 401/403/rate limits due to invalid keys, network issues, or test environment configuration
