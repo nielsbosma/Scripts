@@ -22,7 +22,7 @@ A plan can contain everything needed but fail due to execution issues. Focus eva
 Evaluate plans across:
 
 ### 1. Groundedness
-- All file references use `file:///` links (enforced in Program.md:181)
+- All file references use markdown links: `[FileName.cs](file:///path)` (enforced in Program.md)
 - References point to actual files, not hallucinated paths
 - Solution based on actual codebase patterns, not general knowledge
 
@@ -60,7 +60,7 @@ This would help identify patterns:
 ## Application
 
 When reviewing plans before execution:
-1. ✓ Groundedness check: all `file:///` links valid?
+1. ✓ Groundedness check: all `[name](file:///...)` links valid?
 2. ✓ Completeness check: can agent execute without questions?
 3. ✓ Test check: automated tests with specific assertions?
 4. ✓ Actionability check: commands copy-pasteable?

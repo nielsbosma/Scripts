@@ -83,5 +83,6 @@ The expanded plan should:
 - The expanded plan must be **immediately actionable** without further investigation
 - If research reveals the problem is already solved or doesn't exist, note that clearly in the expanded plan
 - Preserve all verification steps and test requirements
+- **When referencing local files in expanded plans, use markdown links: `[FileName.cs](file:///path/to/FileName.cs)`**
 - Keep the plan self-contained with all paths and information for an LLM coding agent
 - Do NOT modify any source code — only read files and transform the plan

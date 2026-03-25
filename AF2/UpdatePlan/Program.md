@@ -76,4 +76,5 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 - Preserve YAML frontmatter exactly as-is
 - Do NOT summarize, abbreviate, or skip sections
 - Do NOT modify any source code — only read files and update the plan file
+- **When referencing local files in plans, use markdown links: `[FileName.cs](file:///path/to/FileName.cs)`**
 - The plan must remain self-contained with all paths and information for an LLM coding agent

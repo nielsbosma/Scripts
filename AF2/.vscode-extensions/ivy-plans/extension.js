@@ -255,7 +255,11 @@ function activate(context) {
                 fs.writeFileSync(tmpPath, '', 'utf8');
 
                 const doc = await vscode.workspace.openTextDocument(tmpPath);
-                await vscode.window.showTextDocument(doc);
+                await vscode.commands.executeCommand('vscode.setEditorLayout', {
+                    orientation: 0,
+                    groups: [{ size: 0.5 }, { size: 0.5 }]
+                });
+                await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Two });
 
                 const saveHandler = vscode.workspace.onDidSaveTextDocument(async (savedDoc) => {
                     if (savedDoc.uri.toString() === doc.uri.toString()) {
@@ -306,9 +310,13 @@ function activate(context) {
                 // Create empty file
                 fs.writeFileSync(tmpPath, '', 'utf8');
 
-                // Open in VSCode
+                // Open in VSCode - split editor vertically and open in bottom half
                 const doc = await vscode.workspace.openTextDocument(tmpPath);
-                await vscode.window.showTextDocument(doc);
+                await vscode.commands.executeCommand('vscode.setEditorLayout', {
+                    orientation: 0, // vertical (top/bottom)
+                    groups: [{ size: 0.5 }, { size: 0.5 }]
+                });
+                await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Two });
 
                 // Trigger on save — onDidCloseTextDocument is unreliable (VS Code delays document disposal)
                 const saveHandler = vscode.workspace.onDidSaveTextDocument(async (savedDoc) => {

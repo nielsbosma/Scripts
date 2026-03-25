@@ -85,6 +85,9 @@
 4. **Output validation** — check generated/computed values appear correctly
 
 ### Gotchas & Tips
+- **CodeBlock syntax tokens use inline styles, not CSS classes** — `react-syntax-highlighter` (Prism mode) applies styles via inline `style` attributes on `<span>` elements inside `<pre><code>`. Do NOT use class-based selectors like `span.token.comment`. To find comment spans, match by text content (starts with `//`, `/*`, `#`, `--`, `<!--`) within `pre code span` elements, then check `getComputedStyle(el).fontStyle` or other computed properties.
+- **Scope element locators to widget containers** — `page.locator('ul')` or `page.locator('ol')` can match Ivy shell elements (e.g., toast viewport `<ol>`). Scope to the widget container: `.markdown-widget ul`, `.markdown-widget ol`, etc.
+- **Tailwind `space-y-*` spacing verification** — `space-y` uses `> :not([hidden]) ~ :not([hidden])` sibling selector, NOT direct `margin-top` on child elements. `getComputedStyle(li).marginTop` returns `0`. Verify spacing via **bounding box gaps**: `box2.y - (box1.y + box1.height) > 0`.
 - **Xml/Json widget toggle buttons use `role="button"`** — the expandable tree nodes in Xml and Json widgets render as `<div role="button">` elements. This means `getByRole("button", { name: "0" })` can match both actual `<button>` elements AND XML toggle nodes whose tag text contains "0". Always use `{ exact: true }` when targeting real buttons on pages that also contain Xml/Json widgets.
 - **Ivy layout doesn't render widgets as direct DOM siblings of headings** — `h2.nextElementSibling` won't contain the widget that follows the heading in the Ivy tree. Use full-page `body` text assertions or specific locators instead of DOM sibling traversal.
 - Ivy apps may take a few seconds to start; 30s timeout is safe
