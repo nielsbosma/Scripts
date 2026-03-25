@@ -86,7 +86,7 @@ For each selected file, allocate a plan ID from `.counter` and create a plan fil
 
 #### Plan Naming
 
-`<ID>-<Queue>-NICETOHAVE-CodeHealth-<ShortTitle>.md`
+`<ID>-<Queue>-NiceToHave-CodeHealth-<ShortTitle>.md`
 
 Determine the queue from the repo:
 - `Ivy-Framework\src\` -> `IvyFramework`
@@ -144,7 +144,7 @@ Commit!
 
 - **Max 10 plans per session**
 - **ONE file per plan** (a file may have multiple issues — group them in one plan)
-- All plans get NICETOHAVE level unless the score is 1-3 (use CRITICAL for those)
+- All plans get NiceToHave level unless the score is 1-3 (use Critical for those)
 - Read the affected source file before writing the plan to provide specific fix instructions
 - Keep plans concise and actionable
 - **READ-ONLY: Only write to `.plans\` directory**

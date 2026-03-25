@@ -16,7 +16,7 @@ Read about the important paths and files in ../.shared/Paths.md
 
 Args contains the user's task description. If it references related plans with `[number]` syntax (e.g. `[205]`), find and read those plan files from `D:\Repos\_Ivy\.plans\` for context.
 
-**Extract Criticality Level**: Look for a criticality or priority level indicator in Args (e.g., "How critical is this fix:" followed by CRITICAL, NICETOHAVE, or NITPICK). If not specified, default to NICETOHAVE.
+**Extract Criticality Level**: Look for a criticality or priority level indicator in Args (e.g., "How critical is this fix:" followed by Critical, NiceToHave, or Nitpick). If not specified, default to NiceToHave.
 
 ### 2. Allocate Plan ID
 
@@ -50,7 +50,6 @@ Use the pattern `{ProjectName}{SubsystemType}` to create granular queues for ind
 
 **For agent-related plans**:
 - **IvyAgentCore**: Agent server, orchestration, core agent logic (`Ivy.Agent.Server`, `Ivy.Agent` core files)
-- **IvyAgentBibe**: Internal tooling apps (`Ivy.Agent.Bibe` apps like PlanReviewer)
 - **IvyAgentPersona**: Persona prompts and instructions (`Ivy.Agent\Agents\Personas\Prompts\*.md`)
 - **IvyAgentWorkflows**: Workflow definitions (`Ivy.Internals\Workflows\*.workflow`)
 - **IvyAgentAnalyzers**: Analyzer implementations (`Ivy.Agent\Agents\Analysers\*.cs`)
@@ -78,7 +77,6 @@ Use the pattern `{ProjectName}{SubsystemType}` to create granular queues for ind
 5. If uncertain, default to base project name
 
 **Examples**:
-- Fix Bibe Plan Reviewer layout → `IvyAgentBibe`
 - Improve persona token usage → `IvyAgentPersona`
 - Add new analyser → `IvyAgentAnalyzers`
 - Fix infrastructure error detection → `IvyAgentAnalyzers`
@@ -89,11 +87,11 @@ Use the pattern `{ProjectName}{SubsystemType}` to create granular queues for ind
 **VsExtension note:** VS Code extensions in `D:\Repos\_Personal\Scripts\AF2\.vscode-extensions` are installed via symlinks — no file copying is needed. Plans should instruct to reload VS Code after editing, not copy files.
 
 LEVEL (priority/criticality):
-- **CRITICAL** — Must be fixed immediately, blocks work or causes severe issues
-- **NICETOHAVE** — Improves functionality but not urgent
-- **NITPICK** — Minor polish, cosmetic fixes, or low-priority refinements
+- **Critical** — Must be fixed immediately, blocks work or causes severe issues
+- **NiceToHave** — Improves functionality but not urgent
+- **Nitpick** — Minor polish, cosmetic fixes, or low-priority refinements
 
-Example: `670-IvyFramework-CRITICAL-FaqCardVsBoxComposition.md`  
+Example: `670-IvyFramework-Critical-FaqCardVsBoxComposition.md`  
 
 Plan format:
 
@@ -204,7 +202,7 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 
 If the IvyFeatureTester discovers problems during verification, it should **automatically create a new implementation plan** to fix the discovered issues:
 
-1. Create a new plan file in D:\Repos\_Ivy\.plans\ with a descriptive name (e.g., 417-IvyFramework-CRITICAL-RadialBarChart-FollowUpFix.md)
+1. Create a new plan file in D:\Repos\_Ivy\.plans\ with a descriptive name (e.g., 417-IvyFramework-Critical-RadialBarChart-FollowUpFix.md)
 2. The plan should include:
    - Clear problem description from test results
    - Root cause analysis if identifiable
@@ -220,7 +218,7 @@ This ensures any issues discovered during testing have a tracked resolution path
 - **!CRITICAL: Every MakePlan execution MUST produce at least one plan file. Even if the task is an analysis, review, or investigation — always create a plan with actionable steps. Never just analyze and report back without a plan.**
 - The plan must include all paths and information for an LLM coding agent to execute end-to-end without human intervention
 - Keep the plan short and concise
-- **When referencing local files, folders, or screenshots in plans, always prefix paths with `file:///` (e.g. `file:///D:/Repos/_Ivy/Ivy-Framework/src/Ivy/Widgets/Button.cs`). This allows the user to open files directly in VS Code by clicking the link.**
+- **When referencing local files, folders, or screenshots in plans, use markdown links with the filename as display text: `[Button.cs](file:///D:/Repos/_Ivy/Ivy-Framework/src/Ivy/Widgets/Button.cs)`. This allows the user to open files directly in VS Code by clicking the link while keeping plans readable.**
 - **!IMPORTANT: ONE issue per plan file — if multiple issues, create multiple plan files with separate IDs**
 - **!CRITICAL: This agent is READ-ONLY for all source code. You must NEVER use Edit, Write, or Bash to create, modify, or delete any file outside `D:\Repos\_Ivy\.plans\`. The ONLY writable paths are:**
   - `D:\Repos\_Ivy\.plans\*.md` (plan files)

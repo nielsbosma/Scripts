@@ -63,4 +63,5 @@ Commit!
 - If the original has YAML frontmatter, copy it to each split plan
 - ONE issue per plan file
 - Keep each plan short and concise
+- **When referencing local files in split plans, use markdown links: `[FileName.cs](file:///path/to/FileName.cs)`**
 - Do NOT modify any source code — only read files and create plan files

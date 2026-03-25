@@ -241,9 +241,9 @@ Use the pattern `{ProjectName}{SubsystemType}` for granular queues instead of ge
 - Token usage optimization across agent → `IvyAgent` (cross-cutting)
 
 - LEVEL (priority/criticality):
-  - **CRITICAL** — Must be fixed immediately, blocks work or causes severe issues (build failures, crashes, data loss)
-  - **NICETOHAVE** — Improves functionality but not urgent (hallucinations, missing docs, workflow improvements)
-  - **NITPICK** — Minor polish, cosmetic fixes, or low-priority refinements (cosmetic issues, minor doc tweaks, formatting)
+  - **Critical** — Must be fixed immediately, blocks work or causes severe issues (build failures, crashes, data loss)
+  - **NiceToHave** — Improves functionality but not urgent (hallucinations, missing docs, workflow improvements)
+  - **Nitpick** — Minor polish, cosmetic fixes, or low-priority refinements (cosmetic issues, minor doc tweaks, formatting)
 - **Check skipped plans before creating**: Read all files in `D:\Repos\_Ivy\.plans\skipped\` and compare the proposed plan against skipped plans. If a similar plan already exists (same problem domain, similar title, or overlapping solution), **DO NOT create the plan**. The user has already decided not to implement these changes. Log the skipped check in your analysis.
 - Before creating a plan, search existing plans to avoid duplicates — update existing plans if they partially cover the finding
 - Read `{WorkDir}/.ivy/plans.md` if it exists — this lists plans created in previous runs of this script. Skip creating plans already listed there
@@ -251,7 +251,7 @@ Use the pattern `{ProjectName}{SubsystemType}` for granular queues instead of ge
   ```markdown
   # Created Plans
 
-  - D:\Repos\_Ivy\.plans\268-Scripts-NICETOHAVE-Example.md
+  - D:\Repos\_Ivy\.plans\268-Scripts-NiceToHave-Example.md
   ```
 
 Plan format:
@@ -311,7 +311,7 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 - Plans must include all paths and information for an LLM coding agent to execute end-to-end
 - Keep plans short and concise
 - Do NOT modify any source code directly — only read files and create plan files. **Exception**: `Hallucinations.md` may be edited directly.
-- **When referencing local files, folders, or screenshots in plans, always prefix paths with `file:///` (e.g. `file:///D:/Repos/_Ivy/Ivy-Framework/src/Ivy/Widgets/Button.cs`). This allows the user to open files directly in VS Code by clicking the link.**
+- **When referencing local files, folders, or screenshots in plans, use markdown links with the filename as display text: `[Button.cs](file:///D:/Repos/_Ivy/Ivy-Framework/src/Ivy/Widgets/Button.cs)`. This allows the user to open files directly in VS Code by clicking the link while keeping plans readable.**
 - **IvyMcp findings must be created as GitHub issues in `Ivy-Interactive/Ivy-Mcp`** — never as local plan files. This includes IvyDoc issues, IvyQuestion wrong answers, and hallucinations originating from the MCP knowledge base.
 - Missing review files are not failures — analyze what's available
 - When annotating review files in `.plans\review\`, preserve the original content — only prepend notes at the top

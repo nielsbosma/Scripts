@@ -41,4 +41,6 @@ Push-Location $programFolder
 claude --dangerously-skip-permissions -- (Get-Content $promptFile -Raw)
 Pop-Location
 
+MoveApprovedPlans
+
 Remove-Item $promptFile

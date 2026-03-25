@@ -15,7 +15,6 @@ Use `{ProjectName}{SubsystemType}` for granular queues to enable parallel proces
 | Queue | Use When | Source Paths |
 |-------|----------|--------------|
 | IvyAgentCore | Agent server, orchestration, core logic | Ivy.Agent.Server, Ivy.Agent (core) |
-| IvyAgentBibe | Internal tooling apps | Ivy.Agent.Bibe |
 | IvyAgentPersona | Persona prompts/instructions | Ivy.Agent\Agents\Personas\Prompts |
 | IvyAgentWorkflows | Workflow definitions | Ivy.Internals\Workflows |
 | IvyAgentAnalyzers | Analyzer implementations | Ivy.Agent\Agents\Analysers |
