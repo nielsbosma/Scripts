@@ -11,9 +11,8 @@ This document contains common patterns and solutions for generating robust Playw
 5. [External API Error Handling](#external-api-error-handling)
 6. [Test Structure Best Practices](#test-structure-best-practices)
 7. [CodeBlock Content Assertions](#codeblock-content-assertions)
-8. [Testing CodeInput Widgets](#testing-codeinput-widgets)
-9. [Button Index Pitfalls](#button-index-pitfalls)
-10. [Windows Process Cleanup](#windows-process-cleanup)
+8. [Button Index Pitfalls](#button-index-pitfalls)
+9. [Windows Process Cleanup](#windows-process-cleanup)
 
 ---
 
@@ -348,107 +347,6 @@ await page.locator('button:has-text("Remove")').first().click();
 
 ---
 
-## Testing CodeInput Widgets
-
-This section documents comprehensive patterns for testing applications that use CodeInput widgets, based on lessons learned from multiple test adjustment rounds. CodeInput testing involves specific challenges around state synchronization, HTML escaping, multi-panel layouts, and visual assertions.
-
-### Filling Content
-
-Use `.fill()` instead of `.type()` for CodeInput:
-
-```typescript
-const codeInput = page.getByRole('textbox').first();
-await codeInput.fill('<root><item>Test</item></root>');
-await page.waitForTimeout(1000); // Allow WebSocket sync
-```
-
-**Why**: CodeInput is a Monaco-based contenteditable element that requires `.fill()` for proper state sync. The 1000ms wait allows the Ivy WebSocket to synchronize state to the backend. Standard 500ms waits are insufficient for CodeInput state propagation.
-
-**Critical**: Without the 1000ms wait after `.fill()`, subsequent button clicks or actions may execute against stale/empty state, causing tests to fail.
-
-### Asserting Content in CodeBlock Output
-
-When verifying code output displayed in CodeBlock, use text locators, not HTML inspection:
-
-```typescript
-// ❌ Wrong - HTML escaped
-await expect(page.content()).toContain('<root>');
-
-// ✅ Correct - matches rendered text
-await expect(page.getByText('<root>').last()).toBeVisible();
-```
-
-**Why**: CodeBlock HTML-escapes content for display (e.g., `<` becomes `&lt;`). Text locators match the visible rendered content, while `page.content()` returns the escaped HTML source.
-
-### Handling Multiple Panels
-
-When testing dual-panel layouts (input + output), use `.first()` or `.last()` to disambiguate:
-
-```typescript
-// Left panel (input)
-await page.getByText('Input').first();
-
-// Right panel (output)
-await page.getByText('<root>').last();
-```
-
-**Why**: Text content often appears in both panels, causing Playwright strict mode violations. Using `.first()` or `.last()` targets the specific panel you're testing.
-
-**Pattern**: For input panels, use `.first()`. For output panels, use `.last()`. This assumes left-to-right or top-to-bottom layouts.
-
-### Testing Status Indicators
-
-Check for text content, not CSS classes:
-
-```typescript
-// ❌ Wrong - assumes specific Tailwind classes
-await expect(page.locator('.bg-emerald-500')).toBeVisible();
-
-// ✅ Correct - checks visible state
-await expect(page.locator('text=Valid').first()).toBeVisible();
-await expect(page.locator('text=Invalid').first()).toBeVisible();
-```
-
-**Why**: Ivy's color mappings (`Colors.Success`, `Colors.Error`, etc.) may change Tailwind class names across versions. Text content is more stable and doesn't couple tests to implementation details.
-
-**Pattern**: When testing badges, alerts, or status indicators, assert on the text content (e.g., "Valid", "Error", "Success") rather than CSS classes like `bg-emerald-500` or `border-red-600`.
-
-### Complete Example: XML Validator Test
-
-This example demonstrates all patterns working together:
-
-```typescript
-test('validates XML and shows status', async ({ page }) => {
-  await page.goto(`http://localhost:${appPort}/`);
-
-  // 1. Fill CodeInput (with state sync wait)
-  const codeInput = page.getByRole('textbox').first();
-  await codeInput.fill('<root><item>Test</item></root>');
-  await page.waitForTimeout(1000); // Critical: wait for WebSocket sync
-
-  // 2. Trigger validation
-  await page.getByRole('button', { name: 'Validate' }).click();
-  await page.waitForTimeout(500);
-
-  // 3. Assert on CodeBlock output (use text locator, not HTML)
-  await expect(page.getByText('<root>').last()).toBeVisible();
-  await expect(page.getByText('<item>').last()).toBeVisible();
-
-  // 4. Assert on status indicator (use text, not CSS class)
-  await expect(page.locator('text=Valid').first()).toBeVisible();
-});
-```
-
-### Key Takeaways
-
-- **Always wait 1000ms** after `.fill()` on CodeInput for WebSocket state sync
-- **Use text locators** (`.getByText()`) for CodeBlock content assertions, not `.content().includes()`
-- **Use `.first()/.last()`** to disambiguate content in multi-panel layouts
-- **Assert on text content** for status indicators, not CSS classes
-- **Test both panels** independently - input state and output rendering are separate concerns
-
----
-
 ## TabsLayout DOM Rendering
 
 ### Issue
@@ -746,7 +644,7 @@ test('feature test', async ({ page }) => {
 | SelectInput (Toggle) | `page.getByRole('radio', { name: 'Option' })` | Toggle variant uses `role="radio"` with `aria-checked` |
 | SelectInput (Multi Toggle) | `page.getByRole('radio', { name: 'Option' })` | Same as toggle; multiple can be `aria-checked="true"` |
 | Switch | `page.getByText('Label Text')` | Labels contain text |
-| CodeInput | `page.getByRole('textbox')` | See [Testing CodeInput Widgets](#testing-codeinput-widgets) for comprehensive patterns |
+| CodeInput | `page.getByRole('textbox')` | NOT `.monaco-editor`, uses contenteditable |
 | Slider | `page.getByRole('slider')` + keyboard | Use ArrowRight/Left, Home/End |
 | Button (text) | `page.getByRole('button', { name: 'Text' })` | Use `exact: true` for single chars |
 | Button (icon) | `page.locator('button:has(svg)').first()` | No accessible name |
@@ -846,8 +744,6 @@ If tests fail on first run, check these common issues:
 14. **Zombie dotnet.exe processes on Windows** → Use `taskkill /F /T /PID` in `afterAll` instead of `serverProcess.kill()` (see [Windows Process Cleanup](#windows-process-cleanup))
 15. **Locator matches wrong element in tabbed app** → Add `:visible` pseudo-class to content locators; `Layout.Tabs()` renders all tab content to DOM with inactive tabs hidden via CSS (see [TabsLayout DOM Rendering](#tabslayout-dom-rendering))
 16. **File input visibility check fails** → Use `.toHaveCount(1)` instead of `.toBeVisible()`
-17. **CodeInput state not syncing to backend** → Add `await page.waitForTimeout(1000)` after `.fill()` for WebSocket synchronization (see [Testing CodeInput Widgets](#testing-codeinput-widgets))
-18. **CodeBlock assertions fail on escaped HTML** → Use `.getByText()` locators instead of `.content().includes()` for HTML/XML content (see [Testing CodeInput Widgets](#testing-codeinput-widgets))
 
 ---
 
@@ -871,7 +767,6 @@ This pattern ensures tests:
 
 ## Last Updated
 
-2026-03-25 - Added comprehensive "Testing CodeInput Widgets" section with patterns for state sync, HTML escaping, multi-panel layouts, and status indicators (XMLFormatterAndValidator test review)
 2026-03-25 - Added FileInput visibility pattern to prevent `.toBeVisible()` failures on hidden file inputs (ClosedXML-Excel-Exporter test review)
 2026-03-24 - Added Multi-Select Toggle variant pattern and common adjustment for toggle/combobox confusion (SeattleWeather test review)
 2026-03-24 - Corrected SelectInput Toggle variant to use `role="radio"` instead of `role="button"` (ReadingTimeEstimator test review)
