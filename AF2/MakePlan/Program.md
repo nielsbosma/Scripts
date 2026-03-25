@@ -50,7 +50,6 @@ Use the pattern `{ProjectName}{SubsystemType}` to create granular queues for ind
 
 **For agent-related plans**:
 - **IvyAgentCore**: Agent server, orchestration, core agent logic (`Ivy.Agent.Server`, `Ivy.Agent` core files)
-- **IvyAgentBibe**: Internal tooling apps (`Ivy.Agent.Bibe` apps like PlanReviewer)
 - **IvyAgentPersona**: Persona prompts and instructions (`Ivy.Agent\Agents\Personas\Prompts\*.md`)
 - **IvyAgentWorkflows**: Workflow definitions (`Ivy.Internals\Workflows\*.workflow`)
 - **IvyAgentAnalyzers**: Analyzer implementations (`Ivy.Agent\Agents\Analysers\*.cs`)
@@ -78,7 +77,6 @@ Use the pattern `{ProjectName}{SubsystemType}` to create granular queues for ind
 5. If uncertain, default to base project name
 
 **Examples**:
-- Fix Bibe Plan Reviewer layout → `IvyAgentBibe`
 - Improve persona token usage → `IvyAgentPersona`
 - Add new analyser → `IvyAgentAnalyzers`
 - Fix infrastructure error detection → `IvyAgentAnalyzers`
