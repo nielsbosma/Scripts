@@ -124,6 +124,23 @@ $content
     return $false
 }
 
+function MoveApprovedPlans {
+    $plansDir = "D:\Repos\_Ivy\.plans"
+    $approvedDir = Join-Path $plansDir "approved"
+    if (-not (Test-Path $approvedDir)) {
+        New-Item -ItemType Directory -Path $approvedDir | Out-Null
+    }
+
+    Get-ChildItem -Path $plansDir -Filter "*.md" -File | ForEach-Object {
+        $content = Get-Content $_.FullName -Raw
+        if ($content -match '\[Approved\]') {
+            $dest = Join-Path $approvedDir $_.Name
+            Move-Item -Path $_.FullName -Destination $dest -Force
+            Write-Host "Approved plan moved to: $dest" -ForegroundColor Green
+        }
+    }
+}
+
 function CollectArgs {
     param(
         [string[]]$Arguments,
