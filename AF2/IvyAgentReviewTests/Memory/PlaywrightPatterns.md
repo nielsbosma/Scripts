@@ -6,12 +6,13 @@ This document contains common patterns and solutions for generating robust Playw
 
 1. [ES Module Setup](#es-module-setup)
 2. [Common Ivy Widget Locators](#common-ivy-widget-locators)
-3. [Callout Component Rendering](#callout-component-rendering)
-4. [External API Error Handling](#external-api-error-handling)
-5. [Test Structure Best Practices](#test-structure-best-practices)
-6. [CodeBlock Content Assertions](#codeblock-content-assertions)
-7. [Button Index Pitfalls](#button-index-pitfalls)
-8. [Windows Process Cleanup](#windows-process-cleanup)
+3. [TabsLayout DOM Rendering](#tabslayout-dom-rendering)
+4. [Callout Component Rendering](#callout-component-rendering)
+5. [External API Error Handling](#external-api-error-handling)
+6. [Test Structure Best Practices](#test-structure-best-practices)
+7. [CodeBlock Content Assertions](#codeblock-content-assertions)
+8. [Button Index Pitfalls](#button-index-pitfalls)
+9. [Windows Process Cleanup](#windows-process-cleanup)
 
 ---
 
@@ -338,6 +339,44 @@ await page.locator('button:has-text("Remove")').first().click();
 
 ---
 
+## TabsLayout DOM Rendering
+
+### Issue
+`Layout.Tabs()` renders ALL tab content to the DOM on initial load. Inactive tabs are hidden with CSS (`display: none` or similar), but their DOM elements remain present.
+
+### Problem
+Locators using `.first()` may match hidden elements from inactive tabs instead of visible elements on the active tab.
+
+### Solution
+Use `:visible` pseudo-class for any locator that targets content inside tabs.
+
+### Examples
+
+```typescript
+// BAD - matches hidden inputs from inactive tabs
+const input = page.locator('input[type="text"]').first();
+const checkbox = page.locator('[role="checkbox"]').first();
+const codeBlock = page.locator('pre code').first();
+
+// GOOD - only matches visible elements on active tab
+const input = page.locator('input[type="text"]:visible').first();
+const checkbox = page.locator('[role="checkbox"]:visible').first();
+const codeBlock = page.locator('pre code:visible').first();
+```
+
+### When to Apply
+Use `:visible` for ANY content-targeting locator when testing apps with multiple tabs:
+- Form inputs (text, number, file, etc.)
+- Checkboxes and radio buttons
+- Buttons within tab content
+- Code blocks, text areas, and other content displays
+- Any element that might appear in multiple tabs
+
+### When NOT Needed
+Navigation elements (tab buttons themselves) don't need `:visible` since they're always visible.
+
+---
+
 ## Callout Component Rendering
 
 ### Problem
@@ -606,6 +645,7 @@ test('feature test', async ({ page }) => {
 | FileInput | `page.locator('input[type="file"]')` | With custom previews, use `.first()` for text selectors |
 | Error Callout | `page.content().includes('Error text')` | More reliable than `getByText()` |
 | Heading | `page.getByRole('heading', { name: 'Text', exact: true })` | Avoids matching heading text in body content |
+| TabsLayout apps | Use `:visible` for content locators | `page.locator('input:visible').first()` |
 
 ---
 
@@ -694,6 +734,7 @@ If tests fail on first run, check these common issues:
 12. **FileInput with custom preview** → Use `.first()` for filename selectors to avoid strict mode violations from duplicate text
 13. **Button index wrong in multi-group layout** → Count ALL buttons on the page, not just within the target group; prefer scoped locators over `.nth()`
 14. **Zombie dotnet.exe processes on Windows** → Use `taskkill /F /T /PID` in `afterAll` instead of `serverProcess.kill()` (see [Windows Process Cleanup](#windows-process-cleanup))
+15. **Locator matches wrong element in tabbed app** → Add `:visible` pseudo-class to content locators; `Layout.Tabs()` renders all tab content to DOM with inactive tabs hidden via CSS (see [TabsLayout DOM Rendering](#tabslayout-dom-rendering))
 
 ---
 
@@ -728,3 +769,4 @@ This pattern ensures tests:
 2026-03-24 - Added Radix UI role-based selector pattern for Select dropdown click interception (GraphQL Countries test review)
 2026-03-24 - Added FileInput pattern with custom preview disambiguation for strict mode violations (ImageToPDFConverter test review)
 2026-03-24 - Added Windows Process Cleanup pattern to fix zombie dotnet.exe processes from afterAll hook (multiple sessions: PDFMerger, OTPGenerator)
+2026-03-24 - Added TabsLayout DOM Rendering pattern for :visible pseudo-class in tabbed apps (ASCIIArtGenerator test review)

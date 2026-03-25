@@ -97,9 +97,9 @@ if ($buildReportExists) {
     }
 }
 
-# --- Phase 2: Run ReviewLangfuse, ReviewSpec, ReviewTests in parallel ---
+# --- Phase 2a: Run ReviewLangfuse + ReviewSpec in parallel ---
 Write-Host ""
-Write-Host "=== Phase 2: ReviewLangfuse + ReviewSpec + ReviewTests (parallel) ===" -ForegroundColor Cyan
+Write-Host "=== Phase 2a: ReviewLangfuse + ReviewSpec (parallel) ===" -ForegroundColor Cyan
 
 $reviewLangfuseScript = Join-Path $PSScriptRoot "IvyAgentReviewLangfuse.ps1"
 $reviewSpecScript = Join-Path $PSScriptRoot "IvyAgentReviewSpec.ps1"
@@ -134,16 +134,6 @@ $jobs += Start-Job -Name "ReviewSpec" -ScriptBlock {
     }
     & pwsh -ExecutionPolicy Bypass -File $using:reviewSpecScript
 }
-$jobs += Start-Job -Name "ReviewTests" -ScriptBlock {
-    Set-Location $using:workDir
-    $ivyDir = Join-Path $using:workDir ".ivy"
-    $testsExist = (-not $using:Force) -and (Test-Path (Join-Path $ivyDir "review-tests.md")) -and (Test-Path (Join-Path $ivyDir "review-ux.md"))
-    if ($testsExist) {
-        Write-Host "Skipping ReviewTests — reports already exist" -ForegroundColor DarkGray
-        return
-    }
-    & pwsh -ExecutionPolicy Bypass -File $using:reviewTestsScript
-}
 
 Write-Host "Waiting for parallel jobs: $($jobs.Name -join ', ')..."
 $jobs | ForEach-Object {
@@ -154,6 +144,70 @@ $jobs | ForEach-Object {
     $output | ForEach-Object { Write-Host $_ }
 }
 $jobs | Remove-Job -Force
+
+# --- Phase 2b: Run ReviewTests (conditional on spec review) ---
+Write-Host ""
+Write-Host "=== Phase 2b: ReviewTests (conditional on spec review) ===" -ForegroundColor Cyan
+
+$ivyDir = Join-Path $workDir ".ivy"
+$specReviewPath = Join-Path $ivyDir "review-spec.md"
+$skipTests = $false
+
+if (Test-Path $specReviewPath) {
+    $specContent = Get-Content $specReviewPath -Raw
+    $impl = 0; $partial = 0; $missing = 0
+    if ($specContent -match '\|\s*Implemented\s*\|\s*(\d+)\s*\|') { $impl = [int]$Matches[1] }
+    if ($specContent -match '\|\s*Partial\s*\|\s*(\d+)\s*\|') { $partial = [int]$Matches[1] }
+    if ($specContent -match '\|\s*Missing\s*\|\s*(\d+)\s*\|') { $missing = [int]$Matches[1] }
+    $total = $impl + $partial + $missing
+    $implPercent = if ($total -gt 0) { [math]::Round(($impl + $partial) / $total * 100) } else { 0 }
+
+    if ($implPercent -lt 30) {
+        $skipTests = $true
+        Write-Host "Skipping ReviewTests — implementation is $implPercent% ($impl implemented, $partial partial, $missing missing; threshold: 30%)" -ForegroundColor Yellow
+
+        $projectName = Split-Path $workDir -Leaf
+
+        $stubTests = @"
+# Test Review: $projectName
+
+## Result
+
+⏭️ **SKIPPED** - Implementation below test threshold
+
+## Reason
+
+Spec review shows $implPercent% implementation ($impl implemented, $partial partial, $missing missing).
+Tests require at least 30% implementation to be meaningful.
+"@
+        $stubUx = @"
+# UX Review: $projectName
+
+## Result
+
+⏭️ **SKIPPED** - Implementation below test threshold
+
+## Reason
+
+Spec review shows $implPercent% implementation. UX review requires testable apps.
+"@
+        if (-not (Test-Path $ivyDir)) { New-Item -ItemType Directory -Path $ivyDir | Out-Null }
+        $stubTests | Set-Content (Join-Path $ivyDir "review-tests.md")
+        $stubUx | Set-Content (Join-Path $ivyDir "review-ux.md")
+    }
+}
+
+if (-not $skipTests) {
+    $testsExist = (-not $Force) -and (Test-Path (Join-Path $ivyDir "review-tests.md")) -and (Test-Path (Join-Path $ivyDir "review-ux.md"))
+    if ($testsExist) {
+        Write-Host "Skipping ReviewTests — reports already exist" -ForegroundColor DarkGray
+    } else {
+        & pwsh -ExecutionPolicy Bypass -File $reviewTestsScript
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Warning: ReviewTests exited with code $LASTEXITCODE" -ForegroundColor Yellow
+        }
+    }
+}
 
 # --- Generate summary.yaml from langfuse data ---
 $langfuseDir = Join-Path $workDir ".ivy" "sessions" $sessionId "langfuse"

@@ -22,7 +22,7 @@ Read about the important paths and files in ../.shared/Paths.md
 - If not, report the error and stop
 - Identify the project name from the `.csproj` filename
 
-Run the following  to describe what Apps a project contains.
+Run the following to describe what Apps a project contains.
 
 > dotnet run --describe
 apps:
@@ -50,6 +50,33 @@ services:
   implementationType: Ivy.ThemeService
   lifetime: Singleton
   description:
+
+**Early exit check**: After running `dotnet run --describe`, examine the apps list. If the only apps present are system apps (`$error-not-found`, `$chrome`), or if `dotnet run --describe` fails (build errors, no project), there is nothing to test. In this case:
+1. Write a stub `.ivy/review-tests.md`:
+   ```markdown
+   # Test Review: [Project Name]
+
+   ## Result
+
+   ❌ **CANNOT TEST** - No apps to test
+
+   ## Issue
+
+   The project contains no testable application code. Only system apps were detected.
+   ```
+2. Write a stub `.ivy/review-ux.md`:
+   ```markdown
+   # UX Review: [Project Name]
+
+   ## Result
+
+   ❌ **CANNOT REVIEW** - No apps to review
+
+   ## Issue
+
+   No testable apps detected. UX review requires running applications.
+   ```
+3. Stop execution — do not proceed to test generation or later steps.
 
 
 ### 3. Collect Project Source
