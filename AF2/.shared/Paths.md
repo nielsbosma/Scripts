@@ -84,3 +84,10 @@ D:\Repos\_Personal\Scripts\AF2\.vscode-extensions
 # Test Manager
 
  D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Test.Manager
+
+ # Tendril 
+
+Tools for managing our plan and harness engineering. 
+
+ D:\Repos\_Ivy\Ivy-Tendril\
+
