@@ -281,10 +281,15 @@ await slider.press('ArrowLeft');  // Decrement by step
 // Text buttons
 await page.getByRole('button', { name: 'Submit' }).click();
 
-// Buttons with .Url() (renders as link-wrapped button)
-await page.getByText('Download PDF').click();
-// OR
+// Buttons with .Url() - state-dependent rendering
+// When enabled: renders as <a href="...">
 await page.locator('a:has-text("Download PDF")').click();
+
+// When disabled: renders as <button disabled>
+await page.locator('button:has-text("Download PDF")').click();
+
+// Universal locator (works for both enabled and disabled states)
+await page.getByText('Download PDF').click();
 
 // Icon-only buttons (no accessible name)
 await page.locator('button:has(svg)').first().click();
@@ -293,9 +298,38 @@ await page.locator('button:has(svg)').first().click();
 await page.getByRole('button', { name: 'C', exact: true }).click();
 ```
 
+#### Button with .Url() Rendering Inconsistency
+
+**Problem**: Button components with `.Url()` render differently depending on their disabled state:
+- **Enabled state**: Renders as `<a href="...">` (anchor tag)
+- **Disabled state**: Renders as `<button disabled>` (button element)
+
+This inconsistency affects test locator selection.
+
+**Solution**: Use state-agnostic locators that work regardless of enabled/disabled state:
+
+```typescript
+// ✅ Best: Text-based locator works for both states
+await page.getByText('Download PDF').click();
+
+// ✅ Alternative: Check element state and use appropriate locator
+const enabledButton = page.locator('a:has-text("Download PDF")');
+const disabledButton = page.locator('button:has-text("Download PDF")');
+const button = await enabledButton.count() > 0 ? enabledButton : disabledButton;
+await button.click();
+
+// ❌ Bad: Assumes always enabled (fails when disabled)
+await page.locator('a:has-text("Download PDF")').click();
+
+// ❌ Bad: Assumes always disabled (fails when enabled)
+await page.locator('button:has-text("Download PDF")').click();
+```
+
 #### Key Points
-- Buttons with `.Url()` render as anchor tags wrapping button elements
-- Use `getByText()` or `locator('a:has-text(...)')` instead of `getByRole('button')` for URL buttons
+- Buttons with `.Url()` render as `<a>` when enabled, `<button>` when disabled
+- Prefer `getByText()` for universal locators that work in both states
+- If targeting by element type, check state first or use conditional logic
+- This inconsistency can cause test failures when button state changes
 
 ---
 
