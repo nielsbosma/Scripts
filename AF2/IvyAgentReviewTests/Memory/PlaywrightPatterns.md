@@ -360,6 +360,71 @@ await expect(page.locator('input[type="file"]')).toBeVisible();
 - File upload functionality works regardless of visibility
 - If the app uses `.ToFileInput()`, the input is wrapped in a custom component but remains hidden
 
+#### Creating Valid Test Images
+
+When testing apps that handle image uploads and display previews, you must create **valid, browser-renderable** PNG files. Invalid PNGs will show as broken image icons in the app UI.
+
+> **Do NOT manually construct PNG bytes without zlib compression** — browsers cannot decode raw pixel data in IDAT chunks. Always use `zlib.deflateSync()` and proper CRC32 checksums.
+
+```typescript
+import zlib from 'zlib';
+
+function createTestImage(width: number, height: number, r = 100, g = 149, b = 237): Buffer {
+  // Build raw scanlines: filter byte (0) + RGB pixels per row
+  const rawData = Buffer.alloc(height * (1 + width * 3));
+  for (let y = 0; y < height; y++) {
+    rawData[y * (1 + width * 3)] = 0; // no filter
+    for (let x = 0; x < width; x++) {
+      const offset = y * (1 + width * 3) + 1 + x * 3;
+      rawData[offset] = r;
+      rawData[offset + 1] = g;
+      rawData[offset + 2] = b;
+    }
+  }
+
+  const compressed = zlib.deflateSync(rawData);
+
+  function crc32(buf: Buffer): number {
+    let crc = 0xFFFFFFFF;
+    for (const byte of buf) {
+      crc ^= byte;
+      for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function chunk(type: string, data: Buffer): Buffer {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const typeAndData = Buffer.concat([Buffer.from(type), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(typeAndData));
+    return Buffer.concat([len, typeAndData, crc]);
+  }
+
+  const ihdrData = Buffer.alloc(13);
+  ihdrData.writeUInt32BE(width, 0);
+  ihdrData.writeUInt32BE(height, 4);
+  ihdrData.writeUInt8(8, 8);  // bit depth
+  ihdrData.writeUInt8(2, 9);  // RGB
+  ihdrData.writeUInt8(0, 10); // compression
+  ihdrData.writeUInt8(0, 11); // filter
+  ihdrData.writeUInt8(0, 12); // interlace
+
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+    chunk('IHDR', ihdrData),
+    chunk('IDAT', compressed),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+// Usage:
+const testImage = createTestImage(100, 100);           // Blue 100x100 image
+const redImage = createTestImage(150, 150, 255, 0, 0); // Red 150x150 image
+fs.writeFileSync(path.resolve(__dirname, 'test-image-1.png'), testImage);
+```
+
 #### Custom Preview Disambiguation
 
 When FileInput is used with custom preview UI (e.g., image cards showing thumbnails and filenames), uploaded filenames appear in multiple DOM locations. This causes strict mode violations when selecting by text.

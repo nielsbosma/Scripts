@@ -8,8 +8,8 @@
 
 ## Common Gitignore Patterns
 
-- **.ivy/ directories**: Ivy Agent session debug logs. Should be gitignored across all repos. Fixed in Ivy-Agent (run 00020) and Ivy-Framework (run 00020).
-- **tmp_out/ directories**: Temporary output directories in Ivy-Framework. Gitignored as of run 00020.
+- **.ivy/ directories**: Ivy Agent session debug logs. Should be gitignored across all repos. Fixed in Ivy-Agent (run 00020) and Ivy-Framework root (run 00020). Note: subdirectories like `src/Ivy.Agent.Filter/`, `src/Ivy.Analyser/`, `src/Ivy/` may generate new `.ivy/` dirs — added glob patterns `.ivy/` and `**/tmp_out/` to `src/.gitignore` in run 00021.
+- **tmp_out/ directories**: Temporary output directories in Ivy-Framework. Gitignored as of run 00020. Extended glob in run 00021.
 
 ## Cross-Repo Namespace Migration
 
@@ -19,7 +19,9 @@
 - **VBCSCompiler file locks**: `dotnet build` frequently fails on first attempt due to VBCSCompiler holding locks on DLLs. Retry usually succeeds. Consider killing VBCSCompiler processes before building.
 - **Process file locks**: Running Ivy.Agent.Server, Ivy.Docs, or other dotnet processes can lock DLLs preventing builds. Kill them before building using PowerShell `Stop-Process` (bash `taskkill` can timeout). Ivy.Docs can spawn many instances (14+).
 - **Microsoft Defender locks**: Defender can temporarily lock DLLs during builds. Retry usually succeeds.
-- **Stale generated docs files**: Ivy-Framework's `Ivy.Docs.Shared/Generated/` can contain stale `.g.cs` files referencing types that no longer exist (e.g., GaugeChart, SignatureInput). Delete the `Generated/` folder before rebuilding to fix. The folder is regenerated during build.
+- **Stale generated docs files**: Ivy-Framework's `Ivy.Docs.Shared/Generated/` can contain stale `.g.cs` files referencing types that no longer exist (e.g., GaugeChart, SignatureInput). Delete the `Generated/` folder before rebuilding to fix. The folder is regenerated during build. Note: the docs generator cannot handle `demo-tabs`/`demo-below` code blocks with variable declarations (statements) — only single expressions work in the inline `new Box().Content(...)` wrapper.
+- **`vp` command not found**: Ivy-Framework frontend build uses `vp install` / `vp run build` (a Volta-based tool). When `vp` is unavailable, manually run `pnpm install` + `pnpm run build` in `src/frontend/`, then `touch src/frontend/dist/.build-stamp` and `touch src/frontend/node_modules/.modules.yaml` to satisfy MSBuild's incremental build checks. The stamp must be re-touched whenever source files change.
+- **Ivy-Mcp NuGet vs project refs**: Ivy-Mcp.Api.Demo references `Ivy` via NuGet package, not project reference. API renames in Ivy-Framework (e.g., ChromeSettings→AppShellSettings) won't be available until a new NuGet is published. Don't rename API calls in repos using NuGet until the package is updated.
 - **Security vulnerabilities**: NuGet packages may have known vulnerabilities that cause build failures with `-warnaserror`. Check `dotnet list package --outdated` and update vulnerable packages. Fixed: Scriban 6.6.0 → 7.0.3 in Ivy-Mcp (run 00020).
 
 ## Build Strategy
