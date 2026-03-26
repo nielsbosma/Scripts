@@ -15,7 +15,8 @@ if (-not $resolved) {
 }
 
 # Move plan to updating/
-$updatingDir = Join-Path (Split-Path $resolved.Path) "updating"
+$plansRoot = "D:\Repos\_Ivy\.plans"
+$updatingDir = Join-Path $plansRoot "updating"
 if (-not (Test-Path $updatingDir)) {
     New-Item -ItemType Directory -Path $updatingDir | Out-Null
 }

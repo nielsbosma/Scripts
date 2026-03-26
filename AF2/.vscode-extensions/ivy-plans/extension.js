@@ -48,7 +48,8 @@ function activate(context) {
             const terminal = vscode.window.createTerminal({ name: 'Update Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\UpdatePlan.ps1" "${uri.fsPath}"`);
-            await openNextPlan(path.dirname(uri.fsPath), path.basename(uri.fsPath));
+            const plansRoot = 'D:\\Repos\\_Ivy\\.plans';
+            await openNextPlan(plansRoot, path.basename(uri.fsPath));
         })
     );
 
@@ -63,7 +64,8 @@ function activate(context) {
             const terminal = vscode.window.createTerminal({ name: 'Expand Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\ExpandPlan.ps1" "${uri.fsPath}"`);
-            await openNextPlan(path.dirname(uri.fsPath), path.basename(uri.fsPath));
+            const plansRoot = 'D:\\Repos\\_Ivy\\.plans';
+            await openNextPlan(plansRoot, path.basename(uri.fsPath));
         })
     );
 
@@ -110,7 +112,8 @@ function activate(context) {
             const terminal = vscode.window.createTerminal({ name: 'Split Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\SplitPlan.ps1" "${uri.fsPath}"`);
-            await openNextPlan(path.dirname(uri.fsPath), path.basename(uri.fsPath));
+            const plansRoot = 'D:\\Repos\\_Ivy\\.plans';
+            await openNextPlan(plansRoot, path.basename(uri.fsPath));
         })
     );
 

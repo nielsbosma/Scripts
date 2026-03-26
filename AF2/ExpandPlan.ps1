@@ -15,7 +15,8 @@ if (-not $resolved) {
 }
 
 # Move plan to expanding/
-$expandingDir = Join-Path (Split-Path $resolved.Path) "expanding"
+$plansRoot = "D:\Repos\_Ivy\.plans"
+$expandingDir = Join-Path $plansRoot "expanding"
 if (-not (Test-Path $expandingDir)) {
     New-Item -ItemType Directory -Path $expandingDir | Out-Null
 }
