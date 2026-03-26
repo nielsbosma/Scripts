@@ -84,5 +84,6 @@ The expanded plan should:
 - If research reveals the problem is already solved or doesn't exist, note that clearly in the expanded plan
 - Preserve all verification steps and test requirements
 - **When referencing local files in expanded plans, use markdown links: `[FileName.cs](file:///path/to/FileName.cs)`**
+- **When referencing screenshots or images in plans, use markdown image syntax: `![description](file:///D:/Screenshots/2026-03-26_05-30_3.png)` or clickable link syntax: `[2026-03-26_05-30_3.png](file:///D:/Screenshots/2026-03-26_05-30_3.png)`. Both formats work in VS Code - image syntax renders inline, link syntax is clickable.**
 - Keep the plan self-contained with all paths and information for an LLM coding agent
 - Do NOT modify any source code — only read files and transform the plan

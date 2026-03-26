@@ -6,6 +6,11 @@
 - **Ivy (connections.slnx)**: Auto-generated Vercel client has lowercase type names triggering CS8981. Suppressed in csproj NoWarn as of run 00009.
 - **Scripts**: No .slnx files to build. Only needs git sync.
 
+## Common Gitignore Patterns
+
+- **.ivy/ directories**: Ivy Agent session debug logs. Should be gitignored across all repos. Fixed in Ivy-Agent (run 00020) and Ivy-Framework (run 00020).
+- **tmp_out/ directories**: Temporary output directories in Ivy-Framework. Gitignored as of run 00020.
+
 ## Cross-Repo Namespace Migration
 
 - **Ivy.Shared → Ivy**: Types in `Ivy-Framework/src/Ivy/Shared/` are being migrated from `namespace Ivy.Shared` to `namespace Ivy` (with `// ReSharper disable once CheckNamespace`). This affects downstream repos (Ivy-Mcp, Ivy) that `using Ivy.Shared`. When syncing, check for CS0234 errors referencing `Ivy.Shared` and update to `using Ivy`.
@@ -15,6 +20,7 @@
 - **Process file locks**: Running Ivy.Agent.Server, Ivy.Docs, or other dotnet processes can lock DLLs preventing builds. Kill them before building using PowerShell `Stop-Process` (bash `taskkill` can timeout). Ivy.Docs can spawn many instances (14+).
 - **Microsoft Defender locks**: Defender can temporarily lock DLLs during builds. Retry usually succeeds.
 - **Stale generated docs files**: Ivy-Framework's `Ivy.Docs.Shared/Generated/` can contain stale `.g.cs` files referencing types that no longer exist (e.g., GaugeChart, SignatureInput). Delete the `Generated/` folder before rebuilding to fix. The folder is regenerated during build.
+- **Security vulnerabilities**: NuGet packages may have known vulnerabilities that cause build failures with `-warnaserror`. Check `dotnet list package --outdated` and update vulnerable packages. Fixed: Scriban 6.6.0 → 7.0.3 in Ivy-Mcp (run 00020).
 
 ## Build Strategy
 

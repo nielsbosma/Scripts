@@ -189,6 +189,7 @@
 - Instead, use `var client = UseService<IClientProvider>()` inside the `Build()` method
 - **`UseDefaultApp(type)` does NOT register the app** — it only sets `DefaultAppId`. You MUST also call `server.AddAppsFromAssembly()` (or `server.AddApp(type)`) to scan and register `[App]`-attributed classes. Without this, the server returns "No serviceable apps are registered" at runtime.
 - `waitForServer` should accept ANY HTTP response (not just 200) — Ivy root URL may redirect (302) to the default app, so checking only for status 200 will cause timeout
+- **Sub-view classes MUST extend `ViewBase`** — custom classes used with the `|` layout operator (e.g., `Layout.Grid() | new MyMetricView(args)`) must inherit from `ViewBase` and override `Build()`. Plain classes with a `Build()` method that returns a widget (like `MetricView`) will render as `ToString()` (the fully qualified class name) instead of their widget content. This is a common code generation bug — if screenshots show raw class names like "Namespace.ClassName", check that the class extends `ViewBase`.
 
 ## Card Component
 

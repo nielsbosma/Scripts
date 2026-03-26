@@ -216,9 +216,11 @@ This ensures any issues discovered during testing have a tracked resolution path
 ### Rules
 
 - **!CRITICAL: Every MakePlan execution MUST produce at least one plan file. Even if the task is an analysis, review, or investigation — always create a plan with actionable steps. Never just analyze and report back without a plan.**
+- **!IMPORTANT: Plans should rarely propose changes to `AGENTS.md` or Persona `.md` files (e.g. files in `Ivy.Agent\Agents\Personas\Prompts\`). These files are read by all flows and must remain tight and handcrafted. Instead, look for a workflow file, analyser, tool instruction, or other targeted file to modify.**
 - The plan must include all paths and information for an LLM coding agent to execute end-to-end without human intervention
 - Keep the plan short and concise
 - **When referencing local files, folders, or screenshots in plans, use markdown links with the filename as display text: `[Button.cs](file:///D:/Repos/_Ivy/Ivy-Framework/src/Ivy/Widgets/Button.cs)`. This allows the user to open files directly in VS Code by clicking the link while keeping plans readable.**
+- **When referencing screenshots or images in plans, use markdown image syntax: `![description](file:///D:/Screenshots/2026-03-26_05-30_3.png)` or clickable link syntax: `[2026-03-26_05-30_3.png](file:///D:/Screenshots/2026-03-26_05-30_3.png)`. Both formats work in VS Code - image syntax renders inline, link syntax is clickable.**
 - **!IMPORTANT: ONE issue per plan file — if multiple issues, create multiple plan files with separate IDs**
 - **!CRITICAL: This agent is READ-ONLY for all source code. You must NEVER use Edit, Write, or Bash to create, modify, or delete any file outside `D:\Repos\_Ivy\.plans\`. The ONLY writable paths are:**
   - `D:\Repos\_Ivy\.plans\*.md` (plan files)
