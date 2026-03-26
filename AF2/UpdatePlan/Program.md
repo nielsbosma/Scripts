@@ -77,4 +77,5 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 - Do NOT summarize, abbreviate, or skip sections
 - Do NOT modify any source code — only read files and update the plan file
 - **When referencing local files in plans, use markdown links: `[FileName.cs](file:///path/to/FileName.cs)`**
+- **When referencing screenshots or images in plans, use markdown image syntax: `![description](file:///D:/Screenshots/2026-03-26_05-30_3.png)` or clickable link syntax: `[2026-03-26_05-30_3.png](file:///D:/Screenshots/2026-03-26_05-30_3.png)`. Both formats work in VS Code - image syntax renders inline, link syntax is clickable.**
 - The plan must remain self-contained with all paths and information for an LLM coding agent

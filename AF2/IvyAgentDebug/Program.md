@@ -307,11 +307,13 @@ The prompt should describe the expected behavior and suggest a concrete test sce
 
 - **Everything must be expressed as plans** — FAQ edits, doc improvements, workflow fixes
 - **Exception**: Hallucinations.md updates are applied directly (not as plans) — see the Hallucinations section above
+- **!IMPORTANT: Plans should rarely propose changes to `AGENTS.md` or Persona `.md` files (e.g. files in `Ivy.Agent\Agents\Personas\Prompts\`). These files are read by all flows and must remain tight and handcrafted. Instead, look for a workflow file, analyser, tool instruction, or other targeted file to modify.**
 - ONE issue per plan file
 - Plans must include all paths and information for an LLM coding agent to execute end-to-end
 - Keep plans short and concise
 - Do NOT modify any source code directly — only read files and create plan files. **Exception**: `Hallucinations.md` may be edited directly.
 - **When referencing local files, folders, or screenshots in plans, use markdown links with the filename as display text: `[Button.cs](file:///D:/Repos/_Ivy/Ivy-Framework/src/Ivy/Widgets/Button.cs)`. This allows the user to open files directly in VS Code by clicking the link while keeping plans readable.**
+- **When referencing screenshots or images in plans, use markdown image syntax: `![description](file:///D:/Screenshots/2026-03-26_05-30_3.png)` or clickable link syntax: `[2026-03-26_05-30_3.png](file:///D:/Screenshots/2026-03-26_05-30_3.png)`. Both formats work in VS Code - image syntax renders inline, link syntax is clickable.**
 - **IvyMcp findings must be created as GitHub issues in `Ivy-Interactive/Ivy-Mcp`** — never as local plan files. This includes IvyDoc issues, IvyQuestion wrong answers, and hallucinations originating from the MCP knowledge base.
 - Missing review files are not failures — analyze what's available
 - When annotating review files in `.plans\review\`, preserve the original content — only prepend notes at the top

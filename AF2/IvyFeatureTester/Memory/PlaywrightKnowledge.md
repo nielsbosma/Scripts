@@ -4,7 +4,7 @@
 
 - Ivy apps are .NET web apps started with `dotnet run -- --port <port>`
 - The frontend client is in `src/frontend/` and built with `vp build` into `src/frontend/dist/`. These assets are embedded into the Ivy.dll via `<EmbeddedResource>`. If testing a commit that changed frontend `.ts` files, you MUST rebuild the frontend (`cd src/frontend && vp build`) before running the dotnet project, otherwise the old bundled JS is served.
-- If `vp build` fails due to pre-existing TS errors in unrelated files, run vite directly: `node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build` — this skips tsc and still produces a working bundle.
+- If `vp build` fails due to pre-existing TS errors in unrelated files, run vite directly: `npx vite build` — this skips tsc and still produces a working bundle. (Note: `node ./node_modules/vite/bin/vite.js` may fail with MODULE_NOT_FOUND if vite is hoisted; use `npx` instead)
 - The server prints `Ivy is running on http://localhost:<port>` when ready
 - Apps are decorated with `[App(icon: Icons.X, path: ["Apps"])]` and inherit `ViewBase`
 - The `Build()` method returns the UI tree
@@ -764,3 +764,39 @@ In headless mode with File System Access API disabled, the save dialog uses `<a 
 - **Range inputs use tuple state, not two separate states**: `UseState<(DateOnly?, DateOnly?)>()` and `UseState<(int, int)>()` are required for `ToDateRangeInput()` and `ToNumberRangeInput()` — these extend `IAnyState`, not tuples of individual states.
 - **Multi-select List variant**: Uses `button[role="checkbox"]` elements. When the same option labels appear in multiple sections (radio, toggle, checkbox), use role-based locators rather than text-based ones to target the correct section.
 - **Optimistic rendering verification**: The `useOptimisticValue` hook provides instant feedback. Tests can use short waits (300-500ms) after interactions rather than waiting for server round-trip. Rapid interaction tests (6 toggles in ~1s) work reliably.
+
+### 2026-03-26 — LineChart Empty Render Bug (LineChartBuilder with ToLineChart)
+- **Canvas presence ≠ visual content**: Charts can have valid canvas elements (correct dimensions, `data-chart-rendered="true"`) but render completely empty
+- **Bug pattern (RESOLVED)**: `data.ToLineChart().Dimension().Measure()` produced empty charts with non-string dimensions (integer years). Two root causes:
+  1. `generateDataProps` in `sharedUtils.ts` assumed string-typed dimension keys → fixed in `bbcf22ff`
+  2. `generateSeries` used case-sensitive dataKey matching — Ivy JSON serializer camelCases dictionary keys (`"count"`) but Line.dataKey preserves PascalCase (`"Count"`) → fixed in `30fb6214`
+- **Chart debugging technique**: Extract LineChartWidget React props via fiber tree to inspect actual data sent from backend. Look at data key casing vs Line/Bar config dataKey casing
+- **Test limitation**: Checking for canvas element existence and `data-chart-rendered` attribute is insufficient — axes/gridlines alone produce enough non-white pixels. Verify actual series rendering by inspecting React fiber props or using more targeted pixel sampling
+- **Silent failure pattern**: No console errors, no backend exceptions when chart series are empty — ECharts renders axes/grid but no lines. Always visually verify screenshots
+- **Case sensitivity pattern**: When charts show axes/labels but no data lines, suspect dataKey case mismatch between serialized data keys and chart config dataKey values. AreaChart, PieChart, FunnelChart already use case-insensitive matching; LineChart and BarChart now do too
+- 11 apps tested (5/10/15/20 items × Default/Dashboard + StringDimension + EmptyData + MultiStyle), 12 tests all pass
+- Project location: `D:\Temp\IvyFeatureTester\2026-03-26\LineChartEmptyRenderBug\`
+
+### 2026-03-26 — Markdown Widget Local Image Support (FIXED and Re-Tested Successfully)
+- **Initial Test (Pre-Fix)**: Commit 1e799a56 added `.DangerouslyAllowLocalFiles()` but feature was NOT working - images showed `src="http://localhost:PORT/ivy/#"` instead of `file://` URLs
+- **Root Cause**: The `urlTransform` callback in MarkdownRenderer.tsx was stripping out file:// URLs before they reached the img component
+- **Fix Applied (Commit 9906a883)**: Updated urlTransform to check `dangerouslyAllowLocalFiles` flag and preserve file:// URLs and Windows paths when enabled
+- **Re-Test Result**: ✅ **ALL 18/18 tests passed** - fix confirmed working
+- **CRITICAL LESSON**: Frontend rebuild is MANDATORY when testing frontend commits. The first test failed because the dist was built BEFORE the fix commit. After `npx vite build`, all tests passed.
+- **How the fix works**:
+  1. Checks `dangerouslyAllowLocalFiles` flag in urlTransform
+  2. If enabled AND URL is `file://` or Windows path → preserves/converts it
+  3. Windows paths (C:\... or C:/...) are converted to `file:///C:/...` format
+  4. Backslashes are normalized to forward slashes
+  5. Default behavior (blocking) is maintained for security
+- **Browser file:// restrictions**: Modern browsers block file:// URL loading in web context (error: "Not allowed to load local resource"). This is EXPECTED and NOT a bug. The important verification is that the `src` attribute contains the correct file:// URL - the browser security warning is normal.
+- **URL format test results**:
+  - file:// URLs: ✅ Preserved (e.g., `file:///C:/Windows/System32/shell32.dll`)
+  - Windows backslash paths: ✅ Converted to file:/// format
+  - Windows forward slash paths: ✅ Converted to file:/// format
+  - HTTP/HTTPS URLs: ✅ Pass through unchanged
+  - Relative paths: ✅ Pass through unchanged
+  - Data URIs: ⚠️ Appear to be blocked (may be intentional)
+- **Security default verified**: Without `.DangerouslyAllowLocalFiles()`, local file paths are correctly blocked and converted to `#`
+- **Test artifacts**: 4 apps (FileUrlsApp, WindowsPathsApp, SecurityDefaultApp, EdgeCasesApp), 18 tests, 20+ screenshots, 18 videos
+- **Project location**: `D:\Temp\IvyFeatureTester\2026-03-26\MarkdownLocalImagesFixRetest\`

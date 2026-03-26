@@ -281,10 +281,15 @@ await slider.press('ArrowLeft');  // Decrement by step
 // Text buttons
 await page.getByRole('button', { name: 'Submit' }).click();
 
-// Buttons with .Url() (renders as link-wrapped button)
-await page.getByText('Download PDF').click();
-// OR
+// Buttons with .Url() - state-dependent rendering
+// When enabled: renders as <a href="...">
 await page.locator('a:has-text("Download PDF")').click();
+
+// When disabled: renders as <button disabled>
+await page.locator('button:has-text("Download PDF")').click();
+
+// Universal locator (works for both enabled and disabled states)
+await page.getByText('Download PDF').click();
 
 // Icon-only buttons (no accessible name)
 await page.locator('button:has(svg)').first().click();
@@ -293,23 +298,66 @@ await page.locator('button:has(svg)').first().click();
 await page.getByRole('button', { name: 'C', exact: true }).click();
 ```
 
+#### Button with .Url() Rendering Inconsistency
+
+**Problem**: Button components with `.Url()` render differently depending on their disabled state:
+- **Enabled state**: Renders as `<a href="...">` (anchor tag)
+- **Disabled state**: Renders as `<button disabled>` (button element)
+
+This inconsistency affects test locator selection.
+
+**Solution**: Use state-agnostic locators that work regardless of enabled/disabled state:
+
+```typescript
+// ✅ Best: Text-based locator works for both states
+await page.getByText('Download PDF').click();
+
+// ✅ Alternative: Check element state and use appropriate locator
+const enabledButton = page.locator('a:has-text("Download PDF")');
+const disabledButton = page.locator('button:has-text("Download PDF")');
+const button = await enabledButton.count() > 0 ? enabledButton : disabledButton;
+await button.click();
+
+// ❌ Bad: Assumes always enabled (fails when disabled)
+await page.locator('a:has-text("Download PDF")').click();
+
+// ❌ Bad: Assumes always disabled (fails when enabled)
+await page.locator('button:has-text("Download PDF")').click();
+```
+
 #### Key Points
-- Buttons with `.Url()` render as anchor tags wrapping button elements
-- Use `getByText()` or `locator('a:has-text(...)')` instead of `getByRole('button')` for URL buttons
+- Buttons with `.Url()` render as `<a>` when enabled, `<button>` when disabled
+- Prefer `getByText()` for universal locators that work in both states
+- If targeting by element type, check state first or use conditional logic
+- This inconsistency can cause test failures when button state changes
 
 ---
 
 ### FileInput
 
-#### Pattern
-```typescript
-// Basic file upload
-const fileInput = page.locator('input[type="file"]');
-await fileInput.setInputFiles('path/to/file.png');
+#### Problem
+File inputs (`<input type="file">`) are hidden by default in HTML. Attempts to verify visibility with `.toBeVisible()` will fail even though the input is functional.
 
-// Wait for upload to complete
-await page.waitForTimeout(1000);
+#### Solution
+Use `.toHaveCount(1)` to verify the input exists without checking visibility:
+
+```typescript
+// ✅ Good: Verify file input exists
+await expect(page.locator('input[type="file"]')).toHaveCount(1);
+
+// Uploading still works normally
+const fileInput = page.locator('input[type="file"]');
+await fileInput.setInputFiles('/path/to/file.csv');
+
+// ❌ Bad: Trying to check visibility (will timeout)
+await expect(page.locator('input[type="file"]')).toBeVisible();
 ```
+
+#### Key Points
+- File inputs are hidden by default in browser implementations
+- Use `.toHaveCount(1)` or `.toBeAttached()` instead of `.toBeVisible()`
+- File upload functionality works regardless of visibility
+- If the app uses `.ToFileInput()`, the input is wrapped in a custom component but remains hidden
 
 #### Custom Preview Disambiguation
 
@@ -330,12 +378,6 @@ await page.getByText('test-image-1.png').first().click();
 await page.locator('.card:has-text("test-image-1.png")').click();
 await page.locator('button:has-text("Remove")').first().click();
 ```
-
-#### Key Points
-- FileInput with custom previews creates duplicate text in the DOM
-- Use `.first()` to disambiguate when selecting by filename
-- Prefer structural selectors (role, test IDs) over text matching when possible
-- For Remove buttons in preview cards, use position or structural locators
 
 ---
 
@@ -642,7 +684,7 @@ test('feature test', async ({ page }) => {
 | Button (icon) | `page.locator('button:has(svg)').first()` | No accessible name |
 | CodeBlock | Split into fragments, use `.includes()` | Syntax highlighting spans break exact matches |
 | SelectInput (Radix option) | `page.getByRole('option', { name: /Text/ })` | Use when `getByText()` is intercepted by Radix popper |
-| FileInput | `page.locator('input[type="file"]')` | With custom previews, use `.first()` for text selectors |
+| FileInput | `page.locator('input[type="file"]')` | Use `.toHaveCount(1)`, NOT `.toBeVisible()` |
 | Error Callout | `page.content().includes('Error text')` | More reliable than `getByText()` |
 | Heading | `page.getByRole('heading', { name: 'Text', exact: true })` | Avoids matching heading text in body content |
 | TabsLayout apps | Use `:visible` for content locators | `page.locator('input:visible').first()` |
@@ -735,6 +777,7 @@ If tests fail on first run, check these common issues:
 13. **Button index wrong in multi-group layout** → Count ALL buttons on the page, not just within the target group; prefer scoped locators over `.nth()`
 14. **Zombie dotnet.exe processes on Windows** → Use `taskkill /F /T /PID` in `afterAll` instead of `serverProcess.kill()` (see [Windows Process Cleanup](#windows-process-cleanup))
 15. **Locator matches wrong element in tabbed app** → Add `:visible` pseudo-class to content locators; `Layout.Tabs()` renders all tab content to DOM with inactive tabs hidden via CSS (see [TabsLayout DOM Rendering](#tabslayout-dom-rendering))
+16. **File input visibility check fails** → Use `.toHaveCount(1)` instead of `.toBeVisible()`
 
 ---
 
@@ -758,6 +801,7 @@ This pattern ensures tests:
 
 ## Last Updated
 
+2026-03-25 - Added FileInput visibility pattern to prevent `.toBeVisible()` failures on hidden file inputs (ClosedXML-Excel-Exporter test review)
 2026-03-24 - Added Multi-Select Toggle variant pattern and common adjustment for toggle/combobox confusion (SeattleWeather test review)
 2026-03-24 - Corrected SelectInput Toggle variant to use `role="radio"` instead of `role="button"` (ReadingTimeEstimator test review)
 2026-03-24 - Updated CodeInput pattern with critical state synchronization timing (XMLFormatterAndValidator test review)

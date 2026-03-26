@@ -64,4 +64,5 @@ Commit!
 - ONE issue per plan file
 - Keep each plan short and concise
 - **When referencing local files in split plans, use markdown links: `[FileName.cs](file:///path/to/FileName.cs)`**
+- **When referencing screenshots or images in plans, use markdown image syntax: `![description](file:///D:/Screenshots/2026-03-26_05-30_3.png)` or clickable link syntax: `[2026-03-26_05-30_3.png](file:///D:/Screenshots/2026-03-26_05-30_3.png)`. Both formats work in VS Code - image syntax renders inline, link syntax is clickable.**
 - Do NOT modify any source code — only read files and create plan files
