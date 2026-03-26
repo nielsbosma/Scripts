@@ -37,6 +37,8 @@ async function openNextPlan(plansDir, excludeFile) {
 }
 
 function activate(context) {
+    const plansRoot = 'D:\\Repos\\_Ivy\\.plans';
+
     // Update Plan - runs UpdatePlan.ps1 on the selected .md file
     context.subscriptions.push(
         vscode.commands.registerCommand('ivy.updatePlan', async (uri) => {
@@ -48,7 +50,6 @@ function activate(context) {
             const terminal = vscode.window.createTerminal({ name: 'Update Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\UpdatePlan.ps1" "${uri.fsPath}"`);
-            const plansRoot = 'D:\\Repos\\_Ivy\\.plans';
             await openNextPlan(plansRoot, path.basename(uri.fsPath));
         })
     );
@@ -64,7 +65,6 @@ function activate(context) {
             const terminal = vscode.window.createTerminal({ name: 'Expand Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\ExpandPlan.ps1" "${uri.fsPath}"`);
-            const plansRoot = 'D:\\Repos\\_Ivy\\.plans';
             await openNextPlan(plansRoot, path.basename(uri.fsPath));
         })
     );
@@ -78,9 +78,9 @@ function activate(context) {
             if (!uri) return;
             await saveAndClose(uri);
             const filePath = uri.fsPath;
-            const dir = path.dirname(filePath);
+            const sourceDir = path.dirname(filePath);
             const fileName = path.basename(filePath);
-            const approvedDir = path.join(dir, 'approved');
+            const approvedDir = path.join(plansRoot, 'approved');
 
             if (!fs.existsSync(approvedDir)) {
                 fs.mkdirSync(approvedDir, { recursive: true });
@@ -97,7 +97,7 @@ function activate(context) {
 
             fs.renameSync(filePath, dest);
             vscode.window.showInformationMessage(`Approved: ${fileName}`);
-            await openNextPlan(dir, fileName);
+            await openNextPlan(sourceDir, fileName);
         })
     );
 
@@ -112,7 +112,6 @@ function activate(context) {
             const terminal = vscode.window.createTerminal({ name: 'Split Plan', shellPath: 'pwsh' });
             terminal.show();
             terminal.sendText(`& "D:\\Repos\\_Personal\\Scripts\\AF2\\SplitPlan.ps1" "${uri.fsPath}"`);
-            const plansRoot = 'D:\\Repos\\_Ivy\\.plans';
             await openNextPlan(plansRoot, path.basename(uri.fsPath));
         })
     );
@@ -126,9 +125,9 @@ function activate(context) {
             if (!uri) return;
             await saveAndClose(uri);
             const filePath = uri.fsPath;
-            const dir = path.dirname(filePath);
+            const sourceDir = path.dirname(filePath);
             const fileName = path.basename(filePath);
-            const skippedDir = path.join(dir, 'skipped');
+            const skippedDir = path.join(plansRoot, 'skipped');
 
             if (!fs.existsSync(skippedDir)) {
                 fs.mkdirSync(skippedDir, { recursive: true });
@@ -145,7 +144,7 @@ function activate(context) {
 
             fs.renameSync(filePath, dest);
             vscode.window.showInformationMessage(`Skipped: ${fileName}`);
-            await openNextPlan(dir, fileName);
+            await openNextPlan(sourceDir, fileName);
         })
     );
 
@@ -166,7 +165,7 @@ function activate(context) {
             fs.writeFileSync(filePath, header + content, 'utf8');
 
             // Move to approved
-            const approvedDir = path.join(path.dirname(filePath), 'approved');
+            const approvedDir = path.join(plansRoot, 'approved');
             if (!fs.existsSync(approvedDir)) {
                 fs.mkdirSync(approvedDir, { recursive: true });
             }
@@ -200,7 +199,7 @@ function activate(context) {
             fs.writeFileSync(filePath, header + content, 'utf8');
 
             // Move to approved
-            const approvedDir = path.join(path.dirname(filePath), 'approved');
+            const approvedDir = path.join(plansRoot, 'approved');
             if (!fs.existsSync(approvedDir)) {
                 fs.mkdirSync(approvedDir, { recursive: true });
             }
