@@ -130,9 +130,15 @@ All questions asked during the session (IvyQuestion and WebFetch+AnswerAgent). U
 
 The tool returns a `Source` field: `IvyQuestion` (local doc lookup) or `AnswerAgent` (WebFetch question answered by LLM).
 
+**Tool output format**: Each question produces TWO rows with the same `ObservationFile`:
+1. **Request** row (`Direction=Request`): Contains the `Question` text; `Success`, `AnswerLength`, and `Error` fields are null
+2. **Response** row (`Direction=Response`): Contains `Success`, `AnswerLength`, and `Error` fields; `Question` field is null
+
+**Processing logic**: Group rows by `ObservationFile`. For each question, extract the `Question` text from the Request row and the status fields (`Success`, `AnswerLength`, `Error`) from the Response row.
+
 **Important**: Only label errors as "ToolFeedback" when an actual `EVENT_ToolFeedback` observation exists (with `input.feedback`). AnswerAgent failures are NOT ToolFeedback — they are LLM processing errors. Use the tool's `Success`/`Error` fields to determine status; do not infer status from other events in the timeline.
 
-**Status mapping**: A question is successful ONLY when the tool returns `Success=true` AND has answer content. ALL other cases — `Success=false`, no response, empty answer, error, timeout — are **failed**. Use only two statuses: `✅ Success` or `❌ Failed`. Do not use any other status (e.g., do not use "❓ No response").
+**Status mapping**: A question is successful ONLY when the Response row has `Success=true` (case-insensitive, as PowerShell returns boolean `True`/`False`) AND `AnswerLength > 0`. ALL other cases — `Success=false`, no Success value, `AnswerLength=0`, empty answer, error, timeout — are **failed**. Use only two statuses: `✅ Success` or `❌ Failed`. Do not use any other status like "❓ No response".
 
 ```markdown
 # IvyQuestion Log: {SessionId}
