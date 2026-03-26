@@ -777,6 +777,19 @@ In headless mode with File System Access API disabled, the save dialog uses `<a 
 - 11 apps tested (5/10/15/20 items × Default/Dashboard + StringDimension + EmptyData + MultiStyle), 12 tests all pass
 - Project location: `D:\Temp\IvyFeatureTester\2026-03-26\LineChartEmptyRenderBug\`
 
+### 2026-03-26 — Markdown OnLinkClick Event for All URLs
+- **Markdown OnLinkClick event now fires for ALL URL types** when handler is registered: http, https, app://, relative paths, root-relative paths, anchor links
+- **Without OnLinkClick handler**: links render normally without special handling (no target="_blank" added by framework)
+- **Event signature**: `OnLinkClick((string url) => { ... })` - must explicitly type parameter to disambiguate overload between `Action<Event<Markdown, string>>` and `Action<string>`
+- **Lambda overload ambiguity**: Markdown has multiple OnLinkClick overloads. Using untyped lambda `url => { }` causes CS0121 ambiguity error. Fix by explicitly typing: `(string url) => { }`
+- **Programmatic URL opening**: `client.OpenUrl(url)` can be called from OnLinkClick handler for custom navigation flows (e.g., confirmation dialogs, analytics tracking)
+- **Test pattern**: When markdown headings contain text matching link text (e.g., "HTTPS Link" in both H2 and `<a>`), use `getByRole('link', { name: 'HTTPS Link' })` instead of `getByText('HTTPS Link')` to avoid strict mode violations
+- **Heading + link text collision**: `getByText('Relative Link')` matches both `<h2>Relative Links</h2>` (partial match) and `<a>Relative Link</a>` — use role-based selectors for precision
+- **Test coverage**: Verified HTTP, HTTPS, custom protocols (app://), relative (./), root-relative (/), all work correctly
+- **Non-breaking change**: Existing Markdown widgets without OnLinkClick continue to work as before
+- 20 tests, all passed after 1 fix round (test selector fixes), no backend errors, logs clean
+- Project location: `D:\Temp\IvyFeatureTester\2026-03-26\MarkdownOnLinkClick\`
+
 ### 2026-03-26 — Markdown Widget Local Image Support (FIXED and Re-Tested Successfully)
 - **Initial Test (Pre-Fix)**: Commit 1e799a56 added `.DangerouslyAllowLocalFiles()` but feature was NOT working - images showed `src="http://localhost:PORT/ivy/#"` instead of `file://` URLs
 - **Root Cause**: The `urlTransform` callback in MarkdownRenderer.tsx was stripping out file:// URLs before they reached the img component
