@@ -116,9 +116,8 @@ $content
     $firmware = Get-Content $PromptFile -Raw
     Remove-Item $PromptFile
 
-    $env:CLAUDECODE = $null
-    $env:CLAUDE_CODE_ENTRYPOINT = $null
-    claude --dangerously-skip-permissions @ExtraClaudeArgs -- $firmware
+    $agent = GetAgentCommandFromConfig
+    & $agent.Executable @($agent.Args) @ExtraClaudeArgs -- $firmware
 
     Pop-Location
     return $false
@@ -138,6 +137,32 @@ function MoveApprovedPlans {
             Move-Item -Path $_.FullName -Destination $dest -Force
             Write-Host "Approved plan moved to: $dest" -ForegroundColor Green
         }
+    }
+}
+
+function GetAgentCommandFromConfig {
+    $configPath = Join-Path (Split-Path $PSScriptRoot) "config.yaml"
+    $raw = "claude --print --output-format stream-json --dangerously-skip-permissions"
+
+    if (Test-Path $configPath) {
+        try {
+            $yaml = Get-Content $configPath -Raw
+            $pattern = "(?m)^agentCommand:\s*(.+)$"
+            $match = [regex]::Match($yaml, $pattern)
+            if ($match.Success) {
+                $raw = $match.Groups[1].Value.Trim()
+            }
+        }
+        catch {
+            Write-Host "Warning: Could not parse agentCommand from config.yaml" -ForegroundColor Yellow
+        }
+    }
+
+    # Split into executable and args
+    $parts = $raw -split '\s+', 2
+    return @{
+        Executable = $parts[0]
+        Args = if ($parts.Length -gt 1) { $parts[1] -split '\s+' } else { @() }
     }
 }
 
