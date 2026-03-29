@@ -584,6 +584,14 @@ Use `:visible` for ANY content-targeting locator when testing apps with multiple
 ### When NOT Needed
 Navigation elements (tab buttons themselves) don't need `:visible` since they're always visible.
 
+### TabsLayout Responsive Collapse
+When a `TabsLayout` has many tabs (6+), the tab bar collapses responsively — only the first 2 tabs are rendered as clickable text triggers; the rest are hidden behind a dropdown chevron. This causes:
+- `getByText('TabName', { exact: true }).first()` for collapsed tabs resolves to Badge elements in card content (same text) instead of the tab trigger
+- `getByRole('tab', { name: '...' })` does NOT work — Ivy tabs don't use `role="tab"`
+- The dropdown options have pointer interception issues (`<html>` intercepts)
+
+**Workaround**: Only test visible tabs directly (typically the first 2). For content behind collapsed tabs, use `page.content().includes()` assertions or verify via search filtering instead of tab navigation. Alternatively, accept limited tab coverage and note as a framework UX issue.
+
 ---
 
 ## Callout Component Rendering
@@ -947,6 +955,10 @@ If tests fail on first run, check these common issues:
 16. **File input visibility check fails** → Use `.toHaveCount(1)` instead of `.toBeVisible()`
 17. **CodeInput state not syncing to backend** → Add `await page.waitForTimeout(1000)` after `.fill()` for WebSocket synchronization (see [Testing CodeInput Widgets](#testing-codeinput-widgets))
 18. **CodeBlock assertions fail on escaped HTML** → Use `.getByText()` locators instead of `.content().includes()` for HTML/XML content (see [Testing CodeInput Widgets](#testing-codeinput-widgets))
+19. **Element "outside of the viewport"** → When `scrollIntoViewIfNeeded()` and `{ force: true }` both fail (overflow-hidden container), use `await element.dispatchEvent('click')` which bypasses all viewport checks
+20. **CodeInput in sheets with title input** → `getByRole('textbox').first()` matches the title TextInput, not the CodeInput. Use `.last()` for the CodeInput when both are present
+21. **Ivy confirm dialog buttons** → `WithConfirm()` renders "Cancel" and "Ok" buttons, NOT a duplicate of the trigger button text. Use `getByRole('button', { name: 'Ok' })` to confirm
+22. **Video afterEach timeout** → Calling `video.path()` or `video.saveAs()` in `afterEach` can cause timeout. Let Playwright handle video naming automatically via config
 
 ---
 
@@ -968,8 +980,58 @@ This pattern ensures tests:
 
 ---
 
+## Video Recording in afterEach
+
+### Problem
+Using `video.saveAs()` in `test.afterEach()` to rename videos hangs indefinitely, causing all tests to timeout even when assertions pass.
+
+### Solution
+Do NOT use custom video rename logic in `afterEach`. Rely on Playwright's built-in video recording (`video: { mode: 'on', dir: './videos' }` in config). Keep `afterEach` empty or minimal:
+
+```typescript
+test.afterEach(async ({ page }) => {
+  // Videos are saved automatically by Playwright config
+});
+```
+
+### Why
+`video.saveAs()` requires the browser context to finalize the video, which can block indefinitely in certain configurations. Playwright automatically saves videos to the configured directory without manual intervention.
+
+### Key Points
+- **NEVER** use `video.saveAs()` in `afterEach` — it hangs
+- Configure video recording in `playwright.config.ts` with `video: { mode: 'on', dir: './videos' }`
+- Playwright handles video filenames automatically based on test names
+- If custom naming is needed, do it as a post-test-run script, not within the test hooks
+
+---
+
+## Connection Secrets for Testing
+
+### Problem
+Ivy apps with connections (e.g., OpenAI) refuse to start if required secrets are not configured. The server prints "Missing secrets detected. The Ivy server cannot start." and exits.
+
+### Solution
+Before running tests, set dummy secrets via `dotnet user-secrets`:
+
+```bash
+cd <project-root>
+dotnet user-secrets set "OpenAI:ApiKey" "sk-test-dummy-key-for-testing"
+```
+
+### When to Apply
+Any Ivy app that has connections listed in `dotnet run --describe` output (e.g., `OpenAI`, `AzureOpenAI`, etc.). Check the `secrets:` section — if there are required (non-optional) secrets, they must be set.
+
+### Key Points
+- Tests should use the external API error handling pattern (success OR error assertions) since the dummy key will fail
+- Only set the minimum required secrets — optional ones can be skipped
+- This is a test environment workaround, not a project fix
+
+---
+
 ## Last Updated
 
+2026-03-26 - Added dispatchEvent viewport workaround, CodeInput textbox ordering in sheets, Ivy confirm dialog button naming patterns (MarkdigWikiEngine test review)
+2026-03-26 - Added Video Recording afterEach hang fix and Connection Secrets for Testing patterns (AIAssistant test review)
 2026-03-25 - Added comprehensive "Testing CodeInput Widgets" section with patterns for state sync, HTML escaping, multi-panel layouts, and status indicators (XMLFormatterAndValidator test review)
 2026-03-25 - Added FileInput visibility pattern to prevent `.toBeVisible()` failures on hidden file inputs (ClosedXML-Excel-Exporter test review)
 2026-03-24 - Added Multi-Select Toggle variant pattern and common adjustment for toggle/combobox confusion (SeattleWeather test review)

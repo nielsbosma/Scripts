@@ -132,7 +132,7 @@ Write the following files directly to `.ivy/tests/`:
 **Videos:**
 - Playwright records a video per test automatically via `video: { mode: 'on', dir: './videos' }`
 - Videos are saved to `.ivy/tests/videos/`
-- After each test, rename the video to match the test name using `test.afterEach`
+- Do NOT use `video.saveAs()` in `test.afterEach` to rename videos — it hangs indefinitely. Rely on Playwright's automatic video naming.
 
 **Logging — this is critical:**
 - Capture ALL browser console logs → write to `.ivy/tests/console.log`
@@ -193,6 +193,17 @@ Write the following files directly to `.ivy/tests/`:
 - Error callouts render complex HTML — `page.content().includes()` is more reliable than `getByText()` for error text
 
 If Args contains additional instructions, apply them to the test generation.
+
+### 7.5. Set Up Connection Secrets
+
+If the project has connections (check `dotnet run --describe` output for `connections:` and `secrets:` sections), set dummy secrets so the server can start:
+
+```powershell
+cd <project-root>
+dotnet user-secrets set "<SecretKey>" "dummy-test-value"
+```
+
+For example, for an OpenAI connection: `dotnet user-secrets set "OpenAI:ApiKey" "sk-test-dummy"`. Only required (non-optional) secrets need to be set. The external API error handling pattern in tests will handle the resulting API failures gracefully.
 
 ### 8. Install Dependencies
 

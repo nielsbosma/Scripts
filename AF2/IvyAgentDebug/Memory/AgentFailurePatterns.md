@@ -34,14 +34,19 @@ Critical failure modes observed during session review.
 **Known Issue**: Plan 846 exists for threshold review. Multiple sessions show extreme evidence:
 - Session d673912f: 5 consecutive reminders ignored
 - Session 68fe7bb2: **7 consecutive reminders ignored** (new record)
+- Session 6632bc59: **6 consecutive reminders**, all at level 0 (escalation broken)
 
 **When it fires correctly**: After IvyQuestion NotFound errors trigger GetTypeInfo fallback loops (expected behavior).
 
 **When it's ineffective**: Agent continues researching despite reminders. No forced TaskReport submission after N reminders.
 
+**Escalation Bug (discovered session 6632bc59)**: The 3-level escalation system (STOP → WARNING → CRITICAL) never advances past level 0. Root cause: In `PersonaAgent.Run()`, `InsertSystemReminder` results are appended to a **local shallow copy** of the context window, not persisted back to `context.ContextWindow`. So `CountPriorFirings(context.ContextWindow)` always returns 0.
+
 **Recommendation**: Circuit breaker after 3 ignored reminders (already suggested in plan 872).
 
-**Plan Created**: 896-IvyAgent-CRITICAL-ResearchPhaseAnalyserNotEffective.md
+**Plans Created**:
+- 896-IvyAgent-CRITICAL-ResearchPhaseAnalyserNotEffective.md
+- 1082-IvyAgentAnalyzers-NiceToHave-FixResearchPhaseAnalyserEscalation.md
 
 ## Context State Propagation Failure
 

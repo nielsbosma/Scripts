@@ -28,9 +28,9 @@ $results = @()
 
 foreach ($traceFolder in $traceFolders) {
     $obsFiles = Get-ChildItem -Path $traceFolder.FullName -Filter "*.json" |
-        Where-Object { $_.Name -ne "trace.json" } | Sort-Object Name
+        Where-Object { $_.Name -ne "trace.json" }
 
-    # Load all observations for look-ahead
+    # Load all observations and sort by startTime for correct chronological processing
     $observations = @()
     foreach ($file in $obsFiles) {
         try {
@@ -38,9 +38,11 @@ foreach ($traceFolder in $traceFolders) {
             $observations += [PSCustomObject]@{
                 File = $file
                 Json = $json
+                StartTime = $json.startTime
             }
         } catch {}
     }
+    $observations = $observations | Sort-Object StartTime
 
     for ($i = 0; $i -lt $observations.Count; $i++) {
         $obs = $observations[$i]

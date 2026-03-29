@@ -63,16 +63,27 @@ foreach ($traceFolder in $traceFolders) {
     }
 
     $obsFiles = Get-ChildItem -Path $traceFolder.FullName -Filter "*.json" |
-        Where-Object { $_.Name -ne "trace.json" } | Sort-Object Name
+        Where-Object { $_.Name -ne "trace.json" }
+
+    # Pre-read all files and sort by startTime for correct chronological processing
+    $obsParsed = @()
+    foreach ($f in $obsFiles) {
+        try {
+            $j = Get-Content $f.FullName -Raw | ConvertFrom-Json
+            $obsParsed += [PSCustomObject]@{ File = $f; Json = $j; StartTime = $j.startTime }
+        } catch {}
+    }
+    $obsParsed = $obsParsed | Sort-Object StartTime
 
     $observations = @()
     $workflowStack = [System.Collections.Generic.Stack[string]]::new()
     $lastState = $null
     $cumulativeInput = 0
 
-    foreach ($file in $obsFiles) {
+    foreach ($obs in $obsParsed) {
         try {
-            $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
+            $file = $obs.File
+            $json = $obs.Json
             $fileName = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
 
             # Workflow tracking - check both input.message (old) and metadata.message (new)

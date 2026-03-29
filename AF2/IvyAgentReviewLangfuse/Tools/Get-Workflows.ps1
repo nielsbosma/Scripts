@@ -22,11 +22,22 @@ foreach ($traceFolder in $traceFolders) {
     $workflowStack = [System.Collections.Generic.Stack[string]]::new()
     $currentWorkflowName = $null
     $obsFiles = Get-ChildItem -Path $traceFolder.FullName -Filter "*.json" |
-        Where-Object { $_.Name -ne "trace.json" } | Sort-Object Name
+        Where-Object { $_.Name -ne "trace.json" }
 
-    foreach ($file in $obsFiles) {
+    # Pre-read all files and sort by startTime for correct chronological processing
+    $obsParsed = @()
+    foreach ($f in $obsFiles) {
         try {
-            $json = Get-Content $file.FullName -Raw | ConvertFrom-Json
+            $j = Get-Content $f.FullName -Raw | ConvertFrom-Json
+            $obsParsed += [PSCustomObject]@{ File = $f; Json = $j; StartTime = $j.startTime }
+        } catch {}
+    }
+    $obsParsed = $obsParsed | Sort-Object StartTime
+
+    foreach ($obs in $obsParsed) {
+        try {
+            $file = $obs.File
+            $json = $obs.Json
 
             # Check both input.message (old format) and metadata.message (new format)
             $message = $null

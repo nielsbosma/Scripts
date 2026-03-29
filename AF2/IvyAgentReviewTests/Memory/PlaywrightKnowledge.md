@@ -304,6 +304,12 @@
 
 ## Run History
 
+### 2026-03-26 — Employee-Handbook
+- Employee handbook app with search, category filter tabs, card-based document list, and blade detail view with markdown content and version history
+- **TabsLayout responsive collapse**: With 6 tabs, only 2 visible; rest collapse into dropdown chevron. `getByText('TabName')` matches Badge elements on cards instead of tab triggers. `getByRole('tab')` doesn't work (Ivy tabs lack `role="tab"`). Fixed by only testing visible tabs and using `page.content()` for assertions.
+- No project fixes needed — clean code
+- 6 tests, 3 fix rounds (all tab locator issues), all passed, logs clean
+
 ### 2026-03-22 — FundMetricsExcel
 - Fund portfolio dashboard with 6 metrics and 4 charts, SQLite + seeded data (120 companies, 93 LPs, 8 funds)
 - **GroupBy + positional record LINQ crash**: `GroupBy(p => p.Sector).Select(g => new ChartData(g.Key, (double)g.Sum(...)))` failed EF Core translation. Fixed by using anonymous type server-side, then projecting to record client-side with `.ToListAsync()` + `.Select()`.
