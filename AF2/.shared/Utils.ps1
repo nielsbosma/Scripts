@@ -84,6 +84,7 @@ function InvokeOrOutputPrompt {
         [string]$LogFile,
         [switch]$GetPrompt,
         [switch]$GetTaskPrompt,
+        [switch]$Interactive,
         [string[]]$ExtraClaudeArgs = @()
     )
 
@@ -116,8 +117,12 @@ $content
     $firmware = Get-Content $PromptFile -Raw
     Remove-Item $PromptFile
 
-    $agent = GetAgentCommandFromConfig
-    & $agent.Executable @($agent.Args) @ExtraClaudeArgs -- $firmware
+    if ($Interactive) {
+        & claude --dangerously-skip-permissions --system-prompt $firmware @ExtraClaudeArgs
+    } else {
+        $agent = GetAgentCommandFromConfig
+        & $agent.Executable @($agent.Args) @ExtraClaudeArgs -- $firmware
+    }
 
     Pop-Location
     return $false
@@ -142,7 +147,7 @@ function MoveApprovedPlans {
 
 function GetAgentCommandFromConfig {
     $configPath = Join-Path (Split-Path $PSScriptRoot) "config.yaml"
-    $raw = "claude --print --output-format stream-json --dangerously-skip-permissions"
+    $raw = "claude --print --verbose --output-format stream-json --dangerously-skip-permissions"
 
     if (Test-Path $configPath) {
         try {

@@ -1,6 +1,7 @@
 param(
     [switch]$GetPrompt,
-    [switch]$GetTaskPrompt
+    [switch]$GetTaskPrompt,
+    [switch]$Interactive
 )
 
 . "$PSScriptRoot\.shared\Utils.ps1"
@@ -15,4 +16,4 @@ Write-Host "Log file: $logFile"
 
 $promptFile = PrepareFirmware $PSScriptRoot $logFile $programFolder @{ Args = $args; WorkDir = (Get-Location).Path }
 
-InvokeOrOutputPrompt $programFolder $promptFile $args $logFile -GetPrompt:$GetPrompt -GetTaskPrompt:$GetTaskPrompt
+InvokeOrOutputPrompt $programFolder $promptFile $args $logFile -GetPrompt:$GetPrompt -GetTaskPrompt:$GetTaskPrompt -Interactive:$Interactive
