@@ -1,6 +1,6 @@
 # IvyAgentDebug
 
-Analyze review data from an Ivy Agent session and generate actionable improvement plans.
+Analyze review data from an Ivy Agent session and generate actionable improvement plans via the Tendril Inbox.
 
 ## Context
 
@@ -14,8 +14,6 @@ By the time you run, these review scripts have already completed and produced fi
 Read about the important paths and files in `../.shared/Paths.md`
 
 Read `/Memory/Langfuse.md` for Langfuse JSON structure reference if you need to inspect raw data.
-
-Plans are stored in `D:\Repos\_Ivy\.plans\`. Each plan gets a sequential numeric ID from the counter file `.counter` in that directory.
 
 ## Execution Steps
 
@@ -42,9 +40,9 @@ If a file is missing, note it and continue with what's available.
 
 Also check for `.ivy/annotated.md` — this contains the client TUI output annotated by the user with `>>` prefixed lines. These annotations are the user's own observations about what went wrong and should be investigated with **highest priority**. Look for every `>>` line and address each one.
 
-Also check for `.ivy/feedback.md` — this contains free-form feedback from the user. Like annotations, this feedback should be treated with **highest priority** and should influence your analysis and plan generation in Step 3.
+Also check for `.ivy/feedback.md` — this contains free-form feedback from the user. Like annotations, this feedback should be treated with **highest priority** and should influence your analysis.
 
-Check the logs:  
+Check the logs:
 
 {WorkDir}/.ivy/sessions/<session-id>/
   <session-id>-client-verbose.log
@@ -56,99 +54,38 @@ Check the logs:
 
 Anything that stands out that we should look into?
 
-### 1b. Cross-Reference Pending Review Files
+### 2. Investigate & Identify Issues
 
-Check `D:\Repos\_Ivy\.plans\review\` for any review/verification files. For each file:
+Analyze all the collected data to find issues and improvements for the Ivy Agent ecosystem.
 
-1. **Parse the review checklist** — extract the plan ID, what was changed, and each verification item
-2. **Match against current session data**:
-   - If the review mentions a **widget or API** (e.g., DataTable, Empty state), check:
-     - `langfuse-hallucinations.md` for hallucinated usage of that API
-     - `langfuse-build-errors.md` for build errors related to that API
-     - `review-ux.md` / screenshots for visual evidence
-     - `langfuse-timeline.md` for tool calls involving that feature
-   - If the review mentions **token/cost metrics**, check:
-     - `summary.yaml` for token counts
-     - `langfuse-timeline.md` for per-generation data
-     - Langfuse raw data for cache metrics (`cacheRead`, `cacheCreationInputTokens`)
-   - If the review mentions **analyser behavior**, check:
-     - `langfuse-system-reminders.md` for analyser firing patterns
-     - `langfuse-build-errors.md` for build retry counts
-   - If the review mentions **specific sessions**, check if the current session ID matches
-3. **Annotate the review file** — prepend a `## Debug Notes (Session {SessionId})` section at the top of the review file with:
-   - Which checklist items have evidence (proven/disproven/inconclusive)
-   - Relevant data excerpts from the session
-   - Date of the cross-reference check
-4. **Create follow-up plans** if the cross-reference reveals:
-   - A review item is definitively disproven (the fix didn't work) → create a fix plan
-   - New issues discovered while investigating the review item → create separate plans
+This can include:
 
-### 2. Search GitHub Issues
+- **Ivy-Framework**: Fix bugs, update APIs to match hallucinations, add missing APIs the agent struggled to find
+- **Ivy-Agent**: Fix bugs, improve token usage, performance, tool instructions, persona usage
+- **Token waste**: Bad instructions causing unnecessary token consumption
+- **One-shot failures**: Review `<session-id>-client-output.log` for signs the session wasn't a clean one-shot
+- **Agent clients**: Bugs in Ivy Studio, Tui, NonInteractive
+- **Documentation**: Strengthen docs where agent got confused
+- **Workflows**: Improve agent workflows and reference connections
+- **Analysers**: Add compile-time checks to `Ivy.Analyser` for common runtime errors
 
-Before creating plans, search GitHub issues to check if a finding is already tracked or has a planned fix. This avoids creating workaround plans for things that are already being built.
+For each issue, determine:
+1. **What went wrong** — with evidence from review files
+2. **Root cause** — hallucination vs missing package vs framework bug vs user code bug
+3. **Which project** it belongs to (Framework, Agent, Tendril, Console, Mcp, Scripts, or leave blank for auto-detection)
+4. **Severity** — Critical, Bug, NiceToHave
 
-```bash
-# Search across all main Ivy repos
-gh search issues "<keyword>" --repo Ivy-Interactive/Ivy-Framework --repo Ivy-Interactive/Ivy-Agent --repo Ivy-Interactive/Ivy-Mcp --repo Ivy-Interactive/Ivy --json title,url,number,state
-```
+#### Hallucinations (DIRECT EDIT — no inbox)
 
-Key repos to search: `Ivy-Interactive/Ivy-Framework`, `Ivy-Interactive/Ivy-Agent`, `Ivy-Interactive/Ivy-Mcp`, `Ivy-Interactive/Ivy`, `Ivy-Interactive/Ivy-Inspectors`
-
-If a GitHub issue already covers a finding:
-- Reference the issue in the plan (e.g. `See: Ivy-Framework#2398`)
-- Don't create workaround plans (e.g. FAQ entries) for features that are already being built — instead note the issue is in progress
-- If the finding adds new context to an existing issue, consider commenting on the issue or creating a plan that references it
-
-### 3. Investigate & Generate Plans
-
-This is a very large task. Feel free to split this up in multiple sub tasks.
-
-Now to the main goal: by analysing all the collected data your task is to come up with plans for how to improve the outcome of the Ivy Agent. 
-
-This can be achieve in many ways:
-
-- Change Ivy-Framework (fix bugs, update APIs to match hallucinations)
-- Did the agent struggle in any way to implement a specific design goal - are we missing any API for this?
-- Improve Ivy-Agent (fix bugs, improve token usage, performance, tool instructions, persona usage, ...)
-- How many tokens where wasted becasue the agent had bad instructions? Can we optimize this?
-- Make sure to review <session-id>-client-output.log for any sign of the session not being a "one-shot"
-- Fix bugs in agent clients (Ivy Studio, Tui, NonInteractive)
-- Strengthen documentation
-- Improve agent workflows and reference connections to provide better context to agent when used
-- Add refactorings after code generation
-- Add analysers to Ivy.Analyser to make common runtime errors into compile time errors. We really want to avoid runtime errors!
-
-For each issue found across the reviews, investigate and create a plan. Search existing plans first to avoid duplicates.
-
-NOTES:
-
-#### Build Errors
-- If `langfuse-build-errors.md` shows errors, cross-reference with `langfuse-hallucinations.md`
-- Distinguish: hallucination vs missing package vs framework bug vs user code bug
-- Could the build error be avoided by improving any part of the agent?
-
-#### Workflow Issues
-- If `langfuse-workflows.md` shows failures, read the workflow source files
-- Check state transitions and prompt templates for issues
-
-#### Test Failures & UX Issues
-- If `review-tests.md` shows external issues, document them as plans
-- If `review-ux.md` has recommendations, assess if they point to framework widget gaps - anything we can improve in the agent?
-- When creating plans from `review-ux.md` findings, list the screenshots referenced in `review-ux.md` in the plan's `## Evidence` section. Screenshots are stored at `{WorkDir}/.ivy/tests/screenshots/` and videos at `{WorkDir}/.ivy/tests/videos/`. Include the full absolute path for each relevant screenshot (e.g., `D:\Temp\IvyAgentTestManager\2026-03-17\00257-Campaign-Dashboard\Test.Campaign-Dashboard\.ivy\tests\screenshots\01-initial-load.png`). The `review-ux.md` file uses `### [filename.png]` headings — parse these filenames and construct the full path using `{WorkDir}/.ivy/tests/screenshots/{filename}`. Include relevant video paths in the `## Evidence` section when the issue involves interactions or animations. Only include screenshots and videos relevant to the specific issue being planned.
-
-#### Hallucinations (DIRECT EDIT — no plans)
-
-When `langfuse-hallucinations.md` reports hallucinated APIs, **directly update** `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Hallucinations.md` instead of creating a plan. This is an exception to the read-only rule.
+When `langfuse-hallucinations.md` reports hallucinated APIs, **directly update** `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs\05_Other\Hallucinations.md` instead of creating an inbox item. This is an exception to the read-only rule.
 
 Steps for each hallucination:
 1. Check if the hallucinated API already has a section in Hallucinations.md — if yes, add the session UUID to the "Found In" list
 2. If new, add a new `##` section following the existing format (Hallucinated API code block, Error, Correct API, Found In)
-3. Check if a refactoring rule could prevent it (see Memory/RefactoringRules.md) — if a rule is warranted, create a plan for that separately
-4. Check `D:\Repos\_Ivy\Ivy-Framework\src\Ivy.Docs.Shared\Docs` for missing or unclear documentation
-5. Check if samples cover the misused pattern
+3. Check if a refactoring rule could prevent it (see Memory/RefactoringRules.md) — if a rule is warranted, create an inbox item for that separately
 
 **Every time Hallucinations.md is edited, also:**
-- **Prune stale entries**: Check whether each existing section's hallucinated API has since been added to the framework (i.e., is no longer a hallucination). If the API now exists, either remove the section or mark it `— now supported`. Verify by searching the Ivy-Framework source.
+- **Prune stale entries**: Check whether each existing section's hallucinated API has since been added to the framework. If the API now exists, either remove the section or mark it `— now supported`. Verify by searching the Ivy-Framework source.
 - **Rerank all `##` sections** by descending frequency using these rules:
   - Count each unique UUID in "Found In" as 1
   - `(multiple sessions)` = 3
@@ -158,23 +95,15 @@ Steps for each hallucination:
   - Ties: preserve existing relative order (stable sort)
   - `— now supported` entries always go to the bottom regardless of count
 
-#### System Reminders
-- If `langfuse-system-reminders.md` shows reminders firing, check:
-  - Are reminders firing excessively? (>3 of same type = agent likely stuck)
-  - Did the agent change behavior after the reminder? If not, the analyser text may need improvement
-  - Check the analyser source in `D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent\Agents\Analysers\` for prompt quality
-  - Consider if the analyser threshold is too low (firing too early) or too high (firing too late)
+#### IvyMcp Issues (GitHub Issues — no inbox)
 
-#### IvyMcp Issues (GitHub Issues — no local plans)
-
-When a finding belongs to the **IvyMcp** queue (issues related to IvyDoc, IvyQuestion, hallucinations originating from IvyMcp knowledge base, or any Ivy-Mcp service behavior), **create a GitHub issue** in `Ivy-Interactive/Ivy-Mcp` instead of a local plan file. Never create local plan files for IvyMcp issues.
+When a finding belongs to **IvyMcp** (IvyDoc, IvyQuestion, hallucinations from MCP knowledge base), **create a GitHub issue** in `Ivy-Interactive/Ivy-Mcp` instead of an inbox item.
 
 Steps:
 1. Determine if the finding is IvyMcp-related by checking:
    - `langfuse-questions.md` — wrong or incomplete IvyQuestion answers
    - `langfuse-docs.md` — IvyDoc 404s or missing documentation served by MCP
    - `langfuse-hallucinations.md` — hallucinations where the source is IvyMcp (check raw IvyQuestion JSON per Memory/IvyMcpHallucinationSource.md)
-   - Any issue where the root cause is in the Ivy-Mcp service code or knowledge base
 
 2. Create a GitHub issue using:
    ```bash
@@ -197,136 +126,70 @@ Steps:
    )"
    ```
 
-3. Record the created issue URL in `{WorkDir}/.ivy/plans.md` alongside any local plans, using the format:
-   ```markdown
-   - https://github.com/Ivy-Interactive/Ivy-Mcp/issues/<number> (IvyMcp: <title>)
-   ```
+3. Use labels if applicable: `--label "bug"` for broken behavior, `--label "knowledge-base"` for wrong answers/hallucinations from MCP.
 
-4. Use labels if applicable: `--label "bug"` for broken behavior, `--label "knowledge-base"` for wrong answers/hallucinations from MCP.
+### 3. Write to Tendril Inbox
 
-### 4. Create Plan Files
+For each actionable finding (that isn't a Hallucination.md edit or IvyMcp GitHub issue), create a `.md` file in `D:\Tendril\Inbox\`.
 
-For each actionable finding, create a plan file in `D:\Repos\_Ivy\.plans\`.
+**File naming**: `<short-descriptive-name>.md` (e.g., `infrastructure-analyser-ineffective.md`, `enum-display-names.md`)
 
-- Read the counter from `.counter` (default 200 if missing), allocate IDs, increment
-- Format: `<ID>-<RepositoryName>-<LEVEL>-<Title>.md`
-- Repository names: `IvyAgent`, `IvyConsole`, `IvyFramework`, `General` (note: `IvyMcp` issues go to GitHub — see IvyMcp section above)
-
-#### Queue Selection Guidelines
-
-Use the pattern `{ProjectName}{SubsystemType}` for granular queues instead of generic project names.
-
-**For agent-related issues**, use these specific queues:
-- **IvyAgentCore**: Agent server, orchestration, core agent logic
-- **IvyAgentBibe**: Internal tooling apps (Ivy.Agent.Bibe apps like PlanReviewer)
-- **IvyAgentPersona**: Persona prompts and instructions
-- **IvyAgentWorkflows**: Workflow definitions in Ivy.Internals\Workflows
-- **IvyAgentAnalyzers**: Analyzer implementations (ResearchPhaseAnalyser, InfrastructureErrorAnalyser, etc.)
-- **IvyAgentTools**: Tool implementations (IvyQuestion, IvyDoc, GetTypeInfo, etc.)
-- **TestManager**: Test framework
-- **IvyAgentShared**: Message definitions
-- **IvyAgent**: Fallback for cross-cutting changes or when uncertain
-
-**Decision tree**:
-1. Does the issue affect a specific subsystem listed above? Use `{ProjectName}{SubsystemType}`.
-2. Does the issue span multiple subsystems? Use base project name (e.g., `IvyAgent`).
-3. Uncertain? Use base project name.
-
-**Examples from reviews**:
-- System reminder analyser firing excessively → `IvyAgentAnalyzers`
-- Agent ignores persona instruction → `IvyAgentPersona`
-- Workflow state transition bug → `IvyAgentWorkflows`
-- IvyQuestion compound questions → `IvyAgentTools`
-- Bibe PlanReviewer UI issue → `IvyAgentBibe`
-- Token usage optimization across agent → `IvyAgent` (cross-cutting)
-
-- LEVEL (priority/criticality):
-  - **Critical** — Must be fixed immediately, blocks work or causes severe issues (build failures, crashes, data loss)
-  - **NiceToHave** — Improves functionality but not urgent (hallucinations, missing docs, workflow improvements)
-  - **Nitpick** — Minor polish, cosmetic fixes, or low-priority refinements (cosmetic issues, minor doc tweaks, formatting)
-- **Check skipped plans before creating**: Read all files in `D:\Repos\_Ivy\.plans\skipped\` and compare the proposed plan against skipped plans. If a similar plan already exists (same problem domain, similar title, or overlapping solution), **DO NOT create the plan**. The user has already decided not to implement these changes. Log the skipped check in your analysis.
-- Before creating a plan, search existing plans to avoid duplicates — update existing plans if they partially cover the finding
-- Read `{WorkDir}/.ivy/plans.md` if it exists — this lists plans created in previous runs of this script. Skip creating plans already listed there
-- After creating new plans, append their paths to `{WorkDir}/.ivy/plans.md` (create the file if it doesn't exist) using this format:
-  ```markdown
-  # Created Plans
-
-  - D:\Repos\_Ivy\.plans\268-Scripts-NiceToHave-Example.md
-  ```
-
-Plan format:
+**File format**:
 
 ```markdown
 ---
-source: {WorkDir}/.ivy/
-session: {SessionId}
-workflow: <workflows used in this session, from langfuse-workflows.md>
-references: <reference connection files read, from langfuse-reference-connections.md>
+project: <ProjectName or leave out for auto-detection>
 ---
-# [Title]
+<Full description of the issue and proposed solution>
 
-## Problem
-
-[What went wrong, with evidence from review files]
-
-## Evidence
-
-[Optional — absolute paths to relevant screenshot(s) from {WorkDir}/.ivy/tests/screenshots/ that demonstrate the problem. Only include when the plan was derived from screenshot/UX analysis.]
-
-## Solution
-
-[Concrete steps — include file paths, code patterns, API names]
-
-## Clean up
-
-1. Commit
+Include:
+- What went wrong (with evidence from review files)
+- Concrete steps to fix (file paths, code patterns, API names)
+- Relevant screenshots/video paths if from UX analysis
+- Session ID for traceability
 ```
 
-### IvyFramework Verification
+The `project` field should match a project in Tendril's config.yaml (Framework, Agent, Tendril, Console, Mcp, Scripts). Omit the frontmatter entirely if you want Tendril to auto-detect the project.
 
-When a plan targets **IvyFramework** (queue = `IvyFramework`) **and the change affects visual/UI behavior** (e.g., fixing a widget bug, changing layout, adding a new component), include a `### Verification` section after the commit instructions with instructions to run **IvyFeatureTester.ps1**.
+**One issue per file.** Keep descriptions concise but include enough context (file paths, code patterns) for a coding agent to execute end-to-end.
 
-**Do NOT add verification for non-visual changes** such as documentation updates, FAQ entries, analyser error messages, refactoring rules, or code-only fixes that don't affect rendered output.
+#### Evidence References
+
+- **When referencing local files** in the description, use full absolute paths (e.g., `D:\Repos\_Ivy\Ivy-Framework\src\Ivy\Widgets\Button.cs`)
+- **When referencing screenshots**, include the full path from `{WorkDir}/.ivy/tests/screenshots/`. The `review-ux.md` file uses `### [filename.png]` headings — parse these and construct the full path using `{WorkDir}/.ivy/tests/screenshots/{filename}`
+- **When referencing videos**, include paths from `{WorkDir}/.ivy/tests/videos/`
+
+### 4. Write Summary Log
+
+Write a summary to `{WorkDir}/.ivy/plans.md` listing what was created:
 
 ```markdown
-### Verification
+# IvyAgentDebug Results
 
-After committing the fix, use **IvyFeatureTester.ps1** to verify the changes visually:
-
-\```powershell
-cd D:\Repos\_Ivy
-D:\Repos\_Personal\Scripts\AF2\IvyFeatureTester.ps1 "Commit <COMMIT_ID>: <description of what to test>. Test with <specific test scenario>."
-\```
-
-Replace `<COMMIT_ID>` with the actual commit hash from the fix commit above.
+- D:\Tendril\Inbox\infrastructure-analyser-ineffective.md (Agent: Infrastructure analyser ignoring reminders)
+- D:\Tendril\Inbox\enum-display-names.md (Framework: Enum display in .ToOptions())
+- https://github.com/Ivy-Interactive/Ivy-Mcp/issues/127 (IvyMcp: IvyQuestion NotFound for Fragment rendering)
+- Hallucinations.md: Added session UUID to Fragment.ForEach entry
 ```
-
-The prompt should describe the expected behavior and suggest a concrete test scenario appropriate for the change.
 
 ### Rules
 
-- **Everything must be expressed as plans** — FAQ edits, doc improvements, workflow fixes
-- **Exception**: Hallucinations.md updates are applied directly (not as plans) — see the Hallucinations section above
-- **!IMPORTANT: Plans should rarely propose changes to `AGENTS.md` or Persona `.md` files (e.g. files in `Ivy.Agent\Agents\Personas\Prompts\`). These files are read by all flows and must remain tight and handcrafted. Instead, look for a workflow file, analyser, tool instruction, or other targeted file to modify.**
-- ONE issue per plan file
-- Plans must include all paths and information for an LLM coding agent to execute end-to-end
-- Keep plans short and concise
-- Do NOT modify any source code directly — only read files and create plan files. **Exception**: `Hallucinations.md` may be edited directly.
-- **When referencing local files, folders, or screenshots in plans, use markdown links with the filename as display text: `[Button.cs](file:///D:/Repos/_Ivy/Ivy-Framework/src/Ivy/Widgets/Button.cs)`. This allows the user to open files directly in VS Code by clicking the link while keeping plans readable.**
-- **When referencing screenshots or images in plans, use markdown image syntax: `![description](file:///D:/Screenshots/2026-03-26_05-30_3.png)` or clickable link syntax: `[2026-03-26_05-30_3.png](file:///D:/Screenshots/2026-03-26_05-30_3.png)`. Both formats work in VS Code - image syntax renders inline, link syntax is clickable.**
-- **IvyMcp findings must be created as GitHub issues in `Ivy-Interactive/Ivy-Mcp`** — never as local plan files. This includes IvyDoc issues, IvyQuestion wrong answers, and hallucinations originating from the MCP knowledge base.
+- **One issue per inbox file**
+- Inbox files must include all paths and information for an LLM coding agent to execute end-to-end
+- Keep descriptions concise but actionable
+- Do NOT modify any source code directly — only read files and create inbox items. **Exceptions**: `Hallucinations.md` may be edited directly.
+- **IvyMcp findings must be created as GitHub issues in `Ivy-Interactive/Ivy-Mcp`** — never as inbox items
+- **Hallucination findings go directly to Hallucinations.md** — never as inbox items
 - Missing review files are not failures — analyze what's available
-- When annotating review files in `.plans\review\`, preserve the original content — only prepend notes at the top
-- If a review file's checklist is fully verified (all items proven), move it to `.plans\review\verified\`
-- Review cross-references should be concise — link to evidence, don't copy large data blocks
+- **!IMPORTANT: Plans should rarely propose changes to `AGENTS.md` or Persona `.md` files. These files are read by all flows and must remain tight and handcrafted. Instead, look for a workflow file, analyser, tool instruction, or other targeted file to modify.**
 
-## Finally 
+## Finally
 
-Give that you are an orchestrator - feel free to make improvements to:
+Given that you are an orchestrator - feel free to make improvements to:
 
 D:\Repos\_Personal\Scripts\AF2\IvyAgentReviewBuild
 D:\Repos\_Personal\Scripts\AF2\IvyAgentReviewLangfuse
 D:\Repos\_Personal\Scripts\AF2\IvyAgentReviewSpec
 D:\Repos\_Personal\Scripts\AF2\IvyAgentReviewTests
 
-According to the the D:\Repos\_Personal\Scripts\AF2\.shared\Firmware.md instructors if you feel that the output from these skills can be improved for you to optimize your future performance. 
+According to the D:\Repos\_Personal\Scripts\AF2\.shared\Firmware.md instructions if you feel that the output from these skills can be improved for you to optimize your future performance.

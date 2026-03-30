@@ -31,8 +31,13 @@ When multiple agent sessions deploy simultaneously, they compete over the root D
 
 ## SetMeta Methods Availability
 
-- `SetMetaTitle` and `SetMetaDescription` work with Ivy 1.2.23
-- `SetMetaGitHubUrl` is NOT available in Ivy 1.2.23 — comment it out with a TODO
+- `SetMetaTitle` and `SetMetaDescription` work with Ivy 1.2.23+
+- `SetMetaGitHubUrl` is NOT available in Ivy 1.2.27 — comment it out with a TODO
+
+## Slack Notification
+
+- The Slack profile "state-of-ivy-agent" no longer exists (as of 2026-03-30)
+- Use "done-by-niels" profile instead
 
 ## Sliplane Deploy Command
 

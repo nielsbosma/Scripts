@@ -15,7 +15,6 @@ $testYamlPath = Join-Path (Split-Path $workDir -Parent) "test.yaml"
 $testRunId = $null
 $taskDescription = ""
 if (Test-Path $testYamlPath) {
-    # Parse run ID and test name from the parent folder name (format: {runId:D5}-{testName})
     $parentName = Split-Path (Split-Path $workDir -Parent) -Leaf
     if ($parentName -match "^(\d+)-(.+)$") {
         $testRunId = $Matches[1]
@@ -78,11 +77,6 @@ if ($Feedback) {
         exit 0
     }
 }
-
-# --- Package FAQ feedback loop ---
-# If debugging reveals a NuGet package-related issue (e.g., wrong API usage, missing config),
-# add a FAQ entry to: D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent\PackageFaqs\<PackageId>.md
-# These are returned to the agent automatically when it adds the package via AddPackage tool.
 
 # --- Phase 1: Run ReviewBuild (must complete first) ---
 Write-Host "=== Phase 1: ReviewBuild ===" -ForegroundColor Cyan
@@ -214,7 +208,6 @@ $langfuseDir = Join-Path $workDir ".ivy" "sessions" $sessionId "langfuse"
 if (Test-Path $langfuseDir) {
     Write-Host "Generating summary.yaml..." -ForegroundColor Cyan
 
-    # Get session status
     $sessionStatusScript = Join-Path $PSScriptRoot "IvyAgentReviewLangfuse\Tools\Get-SessionStatus.ps1"
     $sessionStatus = & $sessionStatusScript -LangfuseDir $langfuseDir
     Write-Host "Session status: $($sessionStatus.Status) — $($sessionStatus.StopReason)" -ForegroundColor $(
@@ -231,7 +224,6 @@ if (Test-Path $langfuseDir) {
     $ivyDir = Join-Path $workDir ".ivy"
     if (-not (Test-Path $ivyDir)) { New-Item -ItemType Directory -Path $ivyDir | Out-Null }
 
-    # Parse spec review for completion metrics
     $specReview = Join-Path $ivyDir "review-spec.md"
     $specImpl = 0; $specPartial = 0; $specMissing = 0
     if (Test-Path $specReview) {
@@ -280,17 +272,7 @@ if (Test-Path $langfuseDir) {
     Write-Host "summary.yaml written." -ForegroundColor Green
 }
 
-# --- Collect pending review files ---
-$reviewPath = "D:\Repos\_Ivy\.plans\review"
-$reviewFiles = @()
-if (Test-Path $reviewPath) {
-    $reviewFiles = Get-ChildItem -Path $reviewPath -Filter "*.md" | Select-Object -ExpandProperty FullName
-    if ($reviewFiles.Count -gt 0) {
-        Write-Host "Found $($reviewFiles.Count) pending review file(s) for cross-reference" -ForegroundColor Cyan
-    }
-}
-
-# --- Phase 3: Agentic analysis ---
+# --- Phase 3: Agentic analysis → dump to Tendril Inbox ---
 Write-Host ""
 Write-Host "=== Phase 3: Analysis ===" -ForegroundColor Cyan
 

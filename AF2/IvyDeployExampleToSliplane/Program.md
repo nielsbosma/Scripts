@@ -322,7 +322,7 @@ git push origin main
 Post a message to Slack about the deployed app:
 
 ```powershell
-cd D:/Repos/_Personal/Notify.Console/src && dotnet run -- slack state-of-ivy-agent --message "Deployed <name>: https://ivy-agent-demos-<name>.sliplane.app | GitHub: https://github.com/Ivy-Interactive/Ivy-Examples/tree/main/agent-demos/<name>"
+cd D:/Repos/_Personal/Notify.Console/src && dotnet run -- slack done-by-niels --message "Deployed <name>: https://ivy-agent-demos-<name>.sliplane.app | GitHub: https://github.com/Ivy-Interactive/Ivy-Examples/tree/main/agent-demos/<name>"
 ```
 
 Include the app name, deployed URL, and GitHub README link in the message.
