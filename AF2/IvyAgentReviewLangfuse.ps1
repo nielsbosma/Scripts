@@ -22,11 +22,25 @@ if (-not (Test-Path $langfuseDir)) {
         # Last resort: use the build output directly
         $ivyAgent = "D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Console\bin\Debug\net9.0\ivy-agent.exe"
     }
-    & $ivyAgent langfuse session get $sessionId -d $workDir
-    if (-not (Test-Path $langfuseDir)) {
-        # Create empty langfuse dir so the agent can still generate session-status report
-        Write-Host "Warning: Download completed but no langfuse data was created. Creating empty dir for partial analysis." -ForegroundColor Yellow
-        New-Item -ItemType Directory -Path $langfuseDir -Force | Out-Null
+    $downloadOutput = & $ivyAgent langfuse session get $sessionId -d $workDir 2>&1 | Out-String
+    $downloadExitCode = $LASTEXITCODE
+
+    if (-not (Test-Path $langfuseDir) -or (Get-ChildItem $langfuseDir -Recurse -File).Count -eq 0) {
+        $errorLog = Join-Path $workDir ".ivy" "sessions" $sessionId "langfuse-download-error.log"
+        @"
+Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+SessionId: $sessionId
+ExitCode: $downloadExitCode
+Command: $ivyAgent langfuse session get $sessionId -d $workDir
+
+Output:
+$downloadOutput
+"@ | Set-Content $errorLog
+
+        Write-Host "Warning: Langfuse download failed (exit code: $downloadExitCode). See $errorLog" -ForegroundColor Yellow
+        if (-not (Test-Path $langfuseDir)) {
+            New-Item -ItemType Directory -Path $langfuseDir -Force | Out-Null
+        }
     }
 }
 
