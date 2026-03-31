@@ -134,8 +134,8 @@ $jobs += Start-Job -Name "ReviewSpec" -ScriptBlock {
 $jobTimeout = 300 # 5 minutes
 Write-Host "Waiting for parallel jobs: $($jobs.Name -join ', ') (timeout: ${jobTimeout}s)..."
 $jobs | ForEach-Object {
-    $job = $_ | Wait-Job -Timeout $jobTimeout
-    if ($job.State -eq 'Running') {
+    $_ | Wait-Job -Timeout $jobTimeout | Out-Null
+    if ($_.State -eq 'Running') {
         Write-Host "Job $($_.Name) timed out after $jobTimeout seconds — stopping" -ForegroundColor Red
         $_ | Stop-Job
     }
@@ -326,16 +326,24 @@ $promptFile = PrepareFirmware $PSScriptRoot $logFile $programFolder @{ Args = $a
 Write-Host "Starting Agent..."
 Push-Location $programFolder
 $claudeTimeout = 600 # 10 minutes
-$promptContent = Get-Content $promptFile -Raw
-$claudeProcess = Start-Process -FilePath "claude" -ArgumentList "--dangerously-skip-permissions", "-p", "--", $promptContent -NoNewWindow -PassThru
-if (-not $claudeProcess.WaitForExit($claudeTimeout * 1000)) {
-    $claudeProcess.Kill()
-    Write-Host "Claude agent timed out after $claudeTimeout seconds" -ForegroundColor Red
+$claudeJob = Start-Job -ScriptBlock {
+    Set-Location $using:programFolder
+    claude --dangerously-skip-permissions -p -- (Get-Content $using:promptFile -Raw)
 }
+$claudeJob | Wait-Job -Timeout $claudeTimeout | Out-Null
+if ($claudeJob.State -eq 'Running') {
+    Write-Host "Claude agent timed out after $claudeTimeout seconds" -ForegroundColor Red
+    $claudeJob | Stop-Job
+}
+$claudeJob | Receive-Job | ForEach-Object { Write-Host $_ }
+$claudeJob | Remove-Job -Force
 Pop-Location
 
 Remove-Item $promptFile
 
+} catch {
+    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host $_.ScriptStackTrace -ForegroundColor DarkRed
 } finally {
     # --- Set Ready if in a test run context (always, even on failure) ---
     if ($testRunId) {
