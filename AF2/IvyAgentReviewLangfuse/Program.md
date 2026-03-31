@@ -63,7 +63,7 @@ Session status report. Always generated first, using `Get-SessionStatus.ps1`.
 ```markdown
 # Session Status: {SessionId}
 
-**Status**: Complete / Failed / PrematureStop
+**Status**: Complete / CompleteWithRetries / Failed / PrematureStop
 **Stop Reason**: {reason from Get-SessionStatus}
 **Last Observation**: {time} — {preview}
 **Last Workflow State**: {state}
@@ -73,7 +73,9 @@ Session status report. Always generated first, using `Get-SessionStatus.ps1`.
 ## Workflows
 | Workflow | Status |
 |----------|--------|
-| {name} | Finished / Active (unfinished) / Failed |
+| {name} | Finished / Recovered / Active (unfinished) / Failed |
+
+Use `RecoveredWorkflows` from Get-SessionStatus to mark workflows that failed then later succeeded as "Recovered" instead of "Failed".
 
 ## Diagnosis (PrematureStop/Failed only)
 
