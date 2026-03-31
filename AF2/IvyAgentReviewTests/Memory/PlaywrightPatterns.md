@@ -959,6 +959,8 @@ If tests fail on first run, check these common issues:
 20. **CodeInput in sheets with title input** → `getByRole('textbox').first()` matches the title TextInput, not the CodeInput. Use `.last()` for the CodeInput when both are present
 21. **Ivy confirm dialog buttons** → `WithConfirm()` renders "Cancel" and "Ok" buttons, NOT a duplicate of the trigger button text. Use `getByRole('button', { name: 'Ok' })` to confirm
 22. **Video afterEach timeout** → Calling `video.path()` or `video.saveAs()` in `afterEach` can cause timeout. Let Playwright handle video naming automatically via config
+23. **App shows default/dashboard instead of target app** → Use `?shell=false` instead of `?chrome=false` in the URL. `chrome=false` is not recognized by the Ivy frontend router.
+24. **Search input not found with `input[type="text"]`** → Ivy's `ToSearchInput()` may not render as `type="text"`. Use `getByPlaceholder('Search ...')` instead.
 
 ---
 
@@ -1028,8 +1030,59 @@ Any Ivy app that has connections listed in `dotnet run --describe` output (e.g.,
 
 ---
 
+## URL Parameter for Shell-less App Rendering
+
+### Problem
+The `?chrome=false` URL parameter does NOT work with Ivy's tab-based AppShell (`UseAppShell(new AppShellSettings().UseTabs(...))`). Navigating to `/<app-id>?chrome=false` always renders the default app (typically a dashboard), not the targeted app.
+
+### Solution
+Use `?shell=false` instead of `?chrome=false`:
+
+```typescript
+// ❌ WRONG: chrome=false doesn't bypass AppShell tabs — always shows default app
+await page.goto(`http://localhost:${appPort}/categories?chrome=false`);
+
+// ✅ CORRECT: shell=false properly renders the targeted app without AppShell
+await page.goto(`http://localhost:${appPort}/categories?shell=false`);
+```
+
+### Why
+The Ivy frontend checks `?shell=false` (via `getShellParam()` in the client code) to determine whether to render the AppShell wrapper. The `?chrome=false` parameter is not recognized by the frontend router.
+
+### Key Points
+- **ALWAYS** use `?shell=false`, never `?chrome=false`
+- This affects ALL apps when using the tab-based AppShell
+- The URL path (`/categories`, `/posts`, etc.) correctly sets the `appId` in the WebSocket connection
+- Without `?shell=false`, the AppShell renders and shows the default app tab
+
+---
+
+## SearchInput Locator
+
+### Problem
+Ivy's `state.ToSearchInput()` renders a custom search input component. The input type varies and `input[type="text"]` may not match.
+
+### Solution
+Use `getByPlaceholder()` for the most reliable matching:
+
+```typescript
+// ✅ GOOD: Match by placeholder text (most reliable)
+const searchInput = page.getByPlaceholder('Search categories');
+
+// ❌ BAD: input type may not be "text"
+const searchInput = page.locator('input[type="text"]').first();
+```
+
+### Key Points
+- `ToSearchInput()` placeholder text follows the pattern "Search <entity>..." (e.g., "Search categories...", "Search posts...")
+- The `.Placeholder()` modifier on `ToSearchInput()` sets the placeholder text
+- `getByPlaceholder()` is substring-matching by default, so "Search categories" matches "Search categories..."
+
+---
+
 ## Last Updated
 
+2026-03-31 - Added shell=false URL parameter pattern and SearchInput locator pattern (BloggingPlatformV2 test review)
 2026-03-26 - Added dispatchEvent viewport workaround, CodeInput textbox ordering in sheets, Ivy confirm dialog button naming patterns (MarkdigWikiEngine test review)
 2026-03-26 - Added Video Recording afterEach hang fix and Connection Secrets for Testing patterns (AIAssistant test review)
 2026-03-25 - Added comprehensive "Testing CodeInput Widgets" section with patterns for state sync, HTML escaping, multi-panel layouts, and status indicators (XMLFormatterAndValidator test review)

@@ -107,8 +107,10 @@ services:
 
 ### 7. Generate Tests
 
-When writing tests it's very useful to test one Ivy app at at time with out the chrome.
-http://localhost:<port>/<app-id>?chrome=false
+When writing tests it's very useful to test one Ivy app at a time without the chrome.
+http://localhost:<port>/<app-id>?shell=false
+
+> **IMPORTANT**: The correct URL parameter is `?shell=false`, NOT `?chrome=false`. The `chrome=false` parameter does not work with the tab-based AppShell and always shows the default app.
 
 Write the following files directly to `.ivy/tests/`:
 
