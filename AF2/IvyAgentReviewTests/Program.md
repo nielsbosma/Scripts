@@ -92,7 +92,13 @@ services:
 ### 5. Check Existing Tests
 
 - Look in `.ivy/tests/` within the project for existing `.spec.ts` files
-- If they exist, read them — improve or extend, do not duplicate
+- If they exist AND this is a re-entry (tests were previously generated):
+  1. Run the existing tests first **without regenerating** (skip to Step 8 → Step 9 for a quick validation run)
+  2. Identify which specs pass and which fail
+  3. Only regenerate specs for apps whose tests **fail or are missing**
+  4. Skip source code collection (Step 3) for apps whose tests already pass — their specs are good
+  5. For failing specs, read the source code only for those specific apps before regenerating
+- If no existing tests, proceed normally
 - Also check for `console.log`, `backend.log` from previous runs — these contain issues to address
 
 ### 6. Create Test Directory
@@ -108,11 +114,31 @@ Write the following files directly to `.ivy/tests/`:
 
 **package.json** — minimal, with `@playwright/test` dependency
 
-**playwright.config.ts** — Chromium only, single worker, no retries, uses `process.env.APP_PORT` for base URL, viewport `{ width: 1920, height: 1080 }`, automatic screenshot capture on failure: `screenshot: 'only-on-failure'`, trace and video recording: `trace: 'retain-on-failure'`, `video: 'retain-on-failure'` in `use`
+**playwright.config.ts** — Chromium only, single worker, no retries, uses `process.env.APP_PORT` for base URL, viewport `{ width: 1920, height: 1080 }`, automatic screenshot capture on failure: `screenshot: 'only-on-failure'`, trace and video recording: `trace: 'retain-on-failure'`, `video: 'retain-on-failure'` in `use`. Must include global setup/teardown:
+```typescript
+export default defineConfig({
+  globalSetup: './global-setup.ts',
+  globalTeardown: './global-teardown.ts',
+  // ...other config
+});
+```
+
+**global-setup.ts** — Starts the dotnet server once for all specs:
+- Find a free port via `net.createServer()`
+- Spawn `dotnet run -- --port <port>` with `shell: true`
+- Wait for HTTP 200 on `http://localhost:<port>`
+- Store the port as `process.env.APP_PORT` and write it to a `.app-port` file so specs can read it
+- Store the PID in a `.server-pid` file for teardown
+- Capture stdout/stderr to `.ivy/tests/backend.log`
+
+**global-teardown.ts** — Kills the dotnet server after all specs finish:
+- Read PID from `.server-pid` file
+- Kill process tree (`taskkill /F /T /PID` on Windows, `kill` on Unix)
+- Clean up `.app-port` and `.server-pid` files
 
 **`<app-name>.spec.ts`** — one spec file per app found in the spec and source code:
-- `beforeAll`: find free port via `net.createServer()`, spawn `dotnet run -- --port <port>`, wait for HTTP 200
-- `afterAll`: kill process tree (use `execSync('taskkill /F /T /PID ' + pid)` on Windows, `serverProcess.kill()` on Unix — see Windows Process Cleanup in Memory/PlaywrightPatterns.md)
+- **No per-spec server management** — the server is started/stopped by global setup/teardown
+- Read the port from the `.app-port` file or `process.env.APP_PORT`
 - `beforeEach`: navigate to root
 - Tests should cover:
   - All UI elements specified in the spec are visible
@@ -209,10 +235,11 @@ For example, for an OpenAI connection: `dotnet user-secrets set "OpenAI:ApiKey" 
 
 ```powershell
 cd .ivy/tests
-vp install
 ```
 
-If Playwright browsers aren't installed, run `npx playwright install chromium`.
+- **Skip install if possible**: If `node_modules/` already exists and `package.json` has not been regenerated (unchanged since last run), skip `vp install`. Only run install when `node_modules/` is missing or `package.json` was regenerated in Step 7.
+- If install is needed: `vp install`
+- **Skip Playwright browser check**: Do NOT proactively run `npx playwright install chromium`. Only run it if the test run in Step 9 fails with a "browser not installed" or "Executable doesn't exist" error.
 
 ### 9. Run Tests and Fix Loop
 
@@ -225,8 +252,9 @@ If Playwright browsers aren't installed, run `npx playwright install chromium`.
      - **Test code** (wrong selectors, timing) → fix the `.spec.ts` files
      - **Project source code** (bugs in .cs files) → fix the `.cs` files in the project directory
      - **Ivy Framework or other external** → do NOT fix, note for later planning
-  3. Apply fixes and re-run
-  4. Record what was changed in each fix round
+  3. Apply fixes
+  4. **Selective retry — only re-run failed specs**: After fixing, identify which `.spec.ts` files failed and re-run only those: `npx playwright test <failed-spec-1.spec.ts> <failed-spec-2.spec.ts>`. Do NOT re-run specs that already passed. The shared server stays running between retries.
+  5. Record what was changed in each fix round
 - Retry until tests pass, logs are clean, and screenshots show no visual errors, up to 5 rounds
 - Focus: runtime errors (in logs AND visually in screenshots) are the priority, not just passing assertions
 
