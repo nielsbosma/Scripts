@@ -150,9 +150,9 @@ $skipTests = $false
 if (Test-Path $specReviewPath) {
     $specContent = Get-Content $specReviewPath -Raw
     $impl = 0; $partial = 0; $missing = 0
-    if ($specContent -match '\|\s*Implemented\s*\|\s*(\d+)\s*\|') { $impl = [int]$Matches[1] }
-    if ($specContent -match '\|\s*Partial\s*\|\s*(\d+)\s*\|') { $partial = [int]$Matches[1] }
-    if ($specContent -match '\|\s*Missing\s*\|\s*(\d+)\s*\|') { $missing = [int]$Matches[1] }
+    if ($specContent -match '\|[^|]*Implemented\s*\|\s*(\d+)\s*\|') { $impl = [int]$Matches[1] }
+    if ($specContent -match '\|[^|]*Partial\s*\|\s*(\d+)\s*\|') { $partial = [int]$Matches[1] }
+    if ($specContent -match '\|[^|]*Missing\s*\|\s*(\d+)\s*\|') { $missing = [int]$Matches[1] }
     $total = $impl + $partial + $missing
     $implPercent = if ($total -gt 0) { [math]::Round(($impl + $partial) / $total * 100) } else { 0 }
 
