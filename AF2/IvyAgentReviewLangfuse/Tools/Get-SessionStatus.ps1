@@ -148,13 +148,17 @@ foreach ($traceFolder in $traceFolders) {
     }
 }
 
+# Detect recovered workflows: failed then later finished with same name
+$recoveredWorkflows = @($failedWorkflows | Where-Object { $_ -in $finishedWorkflows })
+$unresolvedFailures = @($failedWorkflows | Where-Object { $_ -notin $finishedWorkflows })
+
 # Determine status
 $hasUnfinishedWorkflows = $activeWorkflows.Count -gt 0
 $status = "Unknown"
 
-if ($failedWorkflows.Count -gt 0) {
+if ($unresolvedFailures.Count -gt 0) {
     $status = "Failed"
-    $stopReason = "Workflow failed: $($failedWorkflows -join ', ')"
+    $stopReason = "Workflow failed: $($unresolvedFailures -join ', ')"
 } elseif ($hasGenerationFailure) {
     $status = "Failed"
     $stopReason = "Generation failure detected"
@@ -168,8 +172,13 @@ if ($failedWorkflows.Count -gt 0) {
     $status = "PrematureStop"
     $stopReason = "No generations found in langfuse data"
 } elseif ($finishedWorkflows.Count -gt 0 -and -not $hasUnfinishedWorkflows) {
-    $status = "Complete"
-    $stopReason = "All workflows completed"
+    if ($recoveredWorkflows.Count -gt 0) {
+        $status = "CompleteWithRetries"
+        $stopReason = "All workflows completed (recovered: $($recoveredWorkflows -join ', '))"
+    } else {
+        $status = "Complete"
+        $stopReason = "All workflows completed"
+    }
 } elseif ($lastBuildSuccess -eq $true) {
     # No workflow events but build succeeded — session completed without workflow system
     $status = "Complete"
@@ -193,5 +202,7 @@ return [PSCustomObject]@{
     ActiveWorkflows = @($activeWorkflows.ToArray())
     FinishedWorkflows = $finishedWorkflows
     FailedWorkflows = $failedWorkflows
+    RecoveredWorkflows = $recoveredWorkflows
+    UnresolvedFailures = $unresolvedFailures
     StopReason = $stopReason
 }

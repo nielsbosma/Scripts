@@ -109,7 +109,9 @@ if ($workflows.Count -eq 0) {
     $workflowGroups = $workflows | Where-Object { $_.WorkflowName } | Group-Object WorkflowName
     foreach ($wf in $workflowGroups) {
         $events = $wf.Group
-        $status = if ($events | Where-Object { $_.EventType -eq "Failed" }) { "❌ Failed" } elseif ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) { "✅ Success" } elseif ($events | Where-Object { $_.EventType -eq "State" -and $_.StateName -eq "Finished" }) { "✅ Success" } else { "🔄 Running" }
+        $hasFailed = $events | Where-Object { $_.EventType -eq "Failed" }
+        $hasFinished = ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) -or ($events | Where-Object { $_.EventType -eq "State" -and $_.StateName -eq "Finished" })
+        $status = if ($hasFailed -and $hasFinished) { "🔄 Recovered" } elseif ($hasFailed) { "❌ Failed" } elseif ($hasFinished) { "✅ Success" } else { "🔄 Running" }
 
         $md += "## $($wf.Name)`n`n"
         $md += "**Status**: $status`n"
@@ -130,7 +132,9 @@ if ($workflows.Count -eq 0) {
     $md += "|----------|--------|-------------|`n"
     foreach ($wf in $workflowGroups) {
         $events = $wf.Group
-        $status = if ($events | Where-Object { $_.EventType -eq "Failed" }) { "❌" } elseif ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) { "✅" } elseif ($events | Where-Object { $_.EventType -eq "State" -and $_.StateName -eq "Finished" }) { "✅" } else { "🔄" }
+        $hasFailed = $events | Where-Object { $_.EventType -eq "Failed" }
+        $hasFinished = ($events | Where-Object { $_.EventType -eq "Finished" -and $_.Success }) -or ($events | Where-Object { $_.EventType -eq "State" -and $_.StateName -eq "Finished" })
+        $status = if ($hasFailed -and $hasFinished) { "🔄" } elseif ($hasFailed) { "❌" } elseif ($hasFinished) { "✅" } else { "🔄" }
         $transCount = ($events | Where-Object { $_.EventType -eq "Transition" }).Count
         $md += "| $($wf.Name) | $status | $transCount |`n"
     }
