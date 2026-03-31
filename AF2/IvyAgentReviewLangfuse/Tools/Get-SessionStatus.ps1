@@ -170,8 +170,12 @@ if ($failedWorkflows.Count -gt 0) {
 } elseif ($finishedWorkflows.Count -gt 0 -and -not $hasUnfinishedWorkflows) {
     $status = "Complete"
     $stopReason = "All workflows completed"
+} elseif ($lastBuildSuccess -eq $true) {
+    # No workflow events but build succeeded — session completed without workflow system
+    $status = "Complete"
+    $stopReason = "No workflows used; last build succeeded"
 } else {
-    # No workflow events at all — likely premature
+    # No workflow events and no successful build — likely premature
     $status = "PrematureStop"
     $stopReason = "No workflow completion events found"
 }
