@@ -961,6 +961,7 @@ If tests fail on first run, check these common issues:
 22. **Video afterEach timeout** → Calling `video.path()` or `video.saveAs()` in `afterEach` can cause timeout. Let Playwright handle video naming automatically via config
 23. **App shows default/dashboard instead of target app** → Use `?shell=false` instead of `?chrome=false` in the URL. `chrome=false` is not recognized by the Ivy frontend router.
 24. **Search input not found with `input[type="text"]`** → Ivy's `ToSearchInput()` may not render as `type="text"`. Use `getByPlaceholder('Search ...')` instead.
+25. **PDF upload fails with "Invalid file type"** → Ivy's security validation rejects hand-crafted PDFs. Use `pdf-lib` to generate proper PDFs (see [FileInput PDF Upload Security Validation](#fileinput-pdf-upload-security-validation))
 
 ---
 
@@ -1080,8 +1081,47 @@ const searchInput = page.locator('input[type="text"]').first();
 
 ---
 
+## FileInput PDF Upload Security Validation
+
+### Problem
+Ivy's `MemoryStreamUploadHandler` validates uploaded file content against the declared MIME type. Hand-crafted PDF binary data (built as strings with `Buffer.from()`) fails this security check with "Invalid file type - File failed security validation. The file content doesn't match the declared type."
+
+### Solution
+Use `pdf-lib` to generate proper PDF files that pass content validation:
+
+```typescript
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+
+async function createTestPdf(): Promise<Buffer> {
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const page = pdfDoc.addPage([612, 792]);
+  page.drawText('Test content here', { x: 50, y: 700, size: 12, font });
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
+}
+```
+
+### Setup
+Add `pdf-lib` to `package.json` dependencies:
+```json
+"dependencies": {
+  "pdf-lib": "^1.17.1"
+}
+```
+
+### Key Points
+- **NEVER** use hand-crafted PDF strings — Ivy's security validation rejects them
+- `pdf-lib` generates proper binary PDF structure with correct headers and cross-references
+- The function is async (returns `Promise<Buffer>`) — must `await` it
+- Write the buffer to disk before passing to `fileInput.setInputFiles()`
+- This pattern is required whenever testing apps with `.Accept(".pdf")` on FileInput
+
+---
+
 ## Last Updated
 
+2026-04-01 - Added FileInput PDF upload security validation pattern with pdf-lib (AIContractClauseFinder test review)
 2026-03-31 - Added shell=false URL parameter pattern and SearchInput locator pattern (BloggingPlatformV2 test review)
 2026-03-26 - Added dispatchEvent viewport workaround, CodeInput textbox ordering in sheets, Ivy confirm dialog button naming patterns (MarkdigWikiEngine test review)
 2026-03-26 - Added Video Recording afterEach hang fix and Connection Secrets for Testing patterns (AIAssistant test review)
