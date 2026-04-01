@@ -32,7 +32,11 @@ When multiple agent sessions deploy simultaneously, they compete over the root D
 ## SetMeta Methods Availability
 
 - `SetMetaTitle` and `SetMetaDescription` work with Ivy 1.2.23+
-- `SetMetaGitHubUrl` is NOT available in Ivy 1.2.27 — comment it out with a TODO
+- `SetMetaGitHubUrl` is NOT available in Ivy 1.2.34 — comment it out with a TODO
+
+## Missing API Types in Ivy NuGet
+
+- `HoverEffect` enum is not available in Ivy 1.2.34. Remove `.Hover()` calls that use it rather than commenting out, as they are non-essential styling.
 
 ## Slack Notification
 
