@@ -84,6 +84,18 @@ Look at the last observation preview, the last workflow state, and any error ind
 Provide a brief analysis of the likely cause.}
 ```
 
+#### All remaining reports (timeline, hallucinations, questions, etc.)
+
+After generating `langfuse-session-status.md`, call `Format-AllReports.ps1` to generate all remaining reports. Do NOT generate report files individually — Format-AllReports.ps1 handles all of them with proper error handling.
+
+```powershell
+& "$toolsDir/Format-AllReports.ps1" -LangfuseDir $LangfuseDir -OutputDir "{WorkDir}/.ivy/" -SessionId $SessionId -Incomplete:$incomplete -Status $status -StopReason $stopReason
+```
+
+This ensures all 9 remaining reports are always generated, even if individual tools fail. The script wraps each report in try/catch and writes an error placeholder file on failure, so downstream tools always have report files to work with.
+
+The report templates below are kept as reference for the expected output format of each report.
+
 #### `langfuse-timeline.md`
 
 Compact session timeline. Use `Get-Timeline.ps1`.
