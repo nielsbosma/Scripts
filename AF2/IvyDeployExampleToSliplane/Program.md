@@ -8,10 +8,10 @@ Deploy an Ivy project to Sliplane as an agent demo in the Ivy-Examples repositor
 
 - **Ivy-Examples repo:** `D:\Repos\_Ivy\Ivy-Examples`
 - **Agent demos folder:** `D:\Repos\_Ivy\Ivy-Examples\agent-demos`
-- **Sliplane CLI:** `dotnet run --project D:/Repos/_Personal/Sliplane.Console/src --`
+- **Sliplane CLI:** `sliplane` (installed globally)
 - **Sliplane project name:** `Ivy-Examples-Agent-Generated`
 - **Sliplane project ID:** `project_c1m7gor0293z`
-- **Sliplane server ID:** `server_335oeo4g3cbd` (ivy-studio-demo)
+- **Sliplane server ID:** `server_fgn4nsi1p36w` (ivy-hosting-1)
 - **GitHub repo:** `Ivy-Interactive/Ivy-Examples`
 
 ## Execution Steps
@@ -242,50 +242,48 @@ If the build fails for other reasons, diagnose and fix before continuing.
 
 Use the project ID and server ID from Constants above. No need to list projects/servers each time.
 
-Create the service (note: `--protocol http` is required when using `--public`, and `--dockerfile` must be the full path from repo root).
-
 If user-secrets were found in step 6, append `--secret-env KEY=VALUE` flags for each secret. Use the actual values from `dotnet user-secrets list` — these are the developer's local secrets and should be carried over to the deployment. Dotnet user-secrets use `:` as a section separator (e.g. `OpenAI:ApiKey`) but environment variables use `__` (double underscore). Convert the keys: replace `:` with `__` in the `--secret-env` flag. Example: secret `OpenAI:ApiKey = sk-123` becomes `--secret-env OpenAI__ApiKey=sk-123`.
 
-**KNOWN BUG (API v0.3.1):** The Sliplane API returns HTTP 500 when `dockerfilePath` is included in service creation, and also when `healthcheck` is omitted.
-
-**Workaround:**
-1. Ensure a temporary Dockerfile exists at the Ivy-Examples repo root, commit and push
-2. Create the service via curl WITHOUT `dockerfilePath`/`dockerContext` but WITH `healthcheck`. Use server `server_fgn4nsi1p36w` (ivy-hosting-1) — the demo server is at capacity:
-```bash
-curl -s -X POST "https://ctrl.sliplane.io/v0/projects/project_c1m7gor0293z/services" \
-  -H "Authorization: Bearer $SLIPLANE_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"ivy-agent-demos-<name>","serverId":"server_fgn4nsi1p36w","deployment":{"url":"https://github.com/Ivy-Interactive/Ivy-Examples","branch":"main","autoDeploy":true},"network":{"public":true,"protocol":"http"},"healthcheck":"/"}'
-```
-3. PATCH the service to set the correct paths:
-```bash
-curl -s -X PATCH "https://ctrl.sliplane.io/v0/projects/project_c1m7gor0293z/services/<SERVICE_ID>" \
-  -H "Authorization: Bearer $SLIPLANE_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"deployment":{"url":"https://github.com/Ivy-Interactive/Ivy-Examples","branch":"main","dockerfilePath":"agent-demos/<name>/Dockerfile","dockerContext":"agent-demos/<name>","autoDeploy":true}}'
-```
-4. Remove the temporary root Dockerfile, commit and push (triggers auto-deploy with correct config)
-5. To add secret env vars, include `"env":[{"key":"KEY","value":"VALUE","secret":true}]` in the PATCH body
-
-If the service already exists (redeployment), trigger a deploy:
-```bash
-curl -s -X POST "https://ctrl.sliplane.io/v0/projects/project_c1m7gor0293z/services/<SERVICE_ID>/deploy" \
-  -H "Authorization: Bearer $SLIPLANE_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
-
-If the service already exists (redeployment), trigger a deploy instead:
+**Service creation** (new service):
 
 ```powershell
-dotnet run --project D:/Repos/_Personal/Sliplane.Console/src -- services deploy `
+sliplane services create `
+  --project-id project_c1m7gor0293z `
+  --name "ivy-agent-demos-<name>" `
+  --server-id server_fgn4nsi1p36w `
+  --repo "https://github.com/Ivy-Interactive/Ivy-Examples" `
+  --branch main `
+  --dockerfile "agent-demos/<name>/Dockerfile" `
+  --docker-context "agent-demos/<name>" `
+  --auto-deploy `
+  --public `
+  --protocol http `
+  --healthcheck "/" `
+  --deploy-include-paths "agent-demos/<name>/*"
+```
+
+Add `--secret-env KEY=VALUE` flags for each user-secret found in step 6 (same key conversion: `:` to `__`).
+
+**Service update** (existing service, to add include-paths to already-deployed services):
+
+```powershell
+sliplane services update `
+  --project-id project_c1m7gor0293z `
+  --service-id <SERVICE_ID> `
+  --deploy-include-paths "agent-demos/<name>/*"
+```
+
+**Redeployment** (trigger a deploy of an existing service):
+
+```powershell
+sliplane services deploy `
   --project-id project_c1m7gor0293z `
   --service-id <SERVICE_ID>
 ```
 
 To find the service ID for redeployment:
 ```powershell
-dotnet run --project D:/Repos/_Personal/Sliplane.Console/src -- services list --project-id project_c1m7gor0293z
+sliplane services list --project-id project_c1m7gor0293z
 ```
 
 ### 9. Wait for deployment
@@ -293,7 +291,7 @@ dotnet run --project D:/Repos/_Personal/Sliplane.Console/src -- services list --
 Check service events/logs to verify the deployment succeeded:
 
 ```powershell
-dotnet run --project D:/Repos/_Personal/Sliplane.Console/src -- services events `
+sliplane services events `
   --project-id project_c1m7gor0293z `
   --service-id <SERVICE_ID>
 ```
