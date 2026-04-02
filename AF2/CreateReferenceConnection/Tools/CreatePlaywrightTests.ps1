@@ -101,7 +101,7 @@ $projectPathTs = ($ProjectPath -replace '\\', '/').TrimEnd('/')
     "@types/node": "^22.10.2"
   }
 }
-"@ | Out-File -FilePath "$TestsDir\package.json" -Encoding UTF8
+"@ | ForEach-Object { [System.IO.File]::WriteAllText("$TestsDir\package.json", $_, [System.Text.UTF8Encoding]::new($false)) }
 
 # ---- Create playwright.config.ts ----
 @"
