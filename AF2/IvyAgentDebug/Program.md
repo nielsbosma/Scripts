@@ -139,6 +139,7 @@ For each actionable finding (that isn't a Hallucination.md edit or IvyMcp GitHub
 ```markdown
 ---
 project: <ProjectName or leave out for auto-detection>
+sourcePath: <absolute path to the test working directory ({WorkDir})>
 ---
 <Full description of the issue and proposed solution>
 
@@ -150,6 +151,8 @@ Include:
 ```
 
 The `project` field should match a project in Tendril's config.yaml (Framework, Agent, Tendril, Console, Mcp, Scripts). Omit the frontmatter entirely if you want Tendril to auto-detect the project.
+
+Always include `sourcePath: {WorkDir}` in inbox frontmatter for traceability back to the test session.
 
 **One issue per file.** Keep descriptions concise but include enough context (file paths, code patterns) for a coding agent to execute end-to-end.
 
