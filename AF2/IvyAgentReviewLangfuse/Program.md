@@ -115,7 +115,15 @@ Compact session timeline. Use `Get-Timeline.ps1`.
 
 Build errors caused by hallucinated APIs/patterns. Use `Get-Hallucinations.ps1`.
 
-Look for the pattern: IvyQuestion answer → WriteFile → Build FAIL. When a build fails after an IvyQuestion-informed write, the question answer likely contained hallucinated APIs.
+Look for the pattern: IvyQuestion answer → WriteFile → Build FAIL. When a build fails after an IvyQuestion-informed write, classify the error. CS1929 errors where the method exists with different overloads are signature mismatches, not hallucinations. Only flag as hallucinated when the API genuinely doesn't exist (CS1061, CS0117, or CS1929 where the method name is not found on the type at all).
+
+**Error classification rules:**
+- `CS1929` (extension method not valid for type): Check if the method name exists on the target type in the Ivy Framework source. If it exists with different overloads → **Signature Mismatch**. If the method name doesn't exist at all → **Hallucinated API**.
+- `CS1061` (type does not contain definition): True hallucination → **Hallucinated API**
+- `CS0117` (type does not contain definition for static member): True hallucination → **Hallucinated API**
+- Other error codes: Classify as **Other**
+
+Signature mismatches are typically self-correcting — the agent fixes them on the next build attempt.
 
 ```markdown
 # Hallucination Analysis: {SessionId}
@@ -127,7 +135,9 @@ Look for the pattern: IvyQuestion answer → WriteFile → Build FAIL. When a bu
 **IvyQuestion**: "{question text}"
 **Answer used in**: `{file path}`
 **Build error**: {error code}: {message}
-**Analysis**: [What was hallucinated — wrong API, wrong method signature, non-existent class, etc.]
+**Classification**: Hallucinated API / Signature Mismatch / Other
+**Analysis**: [What was hallucinated or mismatched — wrong API, wrong method signature, non-existent class, etc.]
+**Self-corrected**: Yes/No (did the agent fix it on retry?)
 
 ## Summary
 
@@ -135,7 +145,8 @@ Look for the pattern: IvyQuestion answer → WriteFile → Build FAIL. When a bu
 |--------|-------|
 | Total IvyQuestions | N |
 | Questions followed by build errors | N |
-| Unique hallucinated APIs | N |
+| Hallucinated APIs (true) | N |
+| Signature mismatches (self-correcting) | N |
 ```
 
 #### `langfuse-questions.md`
