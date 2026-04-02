@@ -160,7 +160,6 @@ Always include `sourcePath: {WorkDir}` in inbox frontmatter for traceability bac
 
 - **When referencing local files** in the description, use full absolute paths (e.g., `D:\Repos\_Ivy\Ivy-Framework\src\Ivy\Widgets\Button.cs`)
 - **When referencing screenshots**, include the full path from `{WorkDir}/.ivy/tests/screenshots/`. The `review-ux.md` file uses `### [filename.png]` headings — parse these and construct the full path using `{WorkDir}/.ivy/tests/screenshots/{filename}`
-- **When referencing videos**, include paths from `{WorkDir}/.ivy/tests/videos/`
 
 ### 4. Write Summary Log
 
