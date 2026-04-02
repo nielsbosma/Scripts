@@ -1,7 +1,8 @@
 param(
     [switch]$Annotate,
     [switch]$Feedback,
-    [switch]$Force
+    [switch]$Force,
+    [string]$DebugFocus = ""
 )
 
 . "$PSScriptRoot\.shared\Utils.ps1"
@@ -76,6 +77,12 @@ if ($Feedback) {
         Write-Host "No feedback provided. Aborting." -ForegroundColor Red
         exit 0
     }
+}
+
+# --- DebugFocus: load focus instructions from file ---
+if ($DebugFocus -ne "" -and (Test-Path $DebugFocus)) {
+    $feedbackContent = Get-Content -Path $DebugFocus -Raw
+    Write-Host "Debug focus loaded from: $DebugFocus" -ForegroundColor Cyan
 }
 
 try {
