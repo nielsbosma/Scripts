@@ -92,7 +92,12 @@ services:
 ### 5. Check Existing Tests
 
 - Look in `.ivy/tests/` within the project for existing `.spec.ts` files
-- If they exist AND this is a re-entry (tests were previously generated):
+- **Test fingerprinting**: Check for `.ivy/tests/.fingerprint` file. This file stores a hash of the spec (`spec.md`) content + source file list. If it exists:
+  1. Compute the current fingerprint: hash of `.ivy/spec.md` content concatenated with a sorted list of `.cs` file paths and their last-modified timestamps
+  2. Compare with the stored fingerprint
+  3. If fingerprints match AND all existing `.spec.ts` files are present: skip Steps 3 and 7 entirely (source collection and test generation). Jump directly to Step 8 → Step 9 for a validation run.
+  4. If fingerprints differ: proceed with the re-entry logic below
+- If existing `.spec.ts` files exist AND this is a re-entry (tests were previously generated):
   1. Run the existing tests first **without regenerating** (skip to Step 8 → Step 9 for a quick validation run)
   2. Identify which specs pass and which fail
   3. Only regenerate specs for apps whose tests **fail or are missing**
@@ -222,6 +227,8 @@ export default defineConfig({
 
 If Args contains additional instructions, apply them to the test generation.
 
+**Write test fingerprint**: After generating tests, compute and write the fingerprint to `.ivy/tests/.fingerprint`. The fingerprint is a hash of `.ivy/spec.md` content concatenated with a sorted list of `.cs` file paths and their last-modified timestamps. This enables Step 5 to skip regeneration on subsequent runs when nothing has changed.
+
 ### 7.5. Set Up Connection Secrets
 
 If the project has connections (check `dotnet run --describe` output for `connections:` and `secrets:` sections), set dummy secrets so the server can start:
@@ -256,13 +263,16 @@ cd .ivy/tests
      - **Ivy Framework or other external** → do NOT fix, note for later planning
   3. Apply fixes
   4. **Selective retry — only re-run failed specs**: After fixing, identify which `.spec.ts` files failed and re-run only those: `npx playwright test <failed-spec-1.spec.ts> <failed-spec-2.spec.ts>`. Do NOT re-run specs that already passed. The shared server stays running between retries.
-  5. Record what was changed in each fix round
-- Retry until tests pass, logs are clean, and screenshots show no visual errors, up to 5 rounds
+  5. **Skip server restart for test-only fixes**: If the only files changed in a fix round are `.spec.ts` files (no `.cs` source changes), skip the server restart entirely — the dotnet server is already running and test-only changes don't require a rebuild. Only restart the server when `.cs` files were modified.
+  6. Record what was changed in each fix round
+- Retry until tests pass, logs are clean, and screenshots show no visual errors, up to 3 rounds
 - Focus: runtime errors (in logs AND visually in screenshots) are the priority, not just passing assertions
 
 ### 10. Review Screenshots → review-ux.md
 
-View every screenshot in `.ivy/tests/screenshots/` and write `.ivy/review-ux.md`:
+**Screenshot filtering**: Before reviewing, categorize screenshots by filename pattern. Skip screenshots that match baseline/initial-load patterns (e.g., `*-initial-load*`, `*01-initial*`) — these just confirm the page rendered and rarely surface actionable issues. Focus review on screenshots taken after interactions, state transitions, or error conditions (e.g., `*-after-*`, `*-error-*`, `*-click-*`, `*-submit-*`). If a screenshot set has fewer than 3 post-interaction screenshots, review all of them including initial loads.
+
+View the filtered screenshots in `.ivy/tests/screenshots/` and write `.ivy/review-ux.md`:
 
 ```markdown
 # UX Review: [Project Name]
