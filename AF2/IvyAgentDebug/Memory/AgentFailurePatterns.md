@@ -404,3 +404,27 @@ CreateContext(() => new AuthContext(currentUser)) // Pass the IState
 - Plan 905: Strengthen infrastructure error handling (suggests stopping after 3 errors)
 - Plan 930: Improve RepeatedInfrastructureErrorAnalyser threshold (suggests being less aggressive)
 - This session evidence: Agent should try cleanup before stopping, combining both approaches
+
+## Sub-task 401 Unauthorized Failures
+
+**Pattern**: Multiple sub-tasks fail simultaneously with HTTP 401 (Unauthorized) during parallel execution, typically late in high-token sessions.
+
+**Example Session**: 1bbd69d3-7fb5-4dd1-acb1-671563c83a72 (BarIndustry-V6)
+- 4 consecutive sub-tasks (#32, #33, #34, #35) all failed with `401 (Unauthorized)`
+- Failures occurred late in session (~10M input tokens consumed)
+- Agent recovered by redoing work sequentially in main thread
+- Session still completed (62/62 spec, 22/22 tests) but at higher cost ($55.87)
+
+**Root Causes** (suspected):
+1. API auth token expiry during long-running sessions
+2. Concurrent request rate limiting
+3. Token budget exhaustion triggering auth rejection
+
+**Impact**: Lost parallelism, wasted tokens on rework, inflated cost. One-shot score dropped to 7.
+
+**Detection**:
+- Client output log shows multiple sub-tasks with "401 (Unauthorized)" failure
+- Sub-tasks fail in rapid succession (same root cause)
+- Agent successfully completes work after switching to sequential execution
+
+**Plan Created**: subtask-401-unauthorized-kills-parallel-work.md

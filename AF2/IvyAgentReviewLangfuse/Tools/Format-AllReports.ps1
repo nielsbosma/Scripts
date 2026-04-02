@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Generates all formatted markdown reports from langfuse data.
 .PARAMETER LangfuseDir
@@ -33,7 +33,7 @@ function Invoke-Tool($name) {
 # Helper to generate incomplete session banner
 function Get-IncompleteBanner {
     if ($Incomplete) {
-        return "`n> **Warning: Session ended prematurely** — data may be incomplete. Status: $Status, Reason: $StopReason`n"
+        return "`n> **Warning: Session ended prematurely** -- data may be incomplete. Status: $Status, Reason: $StopReason`n"
     }
     return ""
 }
@@ -67,7 +67,7 @@ Write-Report -Name "timeline" -FileName "langfuse-timeline.md" -Generator {
     $md += $banner
     if (-not $timeline -or $timeline.Count -eq 0) {
         if ($Incomplete) {
-            $md += "`nNo data available — session ended before this data was generated.`n"
+            $md += "`nNo data available -- session ended before this data was generated.`n"
         }
     } else {
         foreach ($trace in $timeline) {
@@ -91,7 +91,7 @@ Write-Report -Name "hallucinations" -FileName "langfuse-hallucinations.md" -Gene
     $md += $banner
     if ($hallucinations.Count -eq 0) {
         if ($Incomplete) {
-            $md += "`nNo data available — session ended before this data was generated.`n"
+            $md += "`nNo data available -- session ended before this data was generated.`n"
         } else {
             $md += "`nNo IvyQuestions found in this session.`n"
         }
@@ -112,41 +112,59 @@ Write-Report -Name "questions" -FileName "langfuse-questions.md" -Generator {
     $questions = Invoke-Tool "Get-IvyQuestions"
     $md = "# IvyQuestion Log: $SessionId`n"
     $md += $banner
-    $requests = $questions | Where-Object { $_.Direction -eq "Request" }
-    $responses = $questions | Where-Object { $_.Direction -eq "Response" }
-    if ($requests.Count -eq 0) {
+    # Pair requests with responses by adjacency in the ordered list
+    $pairs = @()
+    for ($i = 0; $i -lt $questions.Count; $i++) {
+        if ($questions[$i].Direction -eq "Request") {
+            $req = $questions[$i]
+            $resp = $null
+            # Find the nearest Response in the list (before or after)
+            if ($i + 1 -lt $questions.Count -and $questions[$i + 1].Direction -eq "Response") {
+                $resp = $questions[$i + 1]
+            } elseif ($i - 1 -ge 0 -and $questions[$i - 1].Direction -eq "Response") {
+                $resp = $questions[$i - 1]
+            }
+            $pairs += [PSCustomObject]@{ Request = $req; Response = $resp }
+        }
+    }
+    if ($pairs.Count -eq 0) {
         if ($Incomplete) {
-            $md += "`nNo data available — session ended before this data was generated.`n"
+            $md += "`nNo data available -- session ended before this data was generated.`n"
         } else {
             $md += "`nNo IvyQuestions asked during this session.`n"
         }
     } else {
         $md += "`n## Questions`n`n"
         $qNum = 1
-        foreach ($req in $requests) {
-            # Find matching response (next response in same trace after this request)
-            $resp = $responses | Where-Object { $_.TraceName -eq $req.TraceName -and $_.ObservationFile -gt $req.ObservationFile } | Select-Object -First 1
-            $status = if ($resp -and $resp.Success) { "✅ Success" } elseif ($resp) { "❌ Failed" } else { "❓ No response" }
+        $successCount = 0
+        $totalChars = 0
+        foreach ($pair in $pairs) {
+            $req = $pair.Request
+            $resp = $pair.Response
+            $isSuccess = $resp -and ($resp.Success -eq $true -or "$($resp.Success)" -ieq "True") -and $resp.AnswerLength -gt 0
+            $status = if ($isSuccess) { "✅ Success" } else { "❌ Failed" }
             $md += "### Q$qNum`: $($req.Question)`n`n"
             $md += "**Source**: $($req.Source)`n"
             $md += "**Status**: $status`n"
-            if ($resp -and $resp.Success) {
+            if ($isSuccess) {
                 $md += "**Answer length**: $($resp.AnswerLength) chars`n"
+                $successCount++
+                $totalChars += $resp.AnswerLength
             } elseif ($resp -and $resp.Error) {
                 $md += "**Error**: $($resp.Error)`n"
+            } elseif (-not $resp) {
+                $md += "**Error**: No answer returned`n"
             }
             $md += "`n"
             $qNum++
         }
 
-        $successCount = ($responses | Where-Object { $_.Success -eq $true }).Count
-        $failedCount = ($responses | Where-Object { $_.Success -eq $false }).Count
-        $totalChars = ($responses | Where-Object { $_.Success -eq $true } | Measure-Object -Property AnswerLength -Sum).Sum
+        $failedCount = $pairs.Count - $successCount
 
         $md += "## Summary`n`n"
         $md += "| Metric | Count |`n"
         $md += "|--------|-------|`n"
-        $md += "| Total IvyQuestions | $($requests.Count) |`n"
+        $md += "| Total IvyQuestions | $($pairs.Count) |`n"
         $md += "| Successful | $successCount |`n"
         $md += "| Failed | $failedCount |`n"
         $md += "| Total answer chars | $totalChars |`n"

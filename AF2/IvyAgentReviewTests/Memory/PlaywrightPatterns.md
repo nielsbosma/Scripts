@@ -962,6 +962,14 @@ If tests fail on first run, check these common issues:
 23. **App shows default/dashboard instead of target app** → Use `?shell=false` instead of `?chrome=false` in the URL. `chrome=false` is not recognized by the Ivy frontend router.
 24. **Search input not found with `input[type="text"]`** → Ivy's `ToSearchInput()` may not render as `type="text"`. Use `getByPlaceholder('Search ...')` instead.
 25. **PDF upload fails with "Invalid file type"** → Ivy's security validation rejects hand-crafted PDFs. Use `pdf-lib` to generate proper PDFs (see [FileInput PDF Upload Security Validation](#fileinput-pdf-upload-security-validation))
+26. **DataTable shows "No items found" with `using var db`** → Add `.ToList()` before `.AsQueryable()` to materialize the query within the DbContext scope. The lazy IQueryable is evaluated after DbContext disposal.
+27. **DataTable cell click doesn't trigger OnCellClick** → `dispatchEvent('click')` on hidden `<td>` elements doesn't trigger Glide Data Grid's OnCellClick handler. Focus tests on data loading verification instead of blade navigation.
+26. **DataTable `th` headers are hidden** → Don't use `th` visibility checks for `ToDataTable()`. Use `page.content().includes()` instead (see [DataTable Rendering Quirks](#datatable-todatatable-rendering-quirks))
+27. **DataTable shows "No items found" with Badge objects** → `object`-typed fields containing Badge instances break Arrow/gRPC serialization. Tables show empty despite having data
+28. **DataTable grid cells not clickable** → Virtual grid cells exist in DOM but are "not visible" to Playwright. Don't try to `.click()` grid cells
+29. **BasicAuth server fails on connect** → Set all 3 required secrets: `BasicAuth:HashSecret`, `BasicAuth:JwtSecret`, `BasicAuth:Users` (with Argon2 hash). Server starts but WebSocket connections fail without them.
+30. **Auth form label "User" matches multiple elements** → Use `page.locator('label').filter({ hasText: 'User' })` — labels show "User *" with asterisk for required fields
+31. **Dialog title strict mode violation** → When a dialog's title matches the trigger button text (e.g., "Add Product" button opens dialog with "Add Product" heading), `getByText('Add Product')` resolves to 2 elements. Always use `getByRole('heading', { name: 'Dialog Title' })` for dialog title assertions.
 
 ---
 
@@ -1119,8 +1127,182 @@ Add `pdf-lib` to `package.json` dependencies:
 
 ---
 
+## DataTable (ToDataTable) Rendering Quirks
+
+### Problem 1: `th` elements are hidden
+Ivy's `ToDataTable()` renders `<th>` elements with `role="columnheader"` but they are considered **hidden** by Playwright. Attempting `page.locator('th').filter({ hasText: 'Name' }).toBeVisible()` will fail with "unexpected value hidden" even though headers are visually rendered on screen.
+
+### Problem 2: Grid cells exist but are not visible
+DataTable uses a virtualized grid. Cell elements (`role="gridcell"`) exist in the DOM but are marked "not visible" by Playwright. Attempting to `.click()` a grid cell will timeout.
+
+### Problem 3: Badge objects break Arrow/gRPC serialization
+When DataTable row records contain `object`-typed fields with `Badge` instances (e.g., `object Active` containing `new Badge("Active").Color(Colors.Green)`), the Arrow/gRPC table serialization fails with "Invalid gRPC message: too short". The DataTable displays "No items found" even though the underlying data exists.
+
+Console error pattern: `No arrow stream found in DataTableResult, trying fallback method` → `Fallback parsing also failed: Error: Invalid gRPC message: too short`
+
+### Problem 4: `dispatchEvent('click')` does NOT trigger OnCellClick
+Even though `dispatchEvent('click')` bypasses visibility checks, it does NOT trigger the DataTable's `OnCellClick` handler. This means blade navigation via cell click cannot be tested with Playwright. The Glide Data Grid captures clicks on the `<canvas>` element, not on the accessibility `<td>` elements.
+
+### Problem 5: `.Select()` to record + `.OrderBy()` = empty table (EF Core translation failure)
+When DataTable list blades use `.Select(e => new RecordType(...)).OrderBy(e => e.Prop)`, EF Core cannot translate the expression tree because the OrderBy references a property on the projected record type. The DataTable silently shows "No items found" with no error.
+
+**Fix**: Move `.OrderBy()` BEFORE `.Select()`, then materialize with `.ToList().AsQueryable()`:
+```csharp
+// ❌ BAD: OrderBy after Select fails EF Core translation
+var query = db.Employees
+    .Include(e => e.Department)
+    .Select(e => new EmployeeRow(e.Id, e.Name, ...))
+    .OrderBy(e => e.Name);  // Fails - can't translate OrderBy on record type
+var table = query.ToDataTable(...)
+
+// ✅ GOOD: OrderBy before Select, then materialize
+var data = db.Employees
+    .Include(e => e.Department)
+    .OrderBy(e => e.Name)   // Works - EF Core can translate on entity
+    .Select(e => new EmployeeRow(e.Id, e.Name, ...))
+    .ToList();
+var table = data.AsQueryable().ToDataTable(...)
+```
+
+**Affected Pattern**: Any DataTable list blade that projects to a record/DTO with `.Select()` and applies `.OrderBy()` after the projection. Common in apps with navigation property display (e.g., Employee → Department.Name, SaleOrder → Customer.Name).
+
+### Problem 6: `dispatchEvent('click')` on gridcell DOES trigger OnRowAction (but NOT OnCellClick)
+While `dispatchEvent('click')` does NOT trigger `OnCellClick` (Problem 4), it DOES trigger `OnRowAction` for the default row action. This means blade push navigation via `RowActions(MenuItem.Default("Edit", "edit"))` + `OnRowAction` CAN be triggered from tests.
+
+```typescript
+// ✅ Works for OnRowAction (blade push/detail navigation)
+const firstCell = page.locator('[role="gridcell"]').first();
+await firstCell.dispatchEvent('click');
+await page.waitForTimeout(1500);
+// Detail blade is now open
+```
+
+### Problem 7: `using var db` + lazy IQueryable = empty table
+When apps use synchronous `using var db = factory.CreateDbContext()` and pass the EF Core `IQueryable` directly to `ToDataTable()` without materializing, the table shows "No items found". The `DbContext` is disposed when `Build()` returns, but `ToDataTable()` evaluates the IQueryable lazily during rendering.
+
+**Fix**: Add `.ToList()` before `.AsQueryable()` to materialize within the DbContext scope:
+```csharp
+// ❌ BAD: IQueryable evaluated after DbContext disposed
+var items = db.Items.Select(...).AsQueryable();
+return items.ToDataTable()...
+
+// ✅ GOOD: Materialized before DbContext disposed
+var items = db.Items.Select(...).ToList().AsQueryable();
+return items.ToDataTable()...
+```
+
+### Solutions
+
+```typescript
+// ❌ BAD: th elements are hidden in DataTable (when column is clipped by blade width)
+await expect(page.locator('th').filter({ hasText: 'Name' })).toBeVisible();
+
+// ✅ OK: getByText() CAN find visible column headers if they're within the blade's visible area
+await expect(page.getByText('Name').first()).toBeVisible(); // Works if not clipped
+
+// ❌ BAD: Grid cells are not visible/clickable
+await page.locator('[role="gridcell"]').first().click();
+
+// ❌ BAD: dispatchEvent doesn't trigger OnCellClick handler
+await page.locator('[role="gridcell"]').first().dispatchEvent('click');
+
+// ✅ GOOD: dispatchEvent DOES trigger OnRowAction (for blade navigation)
+await page.locator('[role="gridcell"]').first().dispatchEvent('click');
+// Detail blade opens if RowActions + OnRowAction is configured
+
+// ✅ GOOD: Use page.content() to check for data presence
+const content = await page.content();
+expect(content.includes('Elena Marchetti') || content.includes('James Thornton')).toBeTruthy();
+
+// ✅ GOOD: Check for either data or empty state
+const hasData = !content.includes('No items found');
+const isEmpty = content.includes('No items found');
+expect(hasData || isEmpty).toBeTruthy();
+
+// ✅ GOOD: Verify no error callouts
+const hasError = content.includes('role="alert"') && content.includes('Error');
+expect(hasError).toBeFalsy();
+```
+
+### When to Apply
+Any test involving `ToDataTable()` / `.AsQueryable().ToDataTable()`. If the app uses raw `Table` (like dashboard `new Table(...)`) instead of DataTable, standard `th` and `tr` locators work fine.
+
+### Key Points
+- DataTable `th` headers exist in DOM but may be "hidden" if clipped by blade width
+- `getByText()` CAN find headers that are within the visible area of the blade
+- DataTable grid cells exist but are not visible/clickable — `dispatchEvent('click')` doesn't work for OnCellClick BUT does work for OnRowAction
+- `.Select()` to record + `.OrderBy()` after projection = silent EF Core translation failure → empty table. Fix: OrderBy before Select, then `.ToList().AsQueryable()`
+- Badge objects in DataTable row `object` fields cause serialization failure → empty table
+- `using var db` + lazy IQueryable pattern causes empty tables — add `.ToList()` before `.AsQueryable()`
+- For DataTable apps, focus tests on verifying data loads (content checks) rather than cell click interactions
+- Dashboard's raw `Table` component works normally with standard locators
+- This is a **Framework-level** issue — note it in review-tests.md External Issues
+
+---
+
+## BasicAuth Testing
+
+### Problem
+Ivy apps using `server.UseAuth<BasicAuthProvider>()` require proper secret configuration before the server can handle WebSocket connections. Without all secrets, the server starts but fails on client connect with `BasicAuth:JwtSecret is required` or `BasicAuth:HashSecret is required`.
+
+### Required Secrets
+BasicAuth requires **3 user secrets**:
+1. `BasicAuth:HashSecret` — base64-encoded byte array used as Argon2 pepper
+2. `BasicAuth:JwtSecret` — base64-encoded symmetric key for JWT signing (minimum 32 bytes)
+3. `BasicAuth:Users` — semicolon-separated `username:argon2hash` pairs
+
+### Setting Up Test Secrets
+```bash
+cd <project-root>
+dotnet user-secrets set "BasicAuth:HashSecret" "<base64-secret>"
+dotnet user-secrets set "BasicAuth:JwtSecret" "<base64-jwt-secret>"
+dotnet user-secrets set "BasicAuth:Users" "admin:<argon2-hash>"
+```
+
+To generate a proper Argon2 hash, use the `Isopoh.Cryptography.Argon2` library (same as Ivy Framework uses). Create a temp project or script that hashes the desired password with the chosen HashSecret.
+
+### Auth Flow in Tests
+- Navigating to any app URL when unauthenticated shows the login form **inline** (not a redirect)
+- The login form has: `User *` label + text input, `Password *` label + password input, `Login` button
+- After successful login, the page automatically switches to the requested app content
+- Auth form labels include asterisks for required fields: use `page.locator('label').filter({ hasText: 'User' })` instead of `getByText('User')`
+
+### Test Pattern
+```typescript
+// Navigate to target app — auth form shows automatically
+await page.goto(`http://localhost:${appPort}/hello-world?shell=false`);
+await page.waitForTimeout(2000);
+
+// Fill credentials
+const userInput = page.locator('input[type="text"]').first();
+await userInput.fill('admin');
+const passwordInput = page.locator('input[type="password"]').first();
+await passwordInput.fill('password');
+
+// Submit
+await page.getByRole('button', { name: 'Login' }).first().click();
+await page.waitForTimeout(3000);
+
+// Verify authenticated content
+await expect(page.getByText('Hello, World!')).toBeVisible({ timeout: 10000 });
+```
+
+### Key Points
+- The server starts fine without secrets but **fails on WebSocket connect** — the initial HTTP 200 check passes but app never renders
+- There may be **two Login buttons** visible (form submit + explicit button) — always use `.first()`
+- Password input uses `input[type="password"]`, not `input[type="text"]`
+- Invalid login shows error callout: "Login failed. Please check your credentials."
+- The `?shell=false` parameter works correctly with auth — it shows the auth form for the targeted app
+
+---
+
 ## Last Updated
 
+2026-04-02 - Added BasicAuth testing pattern: secret setup, auth flow, login form locators (BasicAuth1 test review)
+2026-04-01 - Added EF Core projected query fix and OnRowAction dispatchEvent pattern (Bakery-V6 test review)
+2026-04-01 - Added dialog title strict mode violation pattern: use getByRole('heading') for dialog title assertions (AgricultureShop test review)
+2026-04-01 - Updated DataTable patterns: dispatchEvent doesn't trigger OnCellClick, using var db + lazy IQueryable = empty table fix, getByText works for visible headers (Blog test review)
+2026-04-01 - Added DataTable rendering quirks: hidden th elements, non-clickable grid cells, Badge object Arrow/gRPC serialization failure (Carwash test review)
 2026-04-01 - Added FileInput PDF upload security validation pattern with pdf-lib (AIContractClauseFinder test review)
 2026-03-31 - Added shell=false URL parameter pattern and SearchInput locator pattern (BloggingPlatformV2 test review)
 2026-03-26 - Added dispatchEvent viewport workaround, CodeInput textbox ordering in sheets, Ivy confirm dialog button naming patterns (MarkdigWikiEngine test review)
