@@ -2,7 +2,9 @@ We have the following repositories on this machine:
 
 Read ../.shared/Repos.md
 
-**Check Args:** If Args contains `-NoBuild`, skip all build steps (steps marked with [BUILD]) below.
+**Check Args:**
+- If Args contains `-NoBuild`, skip all build steps (steps marked with [BUILD]) below.
+- If Args contains `-Repos <comma-separated-paths>`, only sync the listed repositories. Otherwise sync all.
 
 For each repository run the following steps as a subtask:
 
