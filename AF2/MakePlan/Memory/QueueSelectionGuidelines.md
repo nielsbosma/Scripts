@@ -47,7 +47,7 @@ Use `{ProjectName}{SubsystemType}` for granular queues to enable parallel proces
 | Queue | Use When | Source Paths |
 |-------|----------|--------------|
 | IvyMcp | MCP service (IvyDoc, IvyQuestion) | Ivy-Mcp (GitHub issues only) |
-| IvyTendril | Tendril task management app | Ivy-Tendril |
+| IvyTendril | Tendril task management app | Ivy-Framework\src\tendril\Ivy.Tendril |
 
 ## Independence Check
 

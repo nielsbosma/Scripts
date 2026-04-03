@@ -30,7 +30,7 @@ Check the firmware header for `Project:` field.
 
 **If `Project: [Auto]` or no project specified**:
 - Analyze the task description to infer the correct project
-- Read `D:\Repos\_Ivy\Ivy-Tendril\config.yaml` to understand available projects
+- Read `D:\Repos\_Ivy\Ivy-Framework\src\tendril\Ivy.Tendril.TeamIvyConfig\config.yaml` to understand available projects
 - Match based on keywords, repo paths, or component names in the description
 - Once you determine the project, update the `project` field in the plan.yaml file created later
 - Use the project context to scope your research

@@ -5,7 +5,7 @@ param([switch]$WhatIf)
 
 $sourceBase = "D:\Tendril"
 $targetBase = "D:\Repos\_Ivy\Ivy-Framework\src\tendril\Ivy.Tendril.TeamIvyConfig"
-$mainRepo = "D:\Repos\_Ivy\Ivy-Tendril"
+$mainRepo = "D:\Repos\_Ivy\Ivy-Framework"
 $directories = @("Inbox", "Plans", "Trash")
 
 Write-Host "Tendril Directory Migration Tool" -ForegroundColor Cyan

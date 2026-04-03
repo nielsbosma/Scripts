@@ -89,5 +89,5 @@ D:\Repos\_Personal\Scripts\AF2\.vscode-extensions
 
 Tools for managing our plan and harness engineering. 
 
- D:\Repos\_Ivy\Ivy-Tendril\
+ D:\Repos\_Ivy\Ivy-Framework\src\tendril\Ivy.Tendril\
 
