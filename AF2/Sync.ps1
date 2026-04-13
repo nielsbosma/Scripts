@@ -34,19 +34,20 @@ if ($selectedSwitches.Count -eq 0) {
 
 $repos = $selectedSwitches | ForEach-Object { $repoMap[$_] }
 
-# Ensure selected repos are on main
-$notOnMain = @()
+# Ensure selected repos are on the expected branch
+$notOnExpected = @()
 foreach ($repo in $repos) {
     if (-not (Test-Path (Join-Path $repo ".git"))) { continue }
     $branch = git -C $repo branch --show-current 2>$null
-    if ($branch -ne "main") {
-        $notOnMain += "$repo (on '$branch')"
+    $expectedBranch = if ($repo -eq $repoMap["Scripts"]) { "main" } else { "development" }
+    if ($branch -ne $expectedBranch) {
+        $notOnExpected += "$repo (on '$branch', expected '$expectedBranch')"
     }
 }
-if ($notOnMain.Count -gt 0) {
-    Write-Host "ERROR: The following repos are not on main:" -ForegroundColor Red
-    foreach ($r in $notOnMain) { Write-Host "  - $r" -ForegroundColor Red }
-    Write-Host "Switch all repos to main before running Sync." -ForegroundColor Red
+if ($notOnExpected.Count -gt 0) {
+    Write-Host "ERROR: The following repos are not on the expected branch:" -ForegroundColor Red
+    foreach ($r in $notOnExpected) { Write-Host "  - $r" -ForegroundColor Red }
+    Write-Host "Switch all repos to the correct branch before running Sync." -ForegroundColor Red
     exit 1
 }
 
