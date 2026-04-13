@@ -3,7 +3,7 @@
 ## Ivy Framework Basics
 
 - Ivy apps are .NET web apps started with `dotnet run -- --port <port>`
-- The server prints `Ivy is running on http://localhost:<port>` when ready
+- The server prints `Ivy is running on https://localhost:<port>` when ready (HTTPS by default)
 - Apps are decorated with `[App(icon: Icons.X, path: ["Apps"])]` and inherit `ViewBase`
 - The `Build()` method returns the UI tree
 - State is managed via `UseState<T>()` which returns reactive state objects

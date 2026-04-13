@@ -721,7 +721,7 @@ Playwright config is evaluated once at startup. Environment variables set dynami
 import { test, expect } from '@playwright/test';
 import { spawn, execSync, ChildProcess } from 'child_process';
 import net from 'net';
-import http from 'http';
+import https from 'https';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
@@ -749,7 +749,7 @@ async function waitForServer(port: number, timeout = 120000): Promise<void> {
   while (Date.now() - start < timeout) {
     try {
       await new Promise<void>((resolve, reject) => {
-        http.get(`http://localhost:${port}`, (res) => {
+        https.get(`https://localhost:${port}`, { rejectUnauthorized: false }, (res) => {
           if (res.statusCode === 200) resolve();
           else reject(new Error(`HTTP ${res.statusCode}`));
         }).on('error', reject);
@@ -804,8 +804,8 @@ test.beforeEach(async ({ page }) => {
     // Write to console.log
   });
 
-  // Navigate to app (disable chrome for single-app testing)
-  await page.goto(`http://localhost:${appPort}/app-id?chrome=false`);
+  // Navigate to app (disable shell for single-app testing)
+  await page.goto(`https://localhost:${appPort}/app-id?shell=false`);
 });
 ```
 
@@ -836,9 +836,10 @@ test('feature test', async ({ page }) => {
 - Use ES module `__dirname` polyfill
 - Use `shell: true` in spawn options on Windows
 - **Use `taskkill /F /T /PID` on Windows** to kill the entire process tree in `afterAll` (see [Windows Process Cleanup](#windows-process-cleanup))
-- Wait for HTTP 200 before running tests
+- **Ivy server runs on HTTPS** — use `https` module with `rejectUnauthorized: false` for health checks, `https://` URLs in tests, and `ignoreHTTPSErrors: true` in playwright config
+- Wait for HTTPS 200 before running tests
 - Capture both stdout and stderr logs
-- Use `?chrome=false` for single-app testing
+- Use `?shell=false` for single-app testing (NOT `?chrome=false`)
 - Take screenshots at every major step
 - Use `fullPage: true` for screenshots
 
@@ -969,7 +970,8 @@ If tests fail on first run, check these common issues:
 28. **DataTable grid cells not clickable** → Virtual grid cells exist in DOM but are "not visible" to Playwright. Don't try to `.click()` grid cells
 29. **BasicAuth server fails on connect** → Set all 3 required secrets: `BasicAuth:HashSecret`, `BasicAuth:JwtSecret`, `BasicAuth:Users` (with Argon2 hash). Server starts but WebSocket connections fail without them.
 30. **Auth form label "User" matches multiple elements** → Use `page.locator('label').filter({ hasText: 'User' })` — labels show "User *" with asterisk for required fields
-31. **Dialog title strict mode violation** → When a dialog's title matches the trigger button text (e.g., "Add Product" button opens dialog with "Add Product" heading), `getByText('Add Product')` resolves to 2 elements. Always use `getByRole('heading', { name: 'Dialog Title' })` for dialog title assertions.
+31. **Server healthcheck times out** → Ivy uses HTTPS with self-signed cert. Use `https` module with `rejectUnauthorized: false` in global-setup, `ignoreHTTPSErrors: true` in config, and `https://` URLs in specs (see [Ivy Server Uses HTTPS](#ivy-server-uses-https-self-signed-cert))
+32. **Dialog title strict mode violation** → When a dialog's title matches the trigger button text (e.g., "Add Product" button opens dialog with "Add Product" heading), `getByText('Add Product')` resolves to 2 elements. Always use `getByRole('heading', { name: 'Dialog Title' })` for dialog title assertions.
 
 ---
 
@@ -1296,8 +1298,72 @@ await expect(page.getByText('Hello, World!')).toBeVisible({ timeout: 10000 });
 
 ---
 
+## Ivy Server Uses HTTPS (Self-Signed Cert)
+
+### Problem
+Ivy development servers always bind to HTTPS with a self-signed certificate. The global-setup healthcheck using `http.get()` will time out because the server never responds on HTTP.
+
+### Solution
+Use the `https` module with `rejectUnauthorized: false` in global-setup.ts, and set `ignoreHTTPSErrors: true` in playwright.config.ts:
+
+```typescript
+// global-setup.ts — use https, not http
+import https from 'https';
+
+async function waitForServer(port: number, timeout = 120000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = https.get(`https://localhost:${port}`, { rejectUnauthorized: false }, (res) => {
+          if (res.statusCode === 200) resolve();
+          else reject(new Error(`HTTP ${res.statusCode}`));
+        });
+        req.on('error', reject);
+      });
+      return;
+    } catch {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+  throw new Error(`Server did not start within ${timeout}ms`);
+}
+```
+
+```typescript
+// playwright.config.ts
+use: {
+  ignoreHTTPSErrors: true,
+  // ...other config
+}
+```
+
+```typescript
+// spec files — use https:// URLs
+await page.goto(`https://localhost:${appPort}/app-id?shell=false`);
+```
+
+### Key Points
+- **ALWAYS** use `https://` for all Ivy server URLs in tests
+- **ALWAYS** add `ignoreHTTPSErrors: true` in playwright.config.ts `use` section
+- **ALWAYS** use `https` module (not `http`) in global-setup.ts healthcheck
+- `rejectUnauthorized: false` is required since Ivy uses a self-signed dev certificate
+- This applies to ALL Ivy projects — there is no HTTP fallback
+- **Port detection**: The `--port` argument may not match the actual HTTPS port. Parse stdout for `https://localhost:(\d+)` to get the real port:
+  ```typescript
+  function parsePortFromOutput(data: string): number | null {
+    const match = data.match(/https:\/\/localhost:(\d+)/);
+    return match ? parseInt(match[1]) : null;
+  }
+  ```
+  Listen on stdout/stderr for this pattern before calling `waitForServer()`.
+
+---
+
 ## Last Updated
 
+2026-04-13 - Added port detection from server stdout: --port arg may not match actual HTTPS port, parse stdout for real port (AIContractClauseFinder-V3 test review)
+2026-04-13 - Added HTTPS requirement: Ivy servers always use HTTPS with self-signed certs, global-setup must use https module (AIErrorMessageExplainer test review)
 2026-04-02 - Added BasicAuth testing pattern: secret setup, auth flow, login form locators (BasicAuth1 test review)
 2026-04-01 - Added EF Core projected query fix and OnRowAction dispatchEvent pattern (Bakery-V6 test review)
 2026-04-01 - Added dialog title strict mode violation pattern: use getByRole('heading') for dialog title assertions (AgricultureShop test review)
