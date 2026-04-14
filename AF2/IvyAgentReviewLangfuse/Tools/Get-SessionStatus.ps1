@@ -71,6 +71,10 @@ foreach ($traceFolder in $traceFolders) {
                     $reason = $json.metadata.finishReason
                     if ($reason -eq "HUNG") { $hasHungGeneration = $true }
                 }
+                # Detect silent generation failure: started but never completed (no endTime)
+                if ($json.startTime -and -not $json.endTime) {
+                    $hasHungGeneration = $true
+                }
                 # Check for generation output as preview
                 if ($json.output) {
                     if ($json.output -is [array]) {

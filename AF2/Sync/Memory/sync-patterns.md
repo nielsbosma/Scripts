@@ -1,5 +1,9 @@
 # Sync Program Patterns
 
+## Branch Configuration
+
+- All Ivy repos (Ivy-Framework, Ivy-Agent, Ivy, Ivy-Mcp) use `development` as default branch. Scripts uses `main`. Changed as of run 00131.
+
 ## Repository Build Notes
 
 - **Ivy**: The `Ivy.Studio/Widgets/frontend` directory requires `npm install` and `npm run build` before `dotnet build` will succeed. The dist files and node_modules are gitignored.
@@ -16,7 +20,7 @@
 - **Ivy.Shared → Ivy**: Types in `Ivy-Framework/src/Ivy/Shared/` are being migrated from `namespace Ivy.Shared` to `namespace Ivy` (with `// ReSharper disable once CheckNamespace`). This affects downstream repos (Ivy-Mcp, Ivy) that `using Ivy.Shared`. When syncing, check for CS0234 errors referencing `Ivy.Shared` and update to `using Ivy`.
 
 ## Known Issues
-- **Ivy.Tendril Plans directory deleted in merges**: The `Apps/Plans/` directory (9 files: Models.cs, PlanYaml.cs, PlanFileExtensions.cs, ContentView.cs, SidebarView.cs, Dialogs/{CreatePlanDialog,CreateIssueDialog,DeletePlanDialog,UpdatePlanDialog}.cs) is repeatedly deleted during merge conflict resolutions. Happened in runs 00122-era, 00126, and 00127. Fix: use `git log --all --oneline -- "src/tendril/Ivy.Tendril/Apps/Plans/"` to find the best restore commit, then `git checkout <commit> -- src/tendril/Ivy.Tendril/Apps/Plans/`. Note: some commits only touch a subset of files — pick the commit with the full set (e.g., a8f731e23 had all 9 files). After building Ivy.Tendril.slnx, always verify the Plans directory exists.
+- **Ivy.Tendril Plans directory deleted in merges**: The `Apps/Plans/` directory (9 files: Models.cs, PlanYaml.cs, PlanFileExtensions.cs, ContentView.cs, SidebarView.cs, Dialogs/{CreatePlanDialog,CreateIssueDialog,DeletePlanDialog,UpdatePlanDialog}.cs) is repeatedly deleted during merge conflict resolutions AND regular PR merges. Happened in runs 00122-era, 00126, 00127, and 00131 (commit 47f1c1d06 deleted them with message "moved to separate module" but no separate module exists). Fix: use `git log --all --oneline -- "src/tendril/Ivy.Tendril/Apps/Plans/"` to find the best restore commit, then `git checkout <commit> -- src/tendril/Ivy.Tendril/Apps/Plans/`. Note: some commits only touch a subset of files — pick the commit with the full set (e.g., 84f58642f had all 9 files). After building Ivy.Tendril.slnx, always verify the Plans directory exists.
 - **Ivy.Agent.Filter stale ANTLR obj**: ANTLR generates `Filters*.cs` files in `Ivy.Agent.Filter/obj/Debug/net10.0/` during build. Stale obj directory without these generated files causes CS2001 errors. Fix: `rm -rf src/Ivy.Agent.Filter/obj src/Ivy.Agent.Filter/bin` and rebuild. First observed run 00122.
 - **Ivy.Tendril.slnx obj contamination**: The `Ivy.Tendril.Test` project is nested inside the `Ivy.Tendril` directory. Stale obj/bin files from the test project can contaminate the main project build, causing duplicate assembly attribute errors (CS0579) and missing Xunit namespace (CS0246). Fix: clean obj/bin for both `Ivy.Tendril` and `Ivy.Tendril.Test` before building (`rm -rf obj bin Ivy.Tendril.Test/obj Ivy.Tendril.Test/bin`). First observed run 00067.
 - **Rust toolchain (dlltool.exe)**: The default Rust toolchain `stable-x86_64-pc-windows-gnu` requires `dlltool.exe` from MinGW which may not be in PATH. Ivy-Framework's Ivy.Docs.Shared project uses a Rust CLI tool during build. Fix: set `rustup override set stable-x86_64-pc-windows-msvc` in the Ivy-Framework directory (done in run 00024).

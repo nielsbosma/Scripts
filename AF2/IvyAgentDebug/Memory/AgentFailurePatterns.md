@@ -405,6 +405,36 @@ CreateContext(() => new AuthContext(currentUser)) // Pass the IState
 - Plan 930: Improve RepeatedInfrastructureErrorAnalyser threshold (suggests being less aggressive)
 - This session evidence: Agent should try cleanup before stopping, combining both approaches
 
+## Bash-Only Exploration Loop (No Code Generation)
+
+**Pattern**: Agent receives a "create app" prompt but spends entire session running bash commands (e.g., sqlite3 queries) to explore provided data, never writing code or starting a workflow. The ResearchPhaseAnalyser doesn't detect this because it tracks GetTypeInfo/IvyQuestion calls, not raw bash exploration.
+
+**Example Session**: 2d62a991-9598-4d9e-a35b-3ec7be6e9471 (LibrarySqlite)
+- Task: "Create a library management application using the provided SQLite database"
+- Spawned Explorer sub-task: "Explore SQLite database schema" (37 tools, 115K tokens, 149.7s)
+- Sub-task ran 30+ sqlite3 queries; main agent also ran redundant queries after
+- **Result**: 0 files written, 0 builds, 0 workflows, 0 IvyQuestions, 41 bash calls (all sqlite3)
+- Session ended during model generation — no FinishedMessage
+
+**Root Causes**:
+1. Agent interpreted "create an application" as "explore the database"
+2. Task tool used for exploration-only sub-task instead of implementation
+3. ResearchPhaseAnalyser doesn't detect bash-only exploration patterns
+4. No guard to enforce that "create" tasks must enter a creation workflow
+
+**Detection**:
+- `writeFileCount: 0` + `bashCount: high` = exploration loop
+- All bash calls are data queries (sqlite3, curl, etc.) with no file creation
+- No workflows triggered for a "create" task
+
+**Distinction from "Empty Task Submission After Research Loop"**:
+- That pattern: agent enters a workflow but submits empty work
+- This pattern: agent never enters a workflow at all
+
+**Plan Created**: agent-exploration-loop-no-implementation.md
+
+---
+
 ## Sub-task 401 Unauthorized Failures
 
 **Pattern**: Multiple sub-tasks fail simultaneously with HTTP 401 (Unauthorized) during parallel execution, typically late in high-token sessions.
@@ -428,3 +458,22 @@ CreateContext(() => new AuthContext(currentUser)) // Pass the IState
 - Agent successfully completes work after switching to sequential execution
 
 **Plan Created**: subtask-401-unauthorized-kills-parallel-work.md
+
+## Self-Destructive Process Kill During File Lock Recovery
+
+**Pattern**: Agent escalates file lock recovery by killing `dotnet.exe`, which terminates the Ivy agent server itself, ending the session immediately.
+
+**Example Session**: 7edf2845-a5cb-439d-b265-a5c3548acba4 (Recipe-App)
+- CreateDbConnection workflow failed due to MSB3021 file lock
+- Agent tried: `dotnet build-server shutdown` → `taskkill RecipeApp.exe` → `taskkill dotnet.exe`
+- Killing dotnet.exe terminated the agent server — no more generations occurred
+- Session ended with zero files written, zero code generated
+
+**Root Cause**: Agent has no guidance about which processes are safe to kill. Killing `dotnet.exe` kills ALL .NET processes including the agent server itself.
+
+**Detection**:
+- Client output log ends with `taskkill /F /IM dotnet.exe` or similar
+- Verbose log shows no agent generations after the kill command, only cleanup cycles
+- Session ends abruptly with workflow still "Running"
+
+**Plan Created**: agent-should-not-kill-dotnet-exe.md
