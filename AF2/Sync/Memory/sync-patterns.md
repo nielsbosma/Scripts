@@ -2,7 +2,7 @@
 
 ## Branch Configuration
 
-- All Ivy repos (Ivy-Framework, Ivy-Agent, Ivy, Ivy-Mcp) use `development` as default branch. Scripts uses `main`. Changed as of run 00131.
+- All Ivy repos (Ivy-Framework, Ivy-Agent, Ivy, Ivy-Mcp, Ivy-Tendril) use `development` as default branch. Scripts uses `main`. Ivy-Tendril added as of run 00141.
 
 ## Repository Build Notes
 
@@ -24,9 +24,9 @@
 - **WidgetBase properties becoming internal**: Ivy-Framework is making WidgetBase properties (Width, Height) `internal set`, requiring downstream repos (Ivy, Ivy-Mcp) to use the fluent extension methods (`.Width()`, `.Height()`) instead of direct property assignment or object initializers. When build errors show `CS0200: Property ... cannot be assigned to -- it is read only`, convert constructor assignments and object initializers to chain the corresponding extension method. For object initializers mixing Width with other settable properties, wrap in parentheses and chain: `(new Widget { Prop = val }).Width(Size.Full())`. Fixed for Width/Height in run 00135.
 
 ## Known Issues
-- **Ivy.Tendril Plans directory deleted in merges**: The `Apps/Plans/` directory (9 files: Models.cs, PlanYaml.cs, PlanFileExtensions.cs, ContentView.cs, SidebarView.cs, Dialogs/{CreatePlanDialog,CreateIssueDialog,DeletePlanDialog,UpdatePlanDialog}.cs) is repeatedly deleted during merge conflict resolutions AND regular PR merges. Happened in runs 00122-era, 00126, 00127, and 00131 (commit 47f1c1d06 deleted them with message "moved to separate module" but no separate module exists). Fix: use `git log --all --oneline -- "src/tendril/Ivy.Tendril/Apps/Plans/"` to find the best restore commit, then `git checkout <commit> -- src/tendril/Ivy.Tendril/Apps/Plans/`. Note: some commits only touch a subset of files — pick the commit with the full set (e.g., 84f58642f had all 9 files). After building Ivy.Tendril.slnx, always verify the Plans directory exists.
+- **Ivy.Tendril Plans directory deleted in merges**: OBSOLETE as of run 00141 — Ivy.Tendril has been extracted to a dedicated `Ivy-Tendril` repo at `D:\Repos\_Ivy\Ivy-Tendril`. The Plans directory issue should no longer occur since it's no longer in the Ivy-Framework repo.
 - **Ivy.Agent.Filter stale ANTLR obj**: ANTLR generates `Filters*.cs` files in `Ivy.Agent.Filter/obj/Debug/net10.0/` during build. Stale obj directory without these generated files causes CS2001 errors. Fix: `rm -rf src/Ivy.Agent.Filter/obj src/Ivy.Agent.Filter/bin` and rebuild. First observed run 00122.
-- **Ivy.Tendril.slnx obj contamination**: The `Ivy.Tendril.Test` project is nested inside the `Ivy.Tendril` directory. Stale obj/bin files from the test project can contaminate the main project build, causing duplicate assembly attribute errors (CS0579) and missing Xunit namespace (CS0246). Fix: clean obj/bin for both `Ivy.Tendril` and `Ivy.Tendril.Test` before building (`rm -rf obj bin Ivy.Tendril.Test/obj Ivy.Tendril.Test/bin`). First observed run 00067.
+- **Ivy.Tendril.slnx obj contamination**: Now in dedicated Ivy-Tendril repo. `Ivy.Tendril.Test` project is at `src/Ivy.Tendril.Test/` (sibling, not nested). Root .gitignore added in run 00141 to prevent obj/bin tracking. The repo initially had 950 tracked obj/bin files — cleaned up in run 00141.
 - **Rust toolchain (dlltool.exe)**: The default Rust toolchain `stable-x86_64-pc-windows-gnu` requires `dlltool.exe` from MinGW which may not be in PATH. Ivy-Framework's Ivy.Docs.Shared project uses a Rust CLI tool during build. Fix: set `rustup override set stable-x86_64-pc-windows-msvc` in the Ivy-Framework directory (done in run 00024).
 - **VBCSCompiler file locks**: `dotnet build` frequently fails on first attempt due to VBCSCompiler holding locks on DLLs. Retry usually succeeds. Consider killing VBCSCompiler processes before building.
 - **Process file locks**: Running Ivy.Agent.Server, Ivy.Docs, or other dotnet processes can lock DLLs preventing builds. Kill them before building using PowerShell `Stop-Process` (bash `taskkill` can timeout). Ivy.Docs can spawn many instances (14+).
@@ -57,3 +57,4 @@
 | Ivy | Ivy.slnx | connections/connections.slnx, connections/Resend/Resend.slnx, Ivy.Console/Ivy.Console.slnx, Ivy.DotNet.Watch/Ivy.DotNet.Watch.slnx, Ivy.Hosting.Sliplane/Ivy.Hosting.Sliplane.slnx |
 | Ivy-Framework | src/Ivy-Framework.slnx | src/Ivy.Analyser/Ivy.Analyser.slnx, src/Ivy.Samples/Ivy.Samples.slnx |
 | Ivy-Mcp | Ivy.Mcp.slnx | - |
+| Ivy-Tendril | src/Ivy.Tendril/Ivy.Tendril.slnx | - |

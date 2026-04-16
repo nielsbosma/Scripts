@@ -19,6 +19,6 @@ Core solutions to build:
   - After building Ivy-Agent.slnx, also build `D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Test.Manager\Ivy.Agent.Test.Manager.csproj` (not included in solution)
   - `D:\Repos\_Ivy\Ivy\Ivy.Console\Ivy.Console.slnx`
   - `D:\Repos\_Ivy\Ivy-Mcp\Ivy.Mcp.slnx`
-  - `D:\Repos\_Ivy\Ivy-Framework\src\tendril\Ivy.Tendril\Ivy.Tendril.slnx`
+  - `D:\Repos\_Ivy\Ivy-Tendril\src\Ivy.Tendril\Ivy.Tendril.slnx`
 - Commit the changes
 - Push to origin
