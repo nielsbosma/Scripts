@@ -6,7 +6,7 @@
 
 ## Repository Build Notes
 
-- **Ivy**: The `Ivy.Studio/Widgets/frontend` directory requires `npm install` and `npm run build` before `dotnet build` will succeed. The dist files and node_modules are gitignored.
+- **Ivy**: The `Ivy.Studio/Widgets/frontend` directory requires `pnpm install` and `pnpm run build` before `dotnet build` will succeed. Uses pnpm (has pnpm-lock.yaml, workspace: protocol — npm will fail with EUNSUPPORTEDPROTOCOL). The dist files and node_modules are gitignored.
 - **Ivy (connections.slnx)**: Auto-generated Vercel client has lowercase type names triggering CS8981. Suppressed in csproj NoWarn as of run 00009.
 - **Scripts**: No .slnx files to build. Only needs git sync.
 
