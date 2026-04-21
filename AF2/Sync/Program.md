@@ -16,7 +16,6 @@ For each repository run the following steps as a subtask:
 Core solutions to build:
   - `D:\Repos\_Ivy\Ivy-Framework\src\Ivy-Framework.slnx`
   - `D:\Repos\_Ivy\Ivy-Agent\Ivy-Agent.slnx`
-  - After building Ivy-Agent.slnx, also build `D:\Repos\_Ivy\Ivy-Agent\Ivy.Agent.Test.Manager\Ivy.Agent.Test.Manager.csproj` (not included in solution)
   - `D:\Repos\_Ivy\Ivy\Ivy.Console\Ivy.Console.slnx`
   - `D:\Repos\_Ivy\Ivy-Mcp\Ivy.Mcp.slnx`
   - `D:\Repos\_Ivy\Ivy-Tendril\src\Ivy.Tendril\Ivy.Tendril.slnx`
