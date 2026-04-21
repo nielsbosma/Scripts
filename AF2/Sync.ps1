@@ -1,8 +1,6 @@
 param(
     [switch]$IvyFramework,
-    [switch]$IvyAgent,
     [switch]$Ivy,
-    [switch]$IvyMcp,
     [switch]$Scripts,
     [switch]$NoBuild,
     [switch]$PullOnly
@@ -13,18 +11,14 @@ param(
 # Map switches to repo paths
 $repoMap = @{
     IvyFramework = "D:\Repos\_Ivy\Ivy-Framework"
-    IvyAgent     = "D:\Repos\_Ivy\Ivy-Agent"
     Ivy          = "D:\Repos\_Ivy\Ivy"
-    IvyMcp       = "D:\Repos\_Ivy\Ivy-Mcp"
     Scripts      = "D:\Repos\_Personal\Scripts"
 }
 
 # Determine which repos to sync
 $selectedSwitches = @()
 if ($IvyFramework) { $selectedSwitches += "IvyFramework" }
-if ($IvyAgent)     { $selectedSwitches += "IvyAgent" }
 if ($Ivy)          { $selectedSwitches += "Ivy" }
-if ($IvyMcp)       { $selectedSwitches += "IvyMcp" }
 if ($Scripts)      { $selectedSwitches += "Scripts" }
 
 # If none specified, sync all
