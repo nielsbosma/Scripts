@@ -44,6 +44,11 @@
 - **Ivy-Mcp NuGet vs project refs**: Ivy-Mcp.Api.Demo references `Ivy` via NuGet package, not project reference. API renames in Ivy-Framework (e.g., ChromeSettings→AppShellSettings) won't be available until a new NuGet is published. Don't rename API calls in repos using NuGet until the package is updated.
 - **Security vulnerabilities**: NuGet packages may have known vulnerabilities that cause build failures with `-warnaserror`. Check `dotnet list package --outdated` and update vulnerable packages. Scriban has been a recurring issue — updated to 7.0.6 across all repos as of run 00027. Note: Ivy-Agent.Shared is a project reference consumed by Ivy — version bumps cascade and must be updated in both repos.
 
+## Ivy Framework Logging Override
+
+- The Ivy framework's `Server.cs` calls `SetMinimumLevel()` **after** `UseWebApplicationBuilder` mods run, overriding any level set in the mod callback. To override framework log levels from a downstream app (like Tendril), use `builder.Configuration.AddInMemoryCollection` to set `Logging:LogLevel:Default` — configuration-based rules take precedence over `SetMinimumLevel`. Fixed in run 00157.
+- Tendril normal mode shows errors only. `--verbose` shows Debug+. `--quiet` shows Warning+.
+
 ## Build Strategy
 
 - Build main/root .slnx per repo first, then sub-solutions not covered by the main one.
