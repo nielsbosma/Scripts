@@ -140,6 +140,28 @@ references: <reference connection files read, from args or langfuse-reference-co
 Commit!
 ```
 
+### 5. Report Status
+
+After creating the plan (or determining the outcome), report back to Tendril via the status API. The environment variables `$env:TENDRIL_URL` and `$env:TENDRIL_JOB_ID` are available.
+
+**Plan created:**
+```powershell
+Invoke-RestMethod -Uri "$env:TENDRIL_URL/api/jobs/$env:TENDRIL_JOB_ID/status" -Method Post -Body ('{"message":"Plan created","planId":"<ID>","planTitle":"<TITLE>"}') -ContentType "application/json" -ErrorAction SilentlyContinue
+```
+Where `<ID>` is the numeric plan ID (e.g. `01097`) and `<TITLE>` is the plan's `# [Title]` heading text.
+
+**Duplicate found:**
+```powershell
+Invoke-RestMethod -Uri "$env:TENDRIL_URL/api/jobs/$env:TENDRIL_JOB_ID/status" -Method Post -Body ('{"message":"Duplicate of <existing-plan-id>"}') -ContentType "application/json" -ErrorAction SilentlyContinue
+```
+
+**Unable to create plan:**
+```powershell
+Invoke-RestMethod -Uri "$env:TENDRIL_URL/api/jobs/$env:TENDRIL_JOB_ID/status" -Method Post -Body ('{"message":"No plan created: <reason>"}') -ContentType "application/json" -ErrorAction SilentlyContinue
+```
+
+This MUST be done before the reflection step. Always report status even if the plan creation failed.
+
 ### Automated Testing Guidelines
 
 Every plan's `## Tests` section MUST include a detailed automated testing plan. Never leave it as just "build and verify manually". Follow these rules:
