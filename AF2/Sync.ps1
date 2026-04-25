@@ -1,6 +1,7 @@
 param(
     [switch]$IvyFramework,
     [switch]$Ivy,
+    [switch]$IvyTendril,
     [switch]$Scripts,
     [switch]$NoBuild,
     [switch]$PullOnly
@@ -12,6 +13,7 @@ param(
 $repoMap = @{
     IvyFramework = "D:\Repos\_Ivy\Ivy-Framework"
     Ivy          = "D:\Repos\_Ivy\Ivy"
+    IvyTendril   = "D:\Repos\_Ivy\Ivy-Tendril"
     Scripts      = "D:\Repos\_Personal\Scripts"
 }
 
@@ -19,6 +21,7 @@ $repoMap = @{
 $selectedSwitches = @()
 if ($IvyFramework) { $selectedSwitches += "IvyFramework" }
 if ($Ivy)          { $selectedSwitches += "Ivy" }
+if ($IvyTendril)   { $selectedSwitches += "IvyTendril" }
 if ($Scripts)      { $selectedSwitches += "Scripts" }
 
 # If none specified, sync all
