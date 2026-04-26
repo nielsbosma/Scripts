@@ -8,6 +8,7 @@
 
 - **Ivy**: The `Ivy.Studio/Widgets/frontend` directory requires `pnpm install` and `pnpm run build` before `dotnet build` will succeed. Uses pnpm (has pnpm-lock.yaml, workspace: protocol — npm will fail with EUNSUPPORTEDPROTOCOL). The dist files and node_modules are gitignored.
 - **Ivy (connections.slnx)**: Auto-generated Vercel client has lowercase type names triggering CS8981. Suppressed in csproj NoWarn as of run 00009.
+- **Ivy.Console.slnx vp install TTY issue**: External widget projects (e.g., Ivy.Widgets.ScreenshotFeedback) use `Ivy.ExternalWidget.targets` which runs `vp install` in `frontend/`. In non-interactive shells, pnpm prompts for module purge confirmation and fails with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`. Fix: set `CI=true` environment variable before building. First observed run 00170.
 - **Scripts**: No .slnx files to build. Only needs git sync.
 
 ## Common Gitignore Patterns
