@@ -56,6 +56,7 @@
 
 - Build main/root .slnx per repo first, then sub-solutions not covered by the main one.
 - Use `-warnaserror` flag to catch warnings as errors per program instructions.
+- **Build order matters**: Ivy-Tendril and Ivy both have project references into Ivy-Framework (e.g., Ivy.Agent.Filter). Build Ivy-Framework first, then Ivy and Ivy-Tendril in parallel. Building Tendril before Framework completes causes MSB3030 (missing .pdb). Confirmed runs 00177.
 - The Ivy repo has multiple sub-solutions (connections.slnx, Resend.slnx) that aren't part of Ivy.slnx.
 - Ivy-Framework has Ivy.Analyser.slnx and Ivy.Samples.slnx as separate sub-solutions.
 
