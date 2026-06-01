@@ -2,7 +2,7 @@ param([Parameter(ValueFromRemainingArguments)][string[]]$Args)
 
 Set-Location "D:\Repos\_Ivy\Ivy-Tendril\src\Ivy.Tendril"
 if ($Args.Count -gt 0) {
-    dotnet run @Args
+    dotnet run -- @Args --find-available-port --browse --enable-dev-tools
 } else {
     dotnet run -- --find-available-port --browse --enable-dev-tools
 }
