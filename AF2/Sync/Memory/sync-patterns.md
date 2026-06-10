@@ -1,5 +1,9 @@
 # Sync Program Patterns
 
+## Program Housekeeping
+
+- **Session logs are gitignored**: `AF2/.gitignore` has `**/Logs/`, so `AF2/Sync/Logs/*.md` are intentionally local-only. Do NOT try to commit them (git add fails on ignored path). Only commit Memory/ or Program.md changes to the Scripts repo. Discovered run 00061.
+
 ## Branch Configuration
 
 - All Ivy repos (Ivy-Framework, Ivy-Agent, Ivy, Ivy-Mcp, Ivy-Tendril) use `development` as default branch. Scripts uses `main`. Ivy-Tendril added as of run 00141.
