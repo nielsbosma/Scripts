@@ -7,9 +7,7 @@ function Sync-Repo {
     try {
         $status = git status --porcelain
         if ($status) {
-            Write-Host "  Local changes detected in $Path" -ForegroundColor Yellow
-            $choice = Read-Host "  Continue anyway? (y/n)"
-            if ($choice -ne 'y') { Pop-Location; exit 1 }
+            Write-Host "  Local changes detected in $Path, skipping pull" -ForegroundColor Yellow
             return
         }
         git pull
