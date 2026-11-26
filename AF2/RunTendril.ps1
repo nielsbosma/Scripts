@@ -28,7 +28,7 @@ Get-Process -Name "Ivy.Tendril" -ErrorAction SilentlyContinue | Stop-Process -Fo
 
 Set-Location "D:\Repos\_Ivy\Ivy-Tendril\src\Ivy.Tendril"
 if ($Args.Count -gt 0) {
-    dotnet run -- @Args --find-available-port --browse --enable-dev-tools
+    dotnet run -- @Args --find-available-port
 } else {
-    dotnet run -- --find-available-port --browse --enable-dev-tools
+    dotnet run -- --find-available-port
 }
